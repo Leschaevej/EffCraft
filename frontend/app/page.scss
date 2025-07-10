@@ -1,0 +1,56 @@
+.landing{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    img{
+        width: 100%;
+        height: auto;
+    }
+    .intro{
+        display: flex;
+        flex-direction: column;
+        text-align: center;
+        gap: 50px;
+        margin: 100px 100px 0 100px;
+        .title{
+            font-size: 40px;
+        }
+        .contenu{
+            font-size: 32px;
+        }
+        .warning{
+            font-size: 24px;
+        }
+    }
+}
+.new {
+    margin: 50px 0 0 0;
+    .conteneur {
+        margin: 0 50px;
+        background-color: var(--secondBackgoundColor);
+        border-radius: 50px;
+        .cards {
+            margin: 0 50px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+            justify-content: center;
+        }
+    }
+}
+
+.product {
+  margin: 50px 0 0 0;
+    .conteneur {
+        margin: 0 50px;
+        background-color: var(--secondBackgoundColor);
+        border-radius: 50px;
+        .cards {
+            margin: 0 50px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+            justify-content: center;
+        }
+    }
+}

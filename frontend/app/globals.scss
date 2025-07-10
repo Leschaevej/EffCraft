@@ -1,0 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Nothing+You+Could+Do&display=swap');
+
+:root {
+  --mainColor: #6F826A;
+  --mainBackgroundColor: #F8E7C8;
+  --secondBackgoundColor: #ffffff;
+}
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+main{
+    background-color: var(--mainBackgroundColor);
+    background-image: url("/fond.webp");
+    background-repeat: repeat;
+    background-position: top left;
+    background-size: auto;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+h2{
+    display: flex;
+    justify-content: center;
+    font-family: 'Nothing You Could Do', cursive, sans-serif;
+    font-size: 96px;
+    font-weight: 400;
+    padding: 20px 0 20px 0;
+}

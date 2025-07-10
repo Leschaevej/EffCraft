@@ -1,0 +1,11 @@
+{
+  "name": "effcraft",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "concurrently -n FRONT,API -c blue,green \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\"",
+    "install:all": "npm install --prefix frontend && npm install --prefix backend"
+  },
+  "devDependencies": {
+    "concurrently": "^8.0.1"
+  }
+}
