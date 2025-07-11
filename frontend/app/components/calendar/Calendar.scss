@@ -1,0 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
+
+.wrapper {
+    text-align: center;
+    background-color: var(--mainBackgroundColor);
+    height: fit-content;
+    width: fit-content;
+    padding: 50px;
+    border-radius: 50px;
+    .calendar {
+        background-color: var(--secondBackgoundColor);
+        border-bottom-left-radius: 50px;
+        border-bottom-right-radius: 50px;
+        border-top-left-radius: 10px;
+        border-top-right-radius: 10px;
+        border-top: 10px solid #DB6D6D;
+        .month {
+            padding: 20px 0 10px 0;
+            font-size: 48px;
+        }
+        .day {
+            padding: 0 0 10px 0;
+            font-size: 96px;
+        }
+    }
+    .time {
+        padding: 50px 0 0 0;
+        font-family: 'Share Tech Mono', monospace;
+        font-size: 52px;
+    }
+}

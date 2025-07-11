@@ -1,0 +1,22 @@
+.leaflet-container {
+    border-radius: 50px;
+    border: 2px solid var(--mainColor);
+}
+.leaflet-popup-content-wrapper {
+    font-size: 16px;
+    color: var(--mainTextColor);
+    background: var(--secondBackgoundColor);
+    padding: 20px;
+    border-radius: 30px;
+}
+.leaflet-popup-tip {
+    background: var(--secondBackgoundColor);
+}
+.leaflet-control-attribution {
+    display: none;
+}
+.leaflet-control-zoom {
+    top: 30px;
+    left: 30px;
+    border: none;
+}

@@ -27,10 +27,10 @@
     margin: 50px 0 0 0;
     .conteneur {
         margin: 0 50px;
+        padding: 50px;
         background-color: var(--secondBackgoundColor);
         border-radius: 50px;
         .cards {
-            margin: 0 50px;
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 30px;
@@ -38,19 +38,65 @@
         }
     }
 }
-
 .product {
   margin: 50px 0 0 0;
     .conteneur {
         margin: 0 50px;
+        padding: 50px;
         background-color: var(--secondBackgoundColor);
         border-radius: 50px;
         .cards {
-            margin: 0 50px;
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 30px;
             justify-content: center;
+        }
+    }
+}
+.event {
+    margin: 50px 0 0 0;
+    .conteneur {
+        margin: 0 50px;
+        padding: 50px;
+        background-color: var(--secondBackgoundColor);
+        border-radius: 50px;
+        h2 {
+            margin-bottom: 30px;
+        }
+        .calendarMap {
+            display: flex;
+            gap: 50px;
+            .mapContaineur {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                justify-content: space-between;
+                .map {
+                    flex-grow: 1;
+                    height: 100%;
+                }
+                .name {
+                    font-size: 32px;
+                    margin-top: 50px;
+                    padding: 30px;
+                    border-radius: 50px;
+                    text-align: center;
+                    background-color: var(--mainBackgroundColor);
+                }
+            }
+        }
+    }
+}
+.contact{
+    margin: 50px 0 0 0;
+    .conteneur{
+        margin: 0 50px;
+        padding: 50px;
+        background-color: var(--secondBackgoundColor);
+        border-radius: 50px;
+        .intro{
+            text-align: center;
+            font-size: 28px;
         }
     }
 }

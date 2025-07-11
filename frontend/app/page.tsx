@@ -1,39 +1,77 @@
 import React from "react";
 import "./page.scss";
 import Card from "../app/components/card/Card";
+import Calendar from "../app/components/calendar/Calendar";
+import Map from "../app/components/map/Map";
 import bijoux from "../app/data/bijoux.json";
+import eventData from "../app/data/event.json";
 
 export default function Home() {
-  return (
-    <main>
-        <section className="landing">
-            <img src="/acceuil.webp" alt="Boucle d'oreil en bois scultpé en bois sculpté " />
-            <div className="intro">
-                <p className="title"> Bienvenue dans mon atelier de création artisanale ! </p>
-                <p className="contenu">Ici, chaque bijou en bois est sculpté à la main avec soin et patience, transformant une matière brute en une pièce unique. Je travaille autant que possible avec des matériaux recyclés ou de récupération, pour offrir une seconde vie à ce que la nature ou le temps a laissé derrière lui. Je crois que chaque création a une histoire, et que c’est cette unicité qui la rend précieuse. Venez flâner dans mon petit jardin créatif et trouvez le bijou qui résonne avec votre personnalité, une œuvre portant l’empreinte de la main de l’artisan et l’âme du bois.</p>
-                <p className="warning">Tous les bijoux que vous trouverez ici sont des pièces uniques. Si le modèle qui vous plaît n’est plus disponible, ne vous inquiétez pas : contactez-moi, je me ferai un plaisir de créer le bijou qui vous inspire.</p>
-            </div>
-        </section>
-        <section className="new">
-            <div className="conteneur">
-            <h2>Nouveautés</h2>
-                <div className="cards">
-                    {bijoux.slice(0, 3).map((bijou) => (
-                        <Card key={bijou.id} bijou={bijou} />
-                    ))}
+    const { date, name, time, address, coords } = eventData.event;
+    const { lat, lng } = coords;
+
+    return (
+        <main>
+            <section className="landing">
+                <img src="/acceuil.webp" alt="Boucle d'oreille en bois sculpté" />
+                <div className="intro">
+                    <p className="title">Bienvenue dans mon atelier de création artisanale !</p>
+                    <p className="contenu">
+                        Ici, chaque bijou en bois est sculpté à la main avec soin et patience,
+                        transformant une matière brute en une pièce unique. Je travaille autant
+                        que possible avec des matériaux recyclés ou de récupération, pour offrir
+                        une seconde vie à ce que la nature ou le temps a laissé derrière lui. Je crois
+                        que chaque création a une histoire, et que c’est cette unicité qui la rend précieuse.
+                        Venez flâner dans mon petit jardin créatif et trouvez le bijou qui résonne avec
+                        votre personnalité, une œuvre portant l’empreinte de la main de l’artisan et l’âme du bois.
+                    </p>
+                    <p className="warning">
+                        Tous les bijoux que vous trouverez ici sont des pièces uniques. Si le modèle qui
+                        vous plaît n’est plus disponible, ne vous inquiétez pas : contactez-moi, je me ferai
+                        un plaisir de créer le bijou qui vous inspire.
+                    </p>
                 </div>
-            </div>
-        </section>
-        <section className="product">
-            <div className="conteneur">
-            <h2>Les bijoux</h2>
-                <div className="cards">
-                    {bijoux.slice(0, 6).map((bijou) => (
+            </section>
+            <section className="new">
+                <div className="conteneur">
+                    <h2>Nouveautés</h2>
+                    <div className="cards">
+                        {bijoux.slice(0, 3).map((bijou) => (
                         <Card key={bijou.id} bijou={bijou} />
-                    ))}
+                        ))}
+                    </div>
                 </div>
-            </div>
-        </section>
-    </main>
-  );
+            </section>
+            <section className="product">
+                <div className="conteneur">
+                    <h2>Les bijoux</h2>
+                    <div className="cards">
+                        {bijoux.slice(0, 6).map((bijou) => (
+                        <Card key={bijou.id} bijou={bijou} />
+                        ))}
+                    </div>
+                </div>
+            </section>
+            <section className="event">
+                <div className="conteneur">
+                    <h2>Evenements</h2>
+                    <div className="calendarMap">
+                        <div className="calendar">
+                            <Calendar date={date} time={time} />
+                        </div>
+                        <div className="mapContaineur">
+                            <Map lat={lat} lng={lng} name={name} address={address} />
+                            <div className="name">{name}</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            <section className="contact">
+                <div className="conteneur">
+                    <h2>Contact</h2>
+                    <p className="intro">Une question, une envie, ou le bijou de vos rêves en tête ?<br/>Parlez-m’en ici, je serai ravie de vous répondre ou de créer avec vous une pièce unique.</p>
+                </div>
+            </section>
+        </main>
+    );
 }

@@ -6,6 +6,9 @@ import { merriweather } from "./font";
 export const metadata: Metadata = {
   title: "Eff Craft",
   description: "Votre univers de bijoux en bois sculpté à la main",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
