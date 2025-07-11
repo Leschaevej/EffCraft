@@ -1,0 +1,24 @@
+.filter {
+    padding: 0 0 50px 0;
+    display: flex;
+    justify-content: center;
+    gap: 50px;
+    width: 70%;
+    button {
+        background: var(--secondColor);
+        cursor: pointer;
+        border-radius: 20px;
+        border: none;
+        font-size: 24px;
+        height: 40px;
+        width: 33%;
+        transition: filter 0.5s ease, background-color 0.5s ease, color 0.5s ease;
+        &.active {
+            background-color: var(--mainColor);
+            color: white;
+        }
+        &:hover:not(.active) {
+            filter: brightness(0.8);
+        }
+    }
+}

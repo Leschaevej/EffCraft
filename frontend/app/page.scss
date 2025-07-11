@@ -39,18 +39,23 @@
     }
 }
 .product {
-  margin: 50px 0 0 0;
+    margin: 50px 0 0 0;
     .conteneur {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
         margin: 0 50px;
-        padding: 50px;
+        padding: 50px 0 50px 0;
         background-color: var(--secondBackgoundColor);
         border-radius: 50px;
-        .cards {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 30px;
-            justify-content: center;
-        }
+    }
+    .carousel-wrapper {
+        width: 100%;
+        transition: opacity 0.5s ease;
+        opacity: 1;
+    }
+    .carousel-wrapper.fade {
+        opacity: 0;
     }
 }
 .event {
@@ -90,6 +95,9 @@
 .contact{
     margin: 50px 0 0 0;
     .conteneur{
+        display: flex;
+        flex-direction: column;
+        align-items: center;
         margin: 0 50px;
         padding: 50px;
         background-color: var(--secondBackgoundColor);

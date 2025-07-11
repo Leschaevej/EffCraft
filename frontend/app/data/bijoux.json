@@ -5,7 +5,7 @@
     "description": "Un collier délicat sculpté dans du bois d’érable, aux teintes chaudes rappelant l’automne.",
     "image": "/bijoux/produit1.webp",
     "prix": 35,
-    "categorie": "necklace"
+    "category": "necklace"
   },
   {
     "id": 2,
@@ -13,7 +13,7 @@
     "description": "Boucles d’oreilles légères et élégantes, taillées dans du bois d’acacia aux formes en spirale.",
     "image": "/bijoux/produit2.webp",
     "prix": 28,
-    "categorie": "earrings"
+    "category": "earrings"
   },
   {
     "id": 3,
@@ -21,7 +21,7 @@
     "description": "Bracelet brut et naturel, façonné dans des racines de hêtre pour un style authentique.",
     "image": "/bijoux/produit3.webp",
     "prix": 32,
-    "categorie": "necklace"
+    "category": "necklace"
   },
   {
     "id": 4,
@@ -29,7 +29,7 @@
     "description": "Un pendentif arrondi, gravé à la main dans du bois d’olivier aux veines chaleureuses.",
     "image": "/bijoux/produit4.webp",
     "prix": 30,
-    "categorie": "necklace"
+    "category": "necklace"
   },
   {
     "id": 5,
@@ -37,7 +37,7 @@
     "description": "Broche élégante en forme de fleur, réalisée avec soin dans du noyer recyclé.",
     "image": "/bijoux/produit5.webp",
     "prix": 24,
-    "categorie": "earrings"
+    "category": "earrings"
   },
   {
     "id": 6,
@@ -45,7 +45,7 @@
     "description": "Créoles fines et légères, sculptées dans du bois de cerisier pour un effet naturel et raffiné.",
     "image": "/bijoux/produit6.webp",
     "prix": 29,
-    "categorie": "earrings"
+    "category": "earrings"
   },
   {
     "id": 7,
@@ -53,7 +53,7 @@
     "description": "Collier léger en bois de bouleau, évoquant la douceur des matins calmes en forêt.",
     "image": "/bijoux/produit7.webp",
     "prix": 33,
-    "categorie": "necklace"
+    "category": "necklace"
   },
   {
     "id": 8,
@@ -61,7 +61,7 @@
     "description": "Petites boucles en forme de gouttes, façonnées dans du bois d’aulne poli.",
     "image": "/bijoux/produit8.webp",
     "prix": 27,
-    "categorie": "earrings"
+    "category": "earrings"
   },
   {
     "id": 9,
@@ -69,7 +69,7 @@
     "description": "Un pendentif rond bicolore représentant une éclipse, en bois d’orme et d’ébène.",
     "image": "/bijoux/produit9.webp",
     "prix": 31,
-    "categorie": "necklace"
+    "category": "necklace"
   },
   {
     "id": 10,
@@ -77,7 +77,7 @@
     "description": "Design torsadé et délicat rappelant les tiges de lierre entrelacées.",
     "image": "/bijoux/produit10.webp",
     "prix": 26,
-    "categorie": "earrings"
+    "category": "earrings"
   },
   {
     "id": 11,
@@ -85,7 +85,7 @@
     "description": "Bijou minimaliste dans un bois de sapin teinté, parfait pour les esprits calmes.",
     "image": "/bijoux/produit11.webp",
     "prix": 34,
-    "categorie": "necklace"
+    "category": "necklace"
   },
   {
     "id": 12,
@@ -93,7 +93,7 @@
     "description": "Légères et pendantes, ces boucles capturent la souplesse des lianes forestières.",
     "image": "/bijoux/produit12.webp",
     "prix": 25,
-    "categorie": "earrings"
+    "category": "earrings"
   },
   {
     "id": 13,
@@ -101,7 +101,7 @@
     "description": "Un collier mystérieux aux tons fumés, façonné dans du frêne vieilli.",
     "image": "/bijoux/produit13.webp",
     "prix": 36,
-    "categorie": "necklace"
+    "category": "necklace"
   },
   {
     "id": 14,
@@ -109,7 +109,7 @@
     "description": "Inspirées des coquilles et textures naturelles du chêne.",
     "image": "/bijoux/produit14.webp",
     "prix": 29,
-    "categorie": "earrings"
+    "category": "earrings"
   },
   {
     "id": 15,
@@ -117,7 +117,7 @@
     "description": "Bijou puissant sculpté dans une racine de noyer sombre et marbrée.",
     "image": "/bijoux/produit15.webp",
     "prix": 38,
-    "categorie": "necklace"
+    "category": "necklace"
   },
   {
     "id": 16,
@@ -125,7 +125,7 @@
     "description": "Design fin et aéré en bois de pin, parfait pour les journées légères.",
     "image": "/bijoux/produit16.webp",
     "prix": 26,
-    "categorie": "earrings"
+    "category": "earrings"
   },
   {
     "id": 17,
@@ -133,7 +133,7 @@
     "description": "Gouttes pendantes en bois clair, reliées par un fil invisible.",
     "image": "/bijoux/produit17.webp",
     "prix": 37,
-    "categorie": "necklace"
+    "category": "necklace"
   },
   {
     "id": 18,
@@ -141,7 +141,7 @@
     "description": "Petites perles sculptées dans de l’érable brut, pour un effet discret et naturel.",
     "image": "/bijoux/produit18.webp",
     "prix": 23,
-    "categorie": "earrings"
+    "category": "earrings"
   },
   {
     "id": 19,
@@ -149,7 +149,7 @@
     "description": "Pièce légère représentant la lumière d’une clairière dans une forêt dense.",
     "image": "/bijoux/produit19.webp",
     "prix": 30,
-    "categorie": "necklace"
+    "category": "necklace"
   },
   {
     "id": 20,
@@ -157,7 +157,7 @@
     "description": "Design ondulé rappelant l’écoulement de l’eau, en bois poli.",
     "image": "/bijoux/produit20.webp",
     "prix": 28,
-    "categorie": "earrings"
+    "category": "earrings"
   },
   {
     "id": 21,
@@ -165,7 +165,7 @@
     "description": "Collier sculpté dans du bois d’olivier noueux, avec une forme en boucle centrale.",
     "image": "/bijoux/produit21.webp",
     "prix": 36,
-    "categorie": "necklace"
+    "category": "necklace"
   },
   {
     "id": 22,
@@ -173,7 +173,7 @@
     "description": "Deux silhouettes fines de brindilles légères taillées avec finesse.",
     "image": "/bijoux/produit22.webp",
     "prix": 27,
-    "categorie": "earrings"
+    "category": "earrings"
   },
   {
     "id": 23,
@@ -181,7 +181,7 @@
     "description": "Un bijou longiligne et parfumé, sculpté dans du cèdre rouge.",
     "image": "/bijoux/produit23.webp",
     "prix": 39,
-    "categorie": "necklace"
+    "category": "necklace"
   },
   {
     "id": 24,
@@ -189,6 +189,6 @@
     "description": "Design floral givré, avec des détails subtils rappelant le givre du matin.",
     "image": "/bijoux/produit24.webp",
     "prix": 29,
-    "categorie": "earrings"
+    "category": "earrings"
   }
 ]
