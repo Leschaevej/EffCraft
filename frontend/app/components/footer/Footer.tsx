@@ -7,22 +7,28 @@ type Category = "all" | "earrings" | "necklace";
 
 export default function Footer() {
     const handleClick = (filter: Category) => {
-        window.dispatchEvent(
-        new CustomEvent("filter-from-footer", {
-            detail: filter,
-        })
-        );
-
-        const section = document.getElementById("product");
-        if (section) {
-        section.scrollIntoView({ behavior: "smooth" });
+        if (window.location.pathname !== "/") {
+            sessionStorage.setItem("scrollToId", "product");
+            sessionStorage.setItem("filterFromFooter", filter);
+            window.location.href = "/";
+        } else {
+            window.dispatchEvent(
+                new CustomEvent("filter-from-footer", {
+                    detail: filter,
+                })
+            );
+            const section = document.getElementById("product");
+            if (section) section.scrollIntoView({ behavior: "smooth" });
         }
     };
 
     const scrollToNew = () => {
-        const section = document.getElementById("new");
-        if (section) {
-        section.scrollIntoView({ behavior: "smooth" });
+        if (window.location.pathname !== "/") {
+            sessionStorage.setItem("scrollToId", "new");
+            window.location.href = "/";
+        } else {
+            const section = document.getElementById("new");
+            if (section) section.scrollIntoView({ behavior: "smooth" });
         }
     };
 
