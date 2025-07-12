@@ -16,6 +16,11 @@ form {
         border: 3px solid var(--mainColor);
         border-radius: 30px;
     }
+    input::placeholder,
+    textarea::placeholder {
+        color: var(--mainColor);
+        font-size: 30px;
+    }
     label {
         position: absolute;
         width: 1px;

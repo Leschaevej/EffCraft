@@ -24,7 +24,7 @@
     }
 }
 .new {
-    margin: 50px 0 0 0;
+    padding: 50px 0 0 0;
     .conteneur {
         margin: 0 50px;
         padding: 50px;
@@ -39,7 +39,7 @@
     }
 }
 .product {
-    margin: 50px 0 0 0;
+    padding: 50px 0 0 0;
     .conteneur {
         display: flex;
         flex-direction: column;
@@ -48,18 +48,18 @@
         padding: 50px 0 50px 0;
         background-color: var(--secondBackgoundColor);
         border-radius: 50px;
-    }
-    .carousel-wrapper {
-        width: 100%;
-        transition: opacity 0.5s ease;
-        opacity: 1;
-    }
-    .carousel-wrapper.fade {
-        opacity: 0;
+        .carouselContaineur {
+            width: 100%;
+            transition: opacity 0.5s ease;
+            opacity: 1;
+        }
+        .carouselContaineur.fade {
+            opacity: 0;
+        }
     }
 }
 .event {
-    margin: 50px 0 0 0;
+    padding: 50px 0 0 0;
     .conteneur {
         margin: 0 50px;
         padding: 50px;
@@ -93,7 +93,7 @@
     }
 }
 .contact{
-    margin: 50px 0 0 0;
+    padding: 50px 0 50px 0;
     .conteneur{
         display: flex;
         flex-direction: column;

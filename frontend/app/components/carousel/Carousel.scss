@@ -35,8 +35,7 @@
         .page {
             flex: 0 0 100%;
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            grid-template-rows: repeat(2, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 50px;
             padding: 0 50px;
         }

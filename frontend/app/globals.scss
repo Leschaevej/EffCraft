@@ -1,17 +1,15 @@
-@import url('https://fonts.googleapis.com/css2?family=Nothing+You+Could+Do&display=swap');
-
 :root {
-  --mainColor: #6F826A;
-  --secondColor: #BBD8A2;
-  --mainBackgroundColor: #F8E7C8;
-  --secondBackgoundColor: #ffffff;
-  --mainTextColor: #24191C;
-  --secondTextColor: #ffffff;
+    --mainColor: #6F826A;
+    --secondColor: #BBD8A2;
+    --mainBackgroundColor: #F8E7C8;
+    --secondBackgoundColor: #ffffff;
+    --mainTextColor: #24191C;
+    --secondTextColor: #ffffff;
 }
 * {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
 main{
     background-color: var(--mainBackgroundColor);
@@ -21,18 +19,18 @@ main{
     background-size: auto;
 }
 a {
-  color: inherit;
-  text-decoration: none;
+    color: inherit;
+    text-decoration: none;
 }
 h2{
     display: flex;
     justify-content: center;
-    font-family: 'Nothing You Could Do', cursive, sans-serif;
     font-size: 96px;
     font-weight: 400;
     padding: 0 0 30px 0;
     color: var(--mainTextColor);
 }
 p{
+    font-size: 20px;
     color: var(--mainTextColor);
 }

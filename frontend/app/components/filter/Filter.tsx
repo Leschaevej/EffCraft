@@ -1,41 +1,39 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import "./Filter.scss";
 
 type Category = "all" | "earrings" | "necklace";
 
 type FilterButtonsProps = {
   onFilterChange: (filter: Category) => void;
+  selectedFilter: Category;
 };
 
-export default function Filter({ onFilterChange }: FilterButtonsProps) {
-  const [selected, setSelected] = useState<Category>("all");
-
+export default function Filter({ onFilterChange, selectedFilter }: FilterButtonsProps) {
   const handleClick = (filter: Category) => {
-    setSelected(filter);
     onFilterChange(filter);
   };
 
   return (
     <div className="filter">
       <button
-        className={selected === "all" ? "active" : ""}
+        className={selectedFilter === "all" ? "active" : ""}
         onClick={() => handleClick("all")}
       >
         Tout
       </button>
       <button
-        className={selected === "earrings" ? "active" : ""}
-        onClick={() => handleClick("earrings")}
-      >
-        Earrings
-      </button>
-      <button
-        className={selected === "necklace" ? "active" : ""}
+        className={selectedFilter === "necklace" ? "active" : ""}
         onClick={() => handleClick("necklace")}
       >
-        Necklace
+        Collier
+      </button>
+      <button
+        className={selectedFilter === "earrings" ? "active" : ""}
+        onClick={() => handleClick("earrings")}
+      >
+        Boucles d'oreilles
       </button>
     </div>
   );

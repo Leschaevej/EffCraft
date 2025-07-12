@@ -44,7 +44,7 @@ export default function Contact() {
                 id="message"
                 value={message}
                 onChange={e => setMessage(e.target.value)}
-                placeholder="Message"
+                placeholder="Message..."
                 required
                 rows={7}
                 />
