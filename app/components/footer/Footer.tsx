@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import "./Footer.scss";
 
 type Category = "all" | "earrings" | "necklace";
@@ -71,10 +72,10 @@ export default function Footer() {
                 </a>
             </div>
             <div className="legal">
-                <a href="/legal">Mentions légales</a>
-                <a href="/terms">CGV</a>
-                <a href="/privacy">Politique de confidentialité</a>
-                <a href="/returns">Retour & échanges</a>
+                <Link href="/legal">Mentions légales</Link>
+                <Link href="/terms">CGV</Link>
+                <Link href="/privacy">Politique de confidentialité</Link>
+                <Link href="/returns">Retour & échanges</Link>
                 <span>© 2025 Eff Craft</span>
             </div>
         </footer>

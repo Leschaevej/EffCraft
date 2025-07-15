@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { FaShoppingBag, FaHeart, FaBars, FaUser } from "react-icons/fa";
 import "./Header.scss";
@@ -33,9 +34,9 @@ export default function Header() {
     <>
       <header className="header">
         <h1 className="logo">
-          <a href="/" onClick={handleLogoClick}>
-            <img src="/logo.webp" alt="Logo Eff Craft" />
-          </a>
+            <Link href="/" onClick={handleLogoClick}>
+                <img src="/logo.webp" alt="Logo Eff Craft" />
+            </Link>
         </h1>
         <nav>
           <FaUser className="icon" onClick={() => setIsLoginOpen(!isLoginOpen)} />
@@ -54,8 +55,6 @@ export default function Header() {
           }}
         />
       )}
-
-      {/* Menu glissant */}
       <div className={`menu ${isMenuOpen ? "open" : ""}`}>
         <ul>
           <li>
@@ -80,8 +79,6 @@ export default function Header() {
           </a>
         </div>
       </div>
-
-      {/* Login glissant */}
       <div className={`login ${isLoginOpen ? "open" : ""}`}>
         <button className="googleButton" onClick={() => alert("Connexion Google")}>
           Se connecter avec Google

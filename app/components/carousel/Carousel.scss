@@ -33,6 +33,7 @@
             transition: transform 1s ease;
         }
         .page {
+            align-items: start;
             flex: 0 0 100%;
             display: grid;
             grid-template-columns: repeat(4, 1fr);

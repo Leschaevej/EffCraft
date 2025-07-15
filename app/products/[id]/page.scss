@@ -1,0 +1,40 @@
+.product {
+    padding: 50px 0 50px 0;
+    .conteneur {
+        display: flex;
+        align-items: center;
+        gap: 50px;
+        margin: 0 50px;
+        padding: 50px;
+        background-color: var(--secondBackgoundColor);
+        border-radius: 50px;
+        .image{
+            width: 65%;
+            img{
+                border-radius: 50px;
+                width: 100%;
+                height: auto;
+                aspect-ratio: 4 / 5;
+                object-fit: cover;
+            }
+        }
+        .details{
+            display: flex;
+            flex-direction: column;
+            gap: 50px;
+            h3{
+                font-size: 48px;
+                font-weight: 400;
+            }
+            .prix{
+                font-size: 48px;
+                font-weight: 700;
+            }
+            .description{
+                font-size: 32px;
+
+            }
+            
+        }
+    }
+}

@@ -1,11 +1,30 @@
 {
-  "name": "effcraft",
-  "version": "0.0.1",
+  "name": "frontend",
+  "version": "0.1.0",
+  "private": true,
   "scripts": {
-    "dev": "concurrently -n FRONT,API -c blue,green \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\"",
-    "install:all": "npm install --prefix frontend && npm install --prefix backend"
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "leaflet": "^1.9.4",
+    "next": "15.3.5",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-icons": "^5.5.0",
+    "react-leaflet": "^5.0.0",
+    "sass": "^1.89.2"
   },
   "devDependencies": {
-    "concurrently": "^8.0.1"
+    "@eslint/eslintrc": "^3",
+    "@types/leaflet": "^1.9.20",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "15.3.5",
+    "typescript": "^5"
   }
 }

@@ -3,14 +3,14 @@
 import React, { useEffect, useState } from "react";
 import "./page.scss";
 import { nothingYouCouldDo } from "./font";
-import Card from "../app/components/card/Card";
-import Filter from "../app/components/filter/Filter";
-import Calendar from "../app/components/calendar/Calendar";
-import Contact from "../app/components/contact/Contact";
-import Map from "../app/components/map/Map";
-import Carousel from "../app/components/carousel/Carousel";
-import bijoux from "../app/data/bijoux.json";
-import eventData from "../app/data/event.json";
+import Card from "./components/card/Card";
+import Filter from "./components/filter/Filter";
+import Calendar from "./components/calendar/Calendar";
+import Contact from "./components/contact/Contact";
+import Map from "./components/map/Map";
+import Carousel from "./components/carousel/Carousel";
+import bijoux from "./data/bijoux.json";
+import eventData from "./data/event.json";
 
 type Category = "all" | "earrings" | "necklace";
 
