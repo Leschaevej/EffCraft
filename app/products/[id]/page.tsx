@@ -1,17 +1,27 @@
-import React from "react";
+import clientPromise from "../../lib/mongodb";
 import { notFound } from "next/navigation";
-import bijoux from "../../data/bijoux.json";
 import "./page.scss";
 
 type Props = {
-    params: Promise<{ id: string }>;
+  params: { id: string };
 };
 
-export default async function ProductPage({ params }: Props) {
-    const awaitedParams = await params;
-    const id = parseInt(awaitedParams.id);
-    const bijou = bijoux.find((b) => b.id === id);
+export async function generateStaticParams() {
+  const client = await clientPromise;
+  const db = client.db("effcraftdatabase");
 
+  const bijoux = await db.collection("products").find({}).toArray();
+
+  return bijoux.map((bijou) => ({
+    id: bijou.id.toString(),
+  }));
+}
+
+export default async function ProductPage({ params }: Props) {
+    const id = parseInt(params.id);
+    const client = await clientPromise;
+    const db = client.db("effcraftdatabase");
+    const bijou = await db.collection("products").findOne({ id });
     if (!bijou) return notFound();
 
     return (
@@ -27,7 +37,6 @@ export default async function ProductPage({ params }: Props) {
                         <p className="description">{bijou.description}</p>
                     </div>
                 </div>
-                
             </section>
         </main>
     );
