@@ -22,7 +22,6 @@ export default function Footer() {
             if (section) section.scrollIntoView({ behavior: "smooth" });
         }
     };
-
     const scrollToNew = () => {
         if (window.location.pathname !== "/") {
             sessionStorage.setItem("scrollToId", "new");
@@ -32,7 +31,6 @@ export default function Footer() {
             if (section) section.scrollIntoView({ behavior: "smooth" });
         }
     };
-
     return (
         <footer className="footer">
             <div className="shortcutInfo">

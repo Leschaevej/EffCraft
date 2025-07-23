@@ -33,12 +33,12 @@
         .cards {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 30px;
+            gap: 50px;
             justify-content: center;
         }
     }
 }
-.product {
+.products {
     padding: 50px 0 0 0;
     .conteneur {
         display: flex;

@@ -8,7 +8,6 @@ export default function Contact() {
     const [email, setEmail] = useState('');
     const [name, setName] = useState('');
     const [message, setMessage] = useState('');
-
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
         console.log({ email, name, message });

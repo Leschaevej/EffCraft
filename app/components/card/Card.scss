@@ -20,3 +20,25 @@
         font-weight: 800;
     }
 }
+.card.skeleton {
+    pointer-events: none;
+    .image-placeholder {
+        width: 100%;
+        aspect-ratio: 4 / 5;
+        background-color: #ddd;
+        border-radius: 50px;
+    }
+    .text-placeholder {
+        height: 29px;
+        background-color: #ddd;
+        border-radius: 10px;
+    }
+    .text-placeholder.short {
+        width: 80%;
+        margin: 0 auto;
+    }
+    .text-placeholder.long {
+        width: 30%;
+        margin: 0 auto;
+    }
+}

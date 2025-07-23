@@ -1,42 +1,47 @@
 .cropper-container {
-  width: 100%;
-  overflow: hidden;
-  border-radius: 50px;
-  background-color: #999999;
-  position: relative;
-  cursor: grab;
-  user-select: none;
-
-  &.dragging {
-    cursor: grabbing;
-  }
+    width: 100%;
+    overflow: hidden;
+    border-radius: 50px;
+    background-color: #999999;
+    position: relative;
+    cursor: grab;
+    user-select: none;
+    &.dragging {
+        cursor: grabbing;
+    }
 }
-
 .cropper-image {
-  position: absolute;
-  user-select: none;
-  touch-action: none;
-  pointer-events: auto;
-  will-change: transform;
+    position: absolute;
+    user-select: none;
+    touch-action: none;
+    pointer-events: auto;
+    will-change: transform;
 }
-
 .cropper-button {
-  position: absolute;
-  bottom: 10px;
-  padding: 8px 15px;
-  border-radius: 10px;
-  border: none;
-  color: white;
-  cursor: pointer;
-  z-index: 10;
-
-  &.confirm {
-    right: 10px;
-    background-color: #333;
-  }
-
-  &.cancel {
-    left: 10px;
-    background-color: #777;
-  }
+    position: absolute;
+    bottom: 30px;
+    padding: 8px 15px;
+    border-radius: 10px;
+    border: none;
+    color: white;
+    cursor: pointer;
+    z-index: 10;
+    &.confirm {
+        right: 30px;
+        background-color: var(--mainColor);
+        transition: background-color 0.3s ease, color 0.3s ease;
+            &:hover {
+            background-color: var(--secondColor);
+            color: var(--mainTextColor);
+            }
+        }
+    &.cancel {
+        left: 30px;
+        background-color: var(--errorColor);
+        transition: background-color 0.3s ease, color 0.3s ease;
+        &:hover {
+            background-color: var(--secondErrorColor);
+            color: var(--mainTextColor);
+        }
+    }
 }

@@ -1,43 +1,41 @@
 import clientPromise from "../../lib/mongodb";
+import { ObjectId } from "mongodb";
 import { notFound } from "next/navigation";
 import "./page.scss";
+import ClientProductDisplay from "../[id]/ClientProductDisplay";
 
-type Props = {
-  params: { id: string };
+type Params = {
+    id: string;
 };
-
+type Bijou = {
+    _id: string;
+    name: string;
+    description: string;
+    price: number;
+    images: string[];
+};
 export async function generateStaticParams() {
-  const client = await clientPromise;
-  const db = client.db("effcraftdatabase");
-
-  const bijoux = await db.collection("products").find({}).toArray();
-
-  return bijoux.map((bijou) => ({
-    id: bijou.id.toString(),
-  }));
-}
-
-export default async function ProductPage({ params }: Props) {
-    const id = parseInt(params.id);
     const client = await clientPromise;
     const db = client.db("effcraftdatabase");
-    const bijou = await db.collection("products").findOne({ id });
-    if (!bijou) return notFound();
-
-    return (
-        <main>
-            <section className="product">
-                <div className="conteneur">
-                    <div className="image">
-                        <img src={bijou.image} alt={bijou.nom} />
-                    </div>
-                    <div className="details">
-                        <h3>{bijou.nom}</h3>
-                        <p className="prix">{bijou.prix} €</p>
-                        <p className="description">{bijou.description}</p>
-                    </div>
-                </div>
-            </section>
-        </main>
-    );
+    const produits = await db.collection("products").find({}, { projection: { _id: 1 } }).toArray();
+    return produits.map((produit) => ({
+        id: produit._id.toString(),
+    }));
+}
+export default async function ProductPage({ params }: { params: Params }) {
+    const id = params.id;
+    if (!ObjectId.isValid(id)) return notFound();
+    const client = await clientPromise;
+    const db = client.db("effcraftdatabase");
+    const collection = db.collection("products");
+    const bijouRaw = await collection.findOne({ _id: new ObjectId(id) });
+    if (!bijouRaw) return notFound();
+    const bijou: Bijou = {
+        _id: bijouRaw._id.toString(),
+        name: bijouRaw.name,
+        description: bijouRaw.description,
+        price: bijouRaw.price,
+        images: bijouRaw.images,
+    };
+    return <ClientProductDisplay bijou={bijou} />;
 }

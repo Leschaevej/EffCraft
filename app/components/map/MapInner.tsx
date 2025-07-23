@@ -12,14 +12,12 @@ L.Icon.Default.mergeOptions({
     iconUrl: '/leaflet/marker-icon.png',
     shadowUrl: '/leaflet/marker-shadow.png',
 });
-
 export interface MapProps {
     lat: number;
     lng: number;
     name: string;
     address: string;
 }
-
 export default function MapInner({ lat, lng, name, address }: MapProps) {
     return (
         <MapContainer
