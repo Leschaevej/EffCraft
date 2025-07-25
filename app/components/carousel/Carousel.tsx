@@ -2,7 +2,7 @@
 
 import React, { ReactElement, useEffect, useRef } from "react";
 import "./Carousel.scss";
-import { MdChevronLeft, MdChevronRight } from "react-icons/md";
+import ArrowButton from "../Arrow";
 
 interface CarouselProps {
     children: ReactElement[];
@@ -16,7 +16,7 @@ export default function Carousel({
     itemsPerPage = 8,
     pageIndex,
     setPageIndex,
-    }: CarouselProps) {
+}: CarouselProps) {
     const totalPages = Math.ceil(children.length / itemsPerPage);
     const pages = Array.from({ length: totalPages }, (_, i) =>
         children.slice(i * itemsPerPage, (i + 1) * itemsPerPage)
@@ -39,8 +39,8 @@ export default function Carousel({
         }
         if (pageIndex === totalPages) {
             if (innerRef.current) {
-                innerRef.current.style.transition = "none";
-                innerRef.current.style.transform = `translateX(-100%)`;
+            innerRef.current.style.transition = "none";
+            innerRef.current.style.transform = `translateX(-100%)`;
             }
             requestAnimationFrame(() => {
             setPageIndex(0);
@@ -62,12 +62,8 @@ export default function Carousel({
     return (
         <div className="carousel">
             <div className="controls">
-                <button onClick={handlePrev} aria-label="Précédent">
-                <MdChevronLeft />
-                </button>
-                <button onClick={handleNext} aria-label="Suivant">
-                <MdChevronRight />
-                </button>
+                <ArrowButton direction="left" onClick={handlePrev} />
+                <ArrowButton direction="right" onClick={handleNext} />
             </div>
             <div className="items">
                 <div
@@ -75,17 +71,17 @@ export default function Carousel({
                     ref={innerRef}
                     style={{ transform: `translateX(-${(pageIndex + 1) * 100}%)` }}
                     >
-                    <div className="page" key="last-clone">
-                        {pages[pages.length - 1]}
+                <div className="page" key="last-clone">
+                    {pages[pages.length - 1]}
+                </div>
+                {pages.map((pageItems, i) => (
+                    <div className="page" key={i}>
+                    {pageItems}
                     </div>
-                    {pages.map((pageItems, i) => (
-                        <div className="page" key={i}>
-                        {pageItems}
-                        </div>
-                    ))}
-                    <div className="page" key="first-clone">
-                        {pages[0]}
-                    </div>
+                ))}
+                <div className="page" key="first-clone">
+                    {pages[0]}
+                </div>
                 </div>
             </div>
         </div>

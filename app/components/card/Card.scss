@@ -6,7 +6,7 @@
     gap: 10px;
     cursor: pointer;
     img {
-        border-radius: 50px;
+        border-radius: 15%;
         width: 100%;
         aspect-ratio: 4/5;
         object-fit: cover;
@@ -25,12 +25,12 @@
     .image-placeholder {
         width: 100%;
         aspect-ratio: 4 / 5;
-        background-color: #ddd;
+        background-color: var(--thirdBackgroundColor);
         border-radius: 50px;
     }
     .text-placeholder {
         height: 29px;
-        background-color: #ddd;
+        background-color: var(--thirdBackgroundColor);
         border-radius: 10px;
     }
     .text-placeholder.short {

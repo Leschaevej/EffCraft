@@ -1,0 +1,93 @@
+.deleteForm {
+    .grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 50px;
+    }
+    .card-wrapper {
+        position: relative;
+        overflow: hidden;
+        aspect-ratio: 4 / 5;
+        width: 100%;
+        .card{
+            cursor: default;
+        }
+        .delete-button {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background-color: var(--errorColor);
+            border: none;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            color: white;
+            font-size: 24px;
+            line-height: 30px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.3s ease;
+            &:hover {
+                background-color: var(--secondErrorColor);
+            }
+        }
+        &.confirming {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0;
+            border-radius: 15%;
+            background-color: var(--thirdBackgroundColor);
+        }
+        .confirm-box {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            gap: 20px;
+            p {
+                font-size: 18px;
+                font-weight: bold;
+                margin: 0;
+            }
+            .buttons {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                width: 100%;
+                .confirm,
+                .cancel {
+                    padding: 10px;
+                    border: none;
+                    border-radius: 10px;
+                    font-weight: bold;
+                    cursor: pointer;
+                    font-size: 16px;
+                    width: 100%;
+                }
+                .confirm {
+                    background-color: var(--errorColor);
+                    transition: background-color 0.3s ease;
+                    color: white;
+                    &:hover {
+                        background-color: var(--secondErrorColor);
+                    }
+                }
+                .cancel {
+                    background-color: #ccc;
+                    transition: background-color 0.3s ease;
+                    color: #333;
+                    &:hover {
+                        background-color: #aaa;
+                    }
+                }
+            }
+        }
+    }
+}

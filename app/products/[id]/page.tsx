@@ -22,8 +22,8 @@ export async function generateStaticParams() {
         id: produit._id.toString(),
     }));
 }
-export default async function ProductPage({ params }: { params: Params }) {
-    const id = params.id;
+export default async function ProductPage({ params }: { params: Promise<Params> }) {
+    const { id } = await params;
     if (!ObjectId.isValid(id)) return notFound();
     const client = await clientPromise;
     const db = client.db("effcraftdatabase");

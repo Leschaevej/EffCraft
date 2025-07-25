@@ -16,6 +16,7 @@
         &.active {
             background-color: var(--mainColor);
             color: white;
+            cursor: default;
         }
         &:hover:not(.active) {
             filter: brightness(0.8);
