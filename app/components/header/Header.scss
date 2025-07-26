@@ -1,4 +1,4 @@
-header {
+.header {
     height: 150px;
     display: flex;
     align-items: center;
@@ -8,18 +8,18 @@ header {
     .logo {
         height: 100%;
         img {
-            padding: 10px 0;
-            height: 100%;
+        padding: 10px 0;
+        height: 100%;
         }
     }
     nav {
         display: flex;
         gap: 50px;
         .icon {
-            height: 50px;
-            width: 50px;
-            color: var(--mainColor);
-            cursor: pointer;
+        height: 50px;
+        width: 50px;
+        color: var(--mainColor);
+        cursor: pointer;
         }
     }
 }
@@ -32,8 +32,9 @@ header {
     z-index: 1;
     cursor: pointer;
 }
-.menu {
-    position: fixed;
+.menu,
+.login {
+    position: absolute;
     top: 150px;
     right: 0;
     width: fit-content;
@@ -41,60 +42,78 @@ header {
     background-color: var(--mainBackgroundColor);
     font-size: 40px;
     border-bottom-left-radius: 50px;
-    box-shadow: -10px 10px 10px rgba(0, 0, 0, 0.3);
     z-index: 2;
-    transform: translateX(105%);
+    transform: translateX(100%);
     pointer-events: none;
-    transition: transform 0.5s ease;
+    transition: transform 0.3s ease, opacity 0.3s ease, box-shadow 0.3s ease;
     &.open {
         transform: translateX(0);
         pointer-events: auto;
+        box-shadow: -10px 10px 10px rgba(0, 0, 0, 0.3);
     }
+    &.closed {
+        transform: translateX(100%);
+        pointer-events: none;
+    }
+}
+.menu {
     ul {
         display: flex;
         flex-direction: column;
         gap: 30px;
         margin-bottom: 30px;
         a {
-            cursor: pointer;
+        color: var(--mainTextColor);
+        cursor: pointer;
+        transition: color 0.3s ease;
             &:hover {
-                text-decoration: underline;
+                color: var(--mainColor);
             }
         }
     }
-    .social {
-        display: flex;
-        gap: 30px;
-        height: fit-content;
-        a {
-            line-height: 0;
-        }
-        img {
-            transition: transform 0.5s ease;
-            border-radius: 10px;
-            box-shadow: -5px 5px 5px rgba(0, 0, 0, 0.3);
-        }
-        img:hover {
-            transform: scale(1.1);
-        }
+  .social {
+    display: flex;
+    gap: 30px;
+
+    a {
+      line-height: 0;
     }
+
+    img {
+      transition: transform 0.3s ease;
+      border-radius: 10px;
+      box-shadow: -5px 5px 5px rgba(0, 0, 0, 0.3);
+
+      &:hover {
+        transform: scale(1.1);
+      }
+    }
+  }
 }
 .login {
-    position: fixed;
-    top: 150px;
-    right: 0;
-    width: fit-content;
-    padding: 30px;
-    background-color: var(--mainBackgroundColor);
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+
+  button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 50px;
     font-size: 40px;
-    border-bottom-left-radius: 50px;
-    box-shadow: -10px 10px 10px rgba(0, 0, 0, 0.3);
-    z-index: 2;
-    transform: translateX(105%);
-    pointer-events: none;
-    transition: transform 0.5s ease;
-    &.open {
-        transform: translateX(0);
-        pointer-events: auto;
+    border-radius: 50px;
+    border: 3px solid transparent;
+    box-shadow: -4px 4px 4px rgba(0, 0, 0, 0.3);
+    transition: border-color 0.3s ease;
+
+    img {
+      height: 40px;
+      width: auto;
+      margin-right: 10px;
     }
+
+    &:hover {
+      border: 3px solid var(--mainColor);
+    }
+  }
 }

@@ -30,7 +30,7 @@ export default function ClientProductDisplay({ bijou }: { bijou: Bijou }) {
     <main key={bijou._id.toString()}>
       <section className="product">
         <div className="conteneur">
-          <div className="carousel">
+          <div className="productCarousel">
             <div className="container">
               <ArrowButton direction="left" onClick={prevImage} />
               <img

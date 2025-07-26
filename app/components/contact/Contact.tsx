@@ -14,7 +14,7 @@ export default function Contact() {
     };
 
     return (
-        <form onSubmit={handleSubmit}>
+        <form className='contactForm' onSubmit={handleSubmit}>
             <div>
                 <label htmlFor="name">Nom</label>
                 <input

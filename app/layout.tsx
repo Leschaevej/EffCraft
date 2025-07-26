@@ -3,6 +3,7 @@ import Header from "./components/header/Header";
 import Footer from "./components/footer/Footer";
 import "./globals.scss";
 import { merriweather } from "./font";
+import { Providers } from "../app/components/providers";
 
 export const metadata: Metadata = {
   title: "Eff Craft",
@@ -14,12 +15,14 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" >
-        <body className={merriweather.className}>
-            <Header />
-            {children}
-            <Footer />
-        </body>
+    <html lang="fr">
+      <body className={merriweather.className}>
+        <Providers>
+          <Header />
+          {children}
+          <Footer />
+        </Providers>
+      </body>
     </html>
   );
 }

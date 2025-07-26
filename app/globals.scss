@@ -14,12 +14,16 @@
     padding: 0;
     box-sizing: border-box;
 }
+html, body {
+  overflow-x: hidden;
+}
 main{
     background-color: var(--mainBackgroundColor);
     background-image: url("/fond.webp");
     background-repeat: repeat;
     background-position: top left;
     background-size: auto;
+    overflow-x: hidden;
 }
 a {
     color: inherit;

@@ -1,12 +1,11 @@
-.manage {
-    padding: 50px 0;
+.backoffice {
+    padding: 50px 0 0 0;
     .toolbar {
         display: flex;
         justify-content: space-between;
         justify-self: center;
         gap: 30px;
         padding: 20px;
-        margin-bottom: 50px;
         border-radius: 50px;
         background-color: var(--secondBackgroundColor);
         width: fit-content;
@@ -17,8 +16,9 @@
                 background-color: var(--secondColor);
                 cursor: pointer;
                 border-radius: 20px;
+                font-size: 24px;
                 font-weight: 600;
-                transition: background-color 0.3s ease;
+                transition: filter 0.3s ease, background-color 0.3s ease, color 0.3s ease;
             &.active {
                 background-color: var(--mainColor);
                 color: var(--secondTextColor);
@@ -29,10 +29,43 @@
             }
         }
     }
-    .conteneur {
-        margin: 0 50px;
-        padding: 50px;
-        background-color: var(--secondBackgroundColor);
-        border-radius: 50px;
+    .manage {
+        padding: 50px 0 50px 0;
+        .addDell {
+            margin: 0 0 50px 0;
+            display: flex;
+            justify-content: space-between;
+            justify-self: center;
+            gap: 30px;
+            padding: 20px;
+            border-radius: 50px;
+            background-color: var(--secondBackgroundColor);
+            width: fit-content;
+            color: var(--mainTextColor);
+                button {
+                    padding: 10px 20px;
+                    border: none;
+                    background-color: var(--secondColor);
+                    cursor: pointer;
+                    border-radius: 20px;
+                    font-size: 24px;
+                    font-weight: 600;
+                    transition: filter 0.3s ease, background-color 0.3s ease, color 0.3s ease;
+                &.active {
+                    background-color: var(--mainColor);
+                    color: var(--secondTextColor);
+                    cursor: default;
+                }
+                &:hover:not(.active) {
+                    filter: brightness(0.8);
+                }
+            }
+        }
+        .conteneur {
+            margin: 0 50px;
+            padding: 50px;
+            background-color: var(--secondBackgroundColor);
+            border-radius: 50px;
+        }
     }
 }

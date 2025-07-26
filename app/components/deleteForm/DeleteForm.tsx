@@ -58,6 +58,7 @@ export default function DeleteForm() {
     try {
       const res = await fetch(`/api/products/${id}`, {
         method: "DELETE",
+        credentials: "include",
       });
       if (!res.ok) throw new Error("Erreur lors de la suppression");
 

@@ -1,21 +1,23 @@
 .filter {
     padding: 0 0 50px 0;
     display: flex;
+    justify-content: space-between;
     justify-content: center;
+    padding: 20px;
     gap: 30px;
-    width: 70%;
+    width: fit-content;
     button {
+        padding: 10px 20px;
         background: var(--secondColor);
         cursor: pointer;
         border-radius: 20px;
         border: none;
         font-size: 24px;
-        height: 40px;
-        width: 33%;
-        transition: filter 0.5s ease, background-color 0.5s ease, color 0.5s ease;
+        font-weight: 600;
+        transition: filter 0.3s ease, background-color 0.3s ease, color 0.3s ease;
         &.active {
             background-color: var(--mainColor);
-            color: white;
+            color: var(--secondTextColor);
             cursor: default;
         }
         &:hover:not(.active) {

@@ -1,11 +1,19 @@
 import { NextResponse } from "next/server";
 import clientPromise from "../../../lib/mongodb";
 import { ObjectId } from "mongodb";
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "../../auth/[...nextauth]/route";
 
 export async function DELETE(
   request: Request,
   { params }: { params: { id: string } }
 ) {
+  const session = await getServerSession(authOptions);
+
+  if (!session || session.user.role !== "admin") {
+    return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+  }
+
   try {
     const { id } = params;
     if (!id) {

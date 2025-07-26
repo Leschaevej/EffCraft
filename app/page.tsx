@@ -102,11 +102,6 @@ export default function Home() {
                     </p>
                 </div>
             </section>
-            <section>
-                <button onClick={() => window.location.href = "/backoffice"}>
-                    Accéder au Backoffice
-                </button>
-            </section>
             <section id="new" className="new">
                 <div className="conteneur">
                     <h2 className={nothingYouCouldDo.className}>Nouveautés</h2>
