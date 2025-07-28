@@ -12,6 +12,9 @@ export default function Backoffice() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
+  const [activeSection, setActiveSection] = useState<"manage" | "orders">("manage");
+  const [activeView, setActiveView] = useState<"add" | "delete">("add");
+
   useEffect(() => {
     if (status === "loading") return;
 
@@ -23,9 +26,6 @@ export default function Backoffice() {
   if (status === "loading" || !session || session.user.role !== "admin") {
     return <p>Chargement...</p>;
   }
-
-  const [activeSection, setActiveSection] = useState<"manage" | "orders">("manage");
-  const [activeView, setActiveView] = useState<"add" | "delete">("add");
 
   return (
     <main className="backoffice">

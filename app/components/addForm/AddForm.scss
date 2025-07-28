@@ -59,9 +59,8 @@
             text-align: center;
             user-select: none;
             outline: none;
-            border: 3px solid transparent;
             &.error {
-                border: 3px solid var(--errorColor);
+                box-shadow: 0 0 0 3px var(--errorColor);
             }
         }
     }

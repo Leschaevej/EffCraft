@@ -11,18 +11,21 @@ import Contact from "./components/contact/Contact";
 import Map from "./components/map/Map";
 import Carousel from "./components/carousel/Carousel";
 import eventData from "./data/event.json";
+import { useSession } from "next-auth/react";
 
 type Category = "all" | "earrings" | "necklace";
 
 export default function Home() {
     const { date, name, time, address, coords } = eventData.event;
     const { lat, lng } = coords;
+    const { data: session, status } = useSession();
     const [filter, setFilter] = useState<Category>("all");
     const [pageIndex, setPageIndex] = useState(0);
     const [isFading, setIsFading] = useState(false);
     const [bijoux, setBijoux] = useState<any[]>([]);
     const [displayedBijoux, setDisplayedBijoux] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [favorites, setFavorites] = useState<string[]>([]);
     useEffect(() => {
         async function fetchBijoux() {
         try {
@@ -40,6 +43,25 @@ export default function Home() {
         }
         fetchBijoux();
     }, []);
+    useEffect(() => {
+        async function fetchFavorites() {
+        if (status !== "authenticated") {
+            setFavorites([]);
+            return;
+        }
+        try {
+            const res = await fetch("/api/user/favorites");
+            if (!res.ok) throw new Error("Erreur lors du chargement des favoris");
+            const data = await res.json();
+            const favIds = data.favorites.map((f: any) => (typeof f === "string" ? f : f._id));
+            setFavorites(favIds);
+        } catch (error) {
+            console.error(error);
+            setFavorites([]);
+        }
+        }
+        fetchFavorites();
+    }, [status]);
     const handleFilterChange = (newFilter: Category) => {
         if (newFilter === filter) return;
         setIsFading(true);
@@ -106,50 +128,58 @@ export default function Home() {
                 <div className="conteneur">
                     <h2 className={nothingYouCouldDo.className}>Nouveautés</h2>
                     <div className="cards">
-                        {isLoading
-                            ? Array.from({ length: 3 }, (_, i) => <CardSkeleton key={`skeleton-${i}`} />)
-                            : bijoux.slice(0, 3).map((bijou) => (
-                                <Card key={bijou._id || bijou.id} bijou={bijou} />
+                    {isLoading
+                        ? Array.from({ length: 3 }, (_, i) => <CardSkeleton key={`skeleton-${i}`} />)
+                        : bijoux.slice(0, 3).map((bijou) => (
+                            <Card
+                            key={bijou._id || bijou.id}
+                            bijou={bijou}
+                            initialIsFavori={favorites.includes(bijou._id)}
+                            />
                         ))}
                     </div>
                 </div>
             </section>
             <section id="product" className="products">
-            <div className="conteneur">
-                <h2 className={nothingYouCouldDo.className}>Les bijoux</h2>
-                <Filter onFilterChange={handleFilterChange} selectedFilter={filter} />
-                <div className={`carouselContaineur ${isFading ? "fade" : ""}`}>
-                    <Carousel itemsPerPage={8} pageIndex={pageIndex} setPageIndex={setPageIndex}>
-                        {isLoading
+                <div className="conteneur">
+                    <h2 className={nothingYouCouldDo.className}>Les bijoux</h2>
+                    <Filter onFilterChange={handleFilterChange} selectedFilter={filter} />
+                    <div className={`carouselContaineur ${isFading ? "fade" : ""}`}>
+                        <Carousel itemsPerPage={8} pageIndex={pageIndex} setPageIndex={setPageIndex}>
+                            {isLoading
                             ? Array.from({ length: 8 }, (_, i) => <CardSkeleton key={i} />)
                             : displayedBijoux.map((bijou) => (
-                                <Card key={bijou._id || bijou.id} bijou={bijou} />
-                            ))}
-                    </Carousel>
+                                <Card
+                                    key={bijou._id || bijou.id}
+                                    bijou={bijou}
+                                    initialIsFavori={favorites.includes(bijou._id)}
+                                />
+                                ))}
+                        </Carousel>
+                    </div>
                 </div>
-            </div>
             </section>
             <section id="event" className="event">
-            <div className="conteneur">
-                <h2 className={nothingYouCouldDo.className}>Événements</h2>
-                <div className="calendarMap">
-                    <div className="calendar">
-                        <Calendar date={date} time={time} />
-                    </div>
-                    <div className="mapContaineur">
-                        <Map lat={lat} lng={lng} name={name} address={address} />
-                        <div className="name">{name}</div>
+                <div className="conteneur">
+                    <h2 className={nothingYouCouldDo.className}>Événements</h2>
+                    <div className="calendarMap">
+                        <div className="calendar">
+                            <Calendar date={date} time={time} />
+                        </div>
+                        <div className="mapContaineur">
+                            <Map lat={lat} lng={lng} name={name} address={address} />
+                            <div className="name">{name}</div>
+                        </div>
                     </div>
                 </div>
-            </div>
             </section>
             <section id="contact" className="contact">
                 <div className="conteneur">
                     <h2 className={nothingYouCouldDo.className}>Contact</h2>
                     <p className="intro">
-                        Une question, une envie, ou le bijou de vos rêves en tête ?<br />
-                        Parlez-m’en ici, je serai ravie de vous répondre ou de créer avec vous une pièce
-                        unique.
+                    Une question, une envie, ou le bijou de vos rêves en tête ?<br />
+                    Parlez-m’en ici, je serai ravie de vous répondre ou de créer avec vous une pièce
+                    unique.
                     </p>
                     <Contact />
                 </div>

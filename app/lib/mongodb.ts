@@ -3,7 +3,7 @@ import { MongoClient } from "mongodb";
 const uri = process.env.MONGODB_URI;
 const options = {};
 if (!uri) {
-    throw new Error("MONGODB_URI doit être défini dans .env.local");
+    throw new Error("MONGODB_URI doit être défini dans .env");
 }
 let client: MongoClient;
 let clientPromise: Promise<MongoClient>;

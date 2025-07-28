@@ -6,6 +6,7 @@
     --thirdBackgroundColor : #ddd;
     --mainTextColor: #24191C;
     --secondTextColor: #ffffff;
+    --favoryColor: #9E552D;
     --errorColor: #9E552D;
     --secondErrorColor: #ca6d3b;
 }
@@ -15,7 +16,7 @@
     box-sizing: border-box;
 }
 html, body {
-  overflow-x: hidden;
+    overflow-x: hidden;
 }
 main{
     background-color: var(--mainBackgroundColor);

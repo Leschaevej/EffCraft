@@ -78,7 +78,10 @@ export default function Header() {
             </h1>
             <nav>
                 <FaUser className="icon" onClick={toggleLogin} />
-                <FaHeart className="icon" />
+                <Link href="/favorites">
+                    <FaHeart className="icon" />
+                </Link>
+
                 <FaShoppingBag className="icon" />
                 <FaBars className="icon" onClick={toggleMenu} />
             </nav>
@@ -130,17 +133,23 @@ export default function Header() {
 
                     {session?.user?.role === "admin" ? (
                         <button
-                        className="backoffice"
-                        onClick={() => router.push("/backoffice")}
-                        >
-                        Backoffice
+                            className="backoffice"
+                            onClick={() => {
+                                closeAllMenus();
+                                router.push("/backoffice");
+                            }}
+                            >
+                            Backoffice
                         </button>
                     ) : (
                         <button
-                        className="commande"
-                        onClick={() => router.push("/commande")}
-                        >
-                        Commande
+                            className="commande"
+                            onClick={() => {
+                                closeAllMenus();
+                                router.push("/commande");
+                            }}
+                            >
+                            Commande
                         </button>
                     )}
                     <button className="logout" onClick={() => signOut()}>
