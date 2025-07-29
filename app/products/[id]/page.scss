@@ -9,89 +9,32 @@
         padding: 50px;
         background-color: var(--secondBackgroundColor);
         border-radius: 50px;
-        .productCarousel {
-            width: 45%;
-            .container {
-                position: relative;
-                width: 100%;
-                overflow: hidden;
-                .image {
-                    width: 100%;
-                    height: auto;
-                    aspect-ratio: 4 / 5;
-                    object-fit: cover;
-                    border-radius: 50px;
-                    display: block;
-                }
-                .button {
-                    position: absolute;
-                    top: 45%;
-                    background: transparent;
-                    border: none;
-                    padding: 0;
-                    margin: 0;
-                    cursor: default;
-                    z-index: 1;
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    &.left {
-                        left: 10px;
-                    }
-                    &.right {
-                        right: 10px;
-                    }
-                    svg {
-                        width: 80px;
-                        height: 80px;
-                        color: var(--mainColor);
-                        path {
-                        pointer-events: auto;
-                        cursor: pointer;
-                        transition: stroke 0.2s ease;
-                        }
-                        &:hover path {
-                            stroke: var(--secondColor);
-                        }
-                    }
-                }
+        .card{
+            width: 50%;
+            svg{
+                height: 80px;
+                width: 80px;
             }
-            .thumbnails {
-                margin-top: 30px;
-                display: flex;
-                gap: 10px;
-                flex-wrap: wrap;
-                justify-content: center;
-                .miniature {
-                    width: 80px;
-                    height: 80px;
-                    object-fit: cover;
-                    cursor: pointer;
-                    border: 3px solid transparent;
-                    border-radius: 10px;
-                    transition: border-color 0.2s;
-                    &.active {
-                        border-color: var(--mainColor);
-                    }
-                }
+            .favori{
+                top: 10%;
+                right: 20%;
             }
         }
-        .details {
+        .info{
             display: flex;
             flex-direction: column;
-            margin: 0 0 110px 0;
-            gap: 50px;
-            width: 35%;
-            h3 {
+            gap: 30px;
+            h3{
                 font-size: 48px;
-                font-weight: 400;
+                font-weight: 800;
             }
-            .prix {
+            .price{
                 font-size: 48px;
-                font-weight: 700;
+                font-weight: 800;
             }
-            .description {
+            .description{
                 font-size: 32px;
+                font-weight: 800;
             }
         }
     }

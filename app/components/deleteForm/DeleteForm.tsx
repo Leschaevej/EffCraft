@@ -77,6 +77,7 @@ export default function DeleteForm() {
                         bijou={product}
                         clickable={false}
                         showPrice={false}
+                        showFavori={false}
                         imageReplacement={
                             confirmingId === product._id ? (
                             <div className="confirm-box">

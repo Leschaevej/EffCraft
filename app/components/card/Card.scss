@@ -14,6 +14,38 @@
             object-fit: cover;
             display: block;
         }
+        .button {
+            position: absolute;
+            top: 45%;
+            background: transparent;
+            border: none;
+            padding: 0;
+            margin: 0;
+            cursor: pointer;
+            z-index: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            &.left {
+                left: 5px;
+            }
+            &.right {
+                right: 5px;
+            }
+            svg {
+                width: 40px;
+                height: 40px;
+                color: var(--mainColor);
+                path {
+                pointer-events: auto;
+                cursor: pointer;
+                transition: stroke 0.2s ease;
+                }
+                &:hover path {
+                    stroke: var(--secondColor);
+                }
+            }
+        }
         .favori {
             position: absolute;
             top: 10%;

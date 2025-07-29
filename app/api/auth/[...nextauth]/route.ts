@@ -22,7 +22,7 @@ export const authOptions: NextAuthOptions = {
             if (mongoose.connection.readyState !== 1) {
             await mongoose.connect(process.env.MONGODB_URI!, {
                 bufferCommands: false,
-                serverSelectionTimeoutMS: 20000,
+                serverSelectionTimeoutMS: 10000,
             });
             }
             let dbUser = await User.findOne({ email: user.email });

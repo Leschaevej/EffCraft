@@ -45,9 +45,23 @@ export default function Home() {
     }, []);
     useEffect(() => {
         async function fetchFavorites() {
-        if (status !== "authenticated") {
-            setFavorites([]);
-            return;
+        if (status === "authenticated") {
+            const pendingId = sessionStorage.getItem("pendingFavori");
+            if (pendingId) {
+                fetch("/api/user/favorites", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ productId: pendingId }),
+                })
+                .then(res => {
+                    if (!res.ok) throw new Error("Erreur ajout favori après login");
+                    setFavorites(prev => [...prev, pendingId]);
+                })
+                .catch(console.error)
+                .finally(() => {
+                    sessionStorage.removeItem("pendingFavori");
+                });
+            }
         }
         try {
             const res = await fetch("/api/user/favorites");
