@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import "./page.scss";
 import { nothingYouCouldDo } from "./font";
 import Card from "./components/card/Card";
-import CardSkeleton from "./components/CardSkeleton";
+import CardSkeleton from "./components/card/CardSkeleton";
 import Filter from "./components/filter/Filter";
 import Calendar from "./components/calendar/Calendar";
 import Contact from "./components/contact/Contact";
@@ -44,37 +44,25 @@ export default function Home() {
         fetchBijoux();
     }, []);
     useEffect(() => {
-        async function fetchFavorites() {
-        if (status === "authenticated") {
-            const pendingId = sessionStorage.getItem("pendingFavori");
-            if (pendingId) {
-                fetch("/api/user/favorites", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ productId: pendingId }),
-                })
-                .then(res => {
-                    if (!res.ok) throw new Error("Erreur ajout favori après login");
-                    setFavorites(prev => [...prev, pendingId]);
-                })
-                .catch(console.error)
-                .finally(() => {
-                    sessionStorage.removeItem("pendingFavori");
-                });
-            }
+    async function fetchFavorites() {
+        if (status === "authenticated") { 
+        const pendingId = sessionStorage.getItem("pendingFavori");
+        if (pendingId) {
+            await fetch("/api/user/favorites", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ productId: pendingId }),
+            });
+            sessionStorage.removeItem("pendingFavori");
         }
-        try {
-            const res = await fetch("/api/user/favorites");
-            if (!res.ok) throw new Error("Erreur lors du chargement des favoris");
-            const data = await res.json();
-            const favIds = data.favorites.map((f: any) => (typeof f === "string" ? f : f._id));
-            setFavorites(favIds);
-        } catch (error) {
-            console.error(error);
-            setFavorites([]);
+        const res = await fetch("/api/user?type=favorites");
+        if (!res.ok) throw new Error("Erreur lors du chargement des favoris");
+        const data = await res.json();
+        const favIds = data.favorites.map((f: any) => (typeof f === "string" ? f : f._id));
+        setFavorites(favIds);
         }
-        }
-        fetchFavorites();
+    }
+    fetchFavorites();
     }, [status]);
     const handleFilterChange = (newFilter: Category) => {
         if (newFilter === filter) return;

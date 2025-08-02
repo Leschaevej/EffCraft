@@ -32,34 +32,32 @@ export default function Header() {
             setIsClosingMenuOrLogin(true);
             closingCount = 0;
             if (menuOpen) {
-            setMenuOpen(false);
-            setTimeout(() => {
-                setMenuVisible(false);
-                checkEndClosing();
-            }, 300);
+                setMenuOpen(false);
+                setTimeout(() => {
+                    setMenuVisible(false);
+                    checkEndClosing();
+                }, 300);
             } else {
-            closingCount++;
+                closingCount++;
             }
             if (loginOpen) {
-            setLoginOpen(false);
-            setTimeout(() => {
-                setLoginVisible(false);
-                checkEndClosing();
-            }, 300);
+                setLoginOpen(false);
+                setTimeout(() => {
+                    setLoginVisible(false);
+                    checkEndClosing();
+                }, 300);
             } else {
-            closingCount++;
+                closingCount++;
             }
             setTimeout(() => {
-            setShowHeader(false);
-            setIsClosingMenuOrLogin(false);
+                setShowHeader(false);
+                setIsClosingMenuOrLogin(false);
             }, 600);
         }
     };
     const controlHeader = () => {
         if (typeof window !== "undefined") {
-            if (isClosingMenuOrLogin) {
-                return;
-            }
+            if (isClosingMenuOrLogin) return;
             const currentScrollY = window.scrollY;
             const scrollingUp = currentScrollY < lastScrollY || currentScrollY <= 0;
             if (!scrollingUp && (loginOpen || menuOpen)) {
@@ -92,13 +90,13 @@ export default function Header() {
         };
     }, [loginOpen]);
     useEffect(() => {
-    if (typeof window !== "undefined") {
-        const scrollPos = sessionStorage.getItem("scrollPos");
-        if (scrollPos) {
-        window.scrollTo(0, parseInt(scrollPos));
-        sessionStorage.removeItem("scrollPos");
+        if (typeof window !== "undefined") {
+            const scrollPos = sessionStorage.getItem("scrollPos");
+            if (scrollPos) {
+                window.scrollTo(0, parseInt(scrollPos));
+                sessionStorage.removeItem("scrollPos");
+            }
         }
-    }
     }, []);
     const handleLogoClick = (e: React.MouseEvent) => {
         if (pathname === "/") {
@@ -151,7 +149,9 @@ export default function Header() {
                     <Link href="/favorites">
                         <FaHeart className="icon" />
                     </Link>
-                    <FaShoppingBag className="icon" />
+                    <Link href="/cart">
+                        <FaShoppingBag className="icon" />
+                    </Link>
                     <FaBars className="icon" onClick={toggleMenu} />
                 </nav>
             </header>
@@ -184,23 +184,17 @@ export default function Header() {
                         <>
                             <p>Bonjour, {session.user.name}</p>
                             {session.user.role === "admin" ? (
-                                <button
-                                    className="backoffice"
-                                    onClick={() => {
-                                        closeAllMenus();
-                                        router.push("/backoffice");
-                                    }}
-                                >
+                                <button className="backoffice" onClick={() => {
+                                    closeAllMenus();
+                                    router.push("/backoffice");
+                                }}>
                                     Backoffice
                                 </button>
                             ) : (
-                                <button
-                                    className="commande"
-                                    onClick={() => {
-                                        closeAllMenus();
-                                        router.push("/commande");
-                                    }}
-                                >
+                                <button className="commande" onClick={() => {
+                                    closeAllMenus();
+                                    router.push("/commande");
+                                }}>
                                     Commande
                                 </button>
                             )}
@@ -210,13 +204,10 @@ export default function Header() {
                         </>
                     ) : (
                         <>
-                            <button
-                                className="google"
-                                onClick={() => {
-                                    sessionStorage.setItem("scrollPos", window.scrollY.toString());
-                                    signIn("google");
-                                }}
-                                >
+                            <button className="google" onClick={() => {
+                                sessionStorage.setItem("scrollPos", window.scrollY.toString());
+                                signIn("google");
+                            }}>
                                 <img src="/google.webp" alt="Google" />
                                 Se connecter avec Google
                             </button>

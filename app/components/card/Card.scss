@@ -19,30 +19,25 @@
             top: 45%;
             background: transparent;
             border: none;
-            padding: 0;
-            margin: 0;
-            cursor: pointer;
-            z-index: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            pointer-events: none;
             &.left {
-                left: 5px;
+                left: 15px;
             }
             &.right {
-                right: 5px;
+                right: 15px;
             }
             svg {
-                width: 40px;
+                width: 20px;
                 height: 40px;
                 color: var(--mainColor);
+                pointer-events: none;
                 path {
                 pointer-events: auto;
                 cursor: pointer;
-                transition: stroke 0.2s ease;
+                transition: color 0.3s ease;
                 }
                 &:hover path {
-                    stroke: var(--secondColor);
+                    color: var(--secondColor);
                 }
             }
         }
@@ -53,14 +48,19 @@
             background: none;
             border: none;
             padding: 0;
-            cursor: pointer;
             color: var(--favoryColor);
-            height: 24px;
-            width: 24px;
+            pointer-events: none;
             svg {
+                height: 30px;
+                width: 30px;
                 stroke: var(--mainTextColor);
-                fill: none;
+                pointer-events: none;
+                display: block;
                 transition: stroke 0.3s ease, fill 0.3s ease;
+                path{
+                    pointer-events: auto;
+                    cursor: pointer;
+                }
             }
             &:hover svg {
                 stroke: var(--favoryColor);

@@ -1,0 +1,72 @@
+.cart {
+    padding: 50px 0;
+    .conteneur {
+        margin: 0 50px;
+        padding: 50px;
+        background-color: var(--secondBackgroundColor);
+        border-radius: 50px;
+        .listTotal {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            .list {
+                width: 50%;
+                list-style: none;
+                display: flex;
+                flex-direction: column;
+                gap: 50px;
+                .item {
+                    display: flex;
+                    align-items: center;
+                    gap: 50px;
+                    .image {
+                        width: 40%;
+                    }
+                    .info {
+                        display: flex;
+                        flex-direction: column;
+                        gap: 30px;
+                    }
+                    .remove {
+                        width: fit-content;
+                        padding: 10px 15px;
+                        background-color: var(--mainColor);
+                        color: white;
+                        border: none;
+                        border-radius: 25px;
+                        cursor: pointer;
+                        transition: background-color 0.3s ease, color 0.3s ease;
+                    }
+                    .remove:hover {
+                    background-color: var(--secondColor);
+                    color: black;
+                    }
+                }
+            }
+            .total {
+                width: 40%;
+                color: white;
+                display: flex;
+                flex-direction: column;
+                gap: 50px;
+                font-size: 24px;
+                font-weight: 800;
+                .valider {
+                    padding: 15px;
+                    border: none;
+                    border-radius: 30px;
+                    background-color: var(--secondColor);
+                    color: black;
+                    font-size: 24px;
+                    font-weight: 700;
+                    cursor: pointer;
+                    transition: background-color 0.3s ease, color 0.3s ease;
+                }
+                .valider:hover {
+                    background-color: var(--mainColor);
+                    color: white;
+                }
+            }
+        }
+    }
+}

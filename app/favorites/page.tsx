@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Card from "../components/card/Card";
-import CardSkeleton from "../components/CardSkeleton";
+import CardSkeleton from "../components/card/CardSkeleton";
 import { useSession, signIn } from "next-auth/react";
 import { nothingYouCouldDo } from "../font";
 import "./page.scss";
@@ -23,7 +23,7 @@ export default function Favorites() {
         if (status !== "authenticated") return;
         const fetchFavorites = async () => {
         try {
-            const res = await fetch("/api/user/favorites");
+            const res = await fetch("/api/user?type=favorites");
             if (!res.ok) throw new Error("Erreur lors du chargement des favoris");
             const data = await res.json();
             setFavorites(data.favorites || []);
