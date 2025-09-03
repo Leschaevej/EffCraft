@@ -14,5 +14,3 @@ logs/
 Thumbs.db
 *.tsbuildinfo
 .sass-cache/
-
-public/products/

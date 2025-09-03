@@ -1,12 +1,16 @@
 # EffCraft
-Projet fullstack Node.js + Next.js (Frontend + Backend)
+Site machant de bijoux en bois
 
-## Installation
-npm run install:all
+## Installation & lancement
+npm start
 
 ## .env
-DATABASE=
-PORT=5000
-
-## Lancement
-npm run dev
+MONGODB_URI=
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+NEXTAUTH_URL=
+ADMIN_EMAILS=
+NEXTAUTH_SECRET=
