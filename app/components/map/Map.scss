@@ -1,6 +1,7 @@
 .leaflet-container {
     border-radius: 50px;
     border: 2px solid var(--mainColor);
+    z-index: 1;
 }
 .leaflet-popup-content-wrapper {
     font-size: 16px;

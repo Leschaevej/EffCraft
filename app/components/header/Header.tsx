@@ -7,6 +7,98 @@ import { FaShoppingBag, FaHeart, FaBars, FaUser } from "react-icons/fa";
 import { signIn, signOut, useSession } from "next-auth/react";
 import "./Header.scss";
 
+// Composant Timer intégré
+function CartTimer() {
+    const { data: session } = useSession();
+    const [timeLeft, setTimeLeft] = useState<number | null>(null);
+    const [expiryTime, setExpiryTime] = useState<Date | null>(null);
+
+    useEffect(() => {
+        const eventSource = new EventSource("/api/cart");
+        eventSource.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === "product_reserved" && session?.user) {
+                const expiry = new Date(data.data.reservedUntil);
+                setExpiryTime(expiry);
+            } else if (data.type === "product_available") {
+                checkCartExpiry();
+            }
+        };
+        eventSource.onerror = () => {
+            console.error("Erreur SSE");
+            eventSource.close();
+        };
+        return () => eventSource.close();
+    }, [session]);
+
+    const checkCartExpiry = async () => {
+        if (!session?.user) {
+            setTimeLeft(null);
+            setExpiryTime(null);
+            return;
+        }
+        try {
+            const res = await fetch("/api/user?type=cart");
+            if (!res.ok) {
+                setTimeLeft(null);
+                return;
+            }
+            const data = await res.json();
+            if (data.cart && data.cart.length > 0) {
+                const firstItem = data.cart[0];
+                if (firstItem.addedAt) {
+                    const addedAt = new Date(firstItem.addedAt);
+                    const expiry = new Date(addedAt.getTime() + 15 * 60 * 1000);
+                    setExpiryTime(expiry);
+                }
+            } else {
+                setTimeLeft(null);
+                setExpiryTime(null);
+            }
+        } catch (error) {
+            console.error("Erreur récupération panier:", error);
+        }
+    };
+
+    useEffect(() => {
+        checkCartExpiry();
+    }, [session]);
+
+    useEffect(() => {
+        if (!expiryTime) {
+            setTimeLeft(null);
+            return;
+        }
+        const updateTimer = () => {
+            const now = new Date();
+            const diff = expiryTime.getTime() - now.getTime();
+            if (diff <= 0) {
+                setTimeLeft(0);
+                setExpiryTime(null);
+                fetch("/api/cart?action=cleanup", { method: "POST" });
+                return;
+            }
+            setTimeLeft(Math.floor(diff / 1000));
+        };
+        updateTimer();
+        const interval = setInterval(updateTimer, 1000);
+        return () => clearInterval(interval);
+    }, [expiryTime]);
+
+    if (timeLeft === null || timeLeft === 0) return null;
+
+    const minutes = Math.floor(timeLeft / 60);
+    const seconds = timeLeft % 60;
+
+    return (
+        <div className="cart-timer">
+            <span className="timer-text">
+                Réservé pour : {minutes}:{seconds.toString().padStart(2, "0")}
+            </span>
+        </div>
+    );
+}
+
 export default function Header() {
     const pathname = usePathname();
     const router = useRouter();
@@ -27,6 +119,34 @@ export default function Header() {
             closingCount = 0;
         }
     };
+    const closeMenusOnly = () => {
+        if (menuOpen || loginOpen) {
+            setIsClosingMenuOrLogin(true);
+            closingCount = 0;
+            if (menuOpen) {
+                setMenuOpen(false);
+                setTimeout(() => {
+                    setMenuVisible(false);
+                    checkEndClosing();
+                }, 300);
+            } else {
+                closingCount++;
+            }
+            if (loginOpen) {
+                setLoginOpen(false);
+                setTimeout(() => {
+                    setLoginVisible(false);
+                    checkEndClosing();
+                }, 300);
+            } else {
+                closingCount++;
+            }
+            setTimeout(() => {
+                setIsClosingMenuOrLogin(false);
+            }, 300);
+        }
+    };
+
     const closeAllMenus = () => {
         if (menuOpen || loginOpen) {
             setIsClosingMenuOrLogin(true);
@@ -60,6 +180,8 @@ export default function Header() {
             if (isClosingMenuOrLogin) return;
             const currentScrollY = window.scrollY;
             const scrollingUp = currentScrollY < lastScrollY || currentScrollY <= 0;
+
+            // Défilement vers le bas avec menu ouvert → ferme menu ET header
             if (!scrollingUp && (loginOpen || menuOpen)) {
                 closeAllMenus();
                 setTimeout(() => {
@@ -68,6 +190,14 @@ export default function Header() {
                 setLastScrollY(currentScrollY);
                 return;
             }
+
+            // Défilement vers le haut avec menu ouvert → ferme SEULEMENT le menu
+            if (scrollingUp && (loginOpen || menuOpen)) {
+                closeMenusOnly();
+                setLastScrollY(currentScrollY);
+                return;
+            }
+
             setShowHeader(scrollingUp);
             setLastScrollY(currentScrollY);
         }
@@ -116,23 +246,37 @@ export default function Header() {
     };
     const toggleMenu = () => {
         if (menuOpen) {
-            closeAllMenus();
+            closeMenusOnly();
         } else {
-            setMenuVisible(true);
-            setTimeout(() => setMenuOpen(true), 10);
             if (loginOpen) {
-                closeAllMenus();
+                // Fermer login d'abord, puis ouvrir menu après l'animation
+                closeMenusOnly();
+                setTimeout(() => {
+                    setMenuVisible(true);
+                    setTimeout(() => setMenuOpen(true), 50);
+                }, 300);
+            } else {
+                // Pas de menu ouvert, ouvrir directement
+                setMenuVisible(true);
+                setTimeout(() => setMenuOpen(true), 10);
             }
         }
     };
     const toggleLogin = () => {
         if (loginOpen) {
-            closeAllMenus();
+            closeMenusOnly();
         } else {
-            setLoginVisible(true);
-            setTimeout(() => setLoginOpen(true), 10);
             if (menuOpen) {
-                closeAllMenus();
+                // Fermer menu d'abord, puis ouvrir login après l'animation
+                closeMenusOnly();
+                setTimeout(() => {
+                    setLoginVisible(true);
+                    setTimeout(() => setLoginOpen(true), 50);
+                }, 300);
+            } else {
+                // Pas de menu ouvert, ouvrir directement
+                setLoginVisible(true);
+                setTimeout(() => setLoginOpen(true), 10);
             }
         }
     };
@@ -144,19 +288,22 @@ export default function Header() {
                         <img src="/logo.webp" alt="Logo Eff Craft" />
                     </Link>
                 </h1>
-                <nav>
-                    <FaUser className="icon" onClick={toggleLogin} />
-                    <Link href="/favorites">
-                        <FaHeart className="icon" />
-                    </Link>
-                    <Link href="/cart">
-                        <FaShoppingBag className="icon" />
-                    </Link>
-                    <FaBars className="icon" onClick={toggleMenu} />
-                </nav>
+                <div className="right-section">
+                    <CartTimer />
+                    <nav>
+                        <FaUser className="icon" onClick={toggleLogin} />
+                        <Link href="/favorites">
+                            <FaHeart className="icon" />
+                        </Link>
+                        <Link href="/cart">
+                            <FaShoppingBag className="icon" />
+                        </Link>
+                        <FaBars className="icon" onClick={toggleMenu} />
+                    </nav>
+                </div>
             </header>
             {(menuOpen || loginOpen) && (
-                <div className="overlay" onClick={closeAllMenus} />
+                <div className="overlay" onClick={closeMenusOnly} />
             )}
             {menuVisible && (
                 <div className={`menu ${menuOpen ? "open" : "closed"}`}>

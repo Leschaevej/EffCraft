@@ -20,9 +20,24 @@
                 font-size: 48px;
                 font-weight: 800;
             }
+            .price-container {
+                display: flex;
+                flex-direction: row;
+                gap: 15px;
+                align-items: center;
+            }
             .price{
                 font-size: 48px;
                 font-weight: 800;
+                margin: 0;
+            }
+            .reserved-status {
+                font-size: 40px;
+                font-weight: 900;
+                color: var(--reservedColor);
+                text-transform: uppercase;
+                margin: 0;
+                letter-spacing: 1px;
             }
             .description{
                 font-size: 32px;
@@ -37,10 +52,23 @@
                 border: none;
                 border-radius: 15px;
                 cursor: pointer;
-                transition: background-color 0.3s ease, color 0.3s ease;
+                transition: background-color 0.3s ease, color 0.3s ease, opacity 0.3s ease;
                 &:hover {
                     color: black;
                     background-color: var(--secondColor)
+                }
+                &.reserved {
+                    background-color: #999;
+                    color: #ccc;
+                    cursor: not-allowed;
+                    opacity: 0.6;
+                    &:hover {
+                        background-color: #999;
+                        color: #ccc;
+                    }
+                }
+                &:disabled {
+                    cursor: not-allowed;
                 }
             }
         }

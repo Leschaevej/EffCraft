@@ -3,8 +3,10 @@ import mongoose from "mongoose";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]/route";
 import User from "../../lib/models/User";
+import Product from "../../lib/models/Product";
 import { ObjectId } from "mongodb";
 import { NextRequest } from "next/server";
+import { notifyClients } from "../cart/route";
 
 interface CartItem {
     productId: mongoose.Types.ObjectId;
@@ -12,7 +14,9 @@ interface CartItem {
 }
 async function dbConnect() {
     if (mongoose.connection.readyState !== 1) {
-        await mongoose.connect(process.env.MONGODB_URI!);
+        await mongoose.connect(process.env.MONGODB_URI!, {
+            dbName: "effcraftdatabase"
+        });
     }
 }
 export async function GET(request: NextRequest) {
@@ -25,9 +29,10 @@ export async function GET(request: NextRequest) {
     if (!user) {
         return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
     }
+    console.log("User trouvé:", { email: user.email, favoritesCount: user.favorites?.length, cartCount: user.cart?.length });
     const type = request.nextUrl.searchParams.get("type");
     const client = await import("../../lib/mongodb").then((mod) => mod.default);
-    const db = client.db();
+    const db = client.db("effcraftdatabase");
     if (type === "cart") {
         const productIds = user.cart.map((item: CartItem) => new ObjectId(item.productId));
         const products = await db
@@ -53,11 +58,17 @@ export async function GET(request: NextRequest) {
     }
     if (type === "favorites") {
         const favoritesIds = user.favorites.map((id: mongoose.Types.ObjectId) => new ObjectId(id));
+        console.log("Favorites IDs:", favoritesIds);
         const favorites = await db
         .collection("products")
         .find({ _id: { $in: favoritesIds } })
         .toArray();
-        return NextResponse.json({ favorites });
+        console.log("Favorites trouvés:", favorites.length);
+        const favoritesWithStringId = favorites.map((f) => ({
+            ...f,
+            _id: f._id.toString(),
+        }));
+        return NextResponse.json({ favorites: favoritesWithStringId });
     }
     return NextResponse.json({ error: "Type invalide" }, { status: 400 });
 }
@@ -76,15 +87,57 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
     }
     if (action === "addCart") {
+        // Vérifier si le produit existe et est disponible
+        const product = await Product.findById(productId);
+        if (!product) {
+            return NextResponse.json({ error: "Produit non trouvé" }, { status: 404 });
+        }
+
+        // Vérifier si le produit est déjà réservé par quelqu'un d'autre
+        if (product.status === "reserved" && product.reservedBy?.toString() !== user._id.toString()) {
+            return NextResponse.json({
+                error: "Ce produit est déjà réservé par un autre utilisateur",
+                reservedUntil: product.reservedUntil
+            }, { status: 409 });
+        }
+
+        // Vérifier si déjà dans le panier de l'utilisateur
         const exists = user.cart.some(
-        (item: CartItem) => item.productId.toString() === productId
+            (item: CartItem) => item.productId.toString() === productId
         );
+
         if (!exists) {
-        const now = new Date();
-        user.cart.push({
-            productId: new mongoose.Types.ObjectId(productId),
-            addedAt: now,
-        });
+            const now = new Date();
+            const reservedUntil = new Date(now.getTime() + 15 * 60 * 1000); // +15 minutes
+
+            // Ajouter au panier de l'utilisateur
+            user.cart.push({
+                productId: new mongoose.Types.ObjectId(productId),
+                addedAt: now,
+            });
+
+            // Réserver le produit
+            product.status = "reserved";
+            product.reservedBy = user._id as mongoose.Types.ObjectId;
+            product.reservedUntil = reservedUntil;
+            await product.save();
+
+            await user.save();
+
+            // Notifier tous les clients connectés qu'un produit a été réservé
+            notifyClients({
+                type: "product_reserved",
+                data: {
+                    productId: productId,
+                    reservedUntil: reservedUntil.toISOString()
+                }
+            });
+
+            return NextResponse.json({
+                success: true,
+                cart: user.cart,
+                reservedUntil: reservedUntil.toISOString()
+            });
         }
     } else if (action === "add_favorite") {
         const alreadyFav = user.favorites.some(
@@ -114,9 +167,24 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
     }
     if (action === "remove_cart") {
+        // Libérer le produit réservé
+        const product = await Product.findById(productId);
+        if (product && product.reservedBy?.toString() === user._id.toString()) {
+            product.status = "available";
+            product.reservedBy = undefined;
+            product.reservedUntil = undefined;
+            await product.save();
+        }
+
         user.cart = user.cart.filter(
-        (item: CartItem) => item.productId.toString() !== productId
+            (item: CartItem) => item.productId.toString() !== productId
         );
+
+        // Notifier tous les clients que le produit est à nouveau disponible
+        notifyClients({
+            type: "product_available",
+            data: { productId: productId }
+        });
     } else if (action === "remove_favorite") {
         user.favorites = user.favorites.filter(
         (id: mongoose.Types.ObjectId) => id.toString() !== productId

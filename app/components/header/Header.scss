@@ -9,7 +9,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 0 50px;
-    z-index: 1;
+    z-index: 1000;
     transition: transform 0.18s ease-in-out, box-shadow 0.3s ease;
     &.hide {
         transform: translateY(-100%);
@@ -24,6 +24,11 @@
             height: 100%;
             padding: 10px 0;
         }
+    }
+    .right-section {
+        display: flex;
+        align-items: center;
+        gap: 50px;
     }
     nav {
         display: flex;
@@ -42,7 +47,7 @@
     left: 0;
     width: 100vw;
     height: 100vh;
-    z-index: 2;
+    z-index: 998;
     cursor: pointer;
 }
 .menu,
@@ -55,7 +60,7 @@
     background-color: var(--mainBackgroundColor);
     font-size: 40px;
     border-bottom-left-radius: 50px;
-    z-index: 2;
+    z-index: 999;
     transform: translateX(100%);
     pointer-events: none;
     transition: transform 0.3s ease, opacity 0.3s ease, box-shadow 0.3s ease;
@@ -123,5 +128,25 @@
         &:hover {
             border: 3px solid var(--mainColor);
         }
+    }
+}
+.cart-timer {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background-color: var(--secondColor);
+    color: var(--mainTextColor);
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+
+    .timer-icon {
+        font-size: 18px;
+    }
+
+    .timer-text {
+        white-space: nowrap;
     }
 }

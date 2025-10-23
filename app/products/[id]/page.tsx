@@ -12,6 +12,8 @@ type Bijou = {
     price: number;
     images: string[];
     category?: string;
+    status?: string;
+    reservedBy?: string | null;
 };
 type Props = {
     params: { id: string };
@@ -42,6 +44,8 @@ export default async function ProductPage({ params }: Props) {
         price: bijouRaw.price,
         images: bijouRaw.images,
         category: bijouRaw.category,
+        status: bijouRaw.status || "available",
+        reservedBy: bijouRaw.reservedBy ? bijouRaw.reservedBy.toString() : null,
     };
     return (
         <main className="product">
@@ -54,7 +58,12 @@ export default async function ProductPage({ params }: Props) {
                 />
                 <div className="info">
                     <h3>{bijou.name}</h3>
-                    <p className="price">{bijou.price} €</p>
+                    <div className="price-container">
+                        <p className="price">{bijou.price} €</p>
+                        {bijou.status === "reserved" && (
+                            <p className="reserved-status">RÉSERVÉ</p>
+                        )}
+                    </div>
                     <p className="description">{bijou.description}</p>
                     <AddToCartButton bijou={bijou} />
                 </div>

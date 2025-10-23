@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import "./Card.scss";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { useReservation } from "../../context/ReservationContext";
 import ArrowButton from "../../components/Arrow";
 
 type Bijou = {
@@ -13,6 +14,8 @@ type Bijou = {
     price: number;
     category?: string;
     images: string[];
+    status?: string;
+    reservedBy?: string | null;
 };
 type CardProps = {
     bijou: Bijou;
@@ -59,9 +62,15 @@ export default function Card({
     showFavori = true,
 }: CardProps) {
     const { data: session } = useSession();
+    const { reservedProducts, availableProducts } = useReservation();
     const [isFavori, setIsFavori] = useState(initialIsFavori);
     const [loading, setLoading] = useState(false);
     const [currentIndex, setCurrentIndex] = useState(0);
+    // Si SSE a notifié que le produit est disponible, c'est prioritaire
+    // Sinon on se fie au contexte réservé ou au status de la DB
+    const isReserved = availableProducts.has(bijou._id)
+        ? false
+        : (reservedProducts.has(bijou._id) || bijou.status === "reserved");
     useEffect(() => {
     const addPendingFavori = async () => {
         const pendingId = sessionStorage.getItem("pendingFavori");
@@ -70,7 +79,10 @@ export default function Card({
             const res = await fetch("/api/user", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productId: pendingId }),
+            body: JSON.stringify({
+                action: "add_favorite",
+                productId: pendingId
+            }),
             });
             if (res.ok) {
             if (pendingId === bijou._id) {
@@ -115,6 +127,13 @@ export default function Card({
             throw new Error(data.error || "Erreur lors de la requête");
         }
         setIsFavori(!isFavori);
+
+        // Émettre un événement si le favori a été retiré
+        if (isFavori) {
+            window.dispatchEvent(new CustomEvent("favorite-removed", {
+                detail: { productId: bijou._id }
+            }));
+        }
         } catch (error) {
         console.error(error);
         }
@@ -154,7 +173,12 @@ export default function Card({
             )}
         </div>
         {showName && <h3>{bijou.name}</h3>}
-        {showPrice && <p className="prix">{bijou.price} €</p>}
+        {showPrice && (
+            <div className="price-container">
+                <p className="prix">{bijou.price} €</p>
+                {isReserved && <p className="reserved-status">RÉSERVÉ</p>}
+            </div>
+        )}
         </div>
     );
     return clickable ? <Link href={`/products/${bijou._id}`}>{content}</Link> : content;

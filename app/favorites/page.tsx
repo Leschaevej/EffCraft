@@ -19,6 +19,8 @@ type Bijou = {
 export default function Favorites() {
     const { data: session, status } = useSession();
     const [favorites, setFavorites] = useState<Bijou[] | null>(null); // null = pas encore chargé
+    const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
+
     useEffect(() => {
         if (status !== "authenticated") return;
         const fetchFavorites = async () => {
@@ -34,6 +36,29 @@ export default function Favorites() {
         };
         fetchFavorites();
     }, [status]);
+
+    useEffect(() => {
+        const handleFavoriteRemoved = (e: Event) => {
+            const customEvent = e as CustomEvent<{ productId: string }>;
+            const productId = customEvent.detail.productId;
+
+            // Marquer comme "en cours de suppression"
+            setRemovingIds(prev => new Set(prev).add(productId));
+
+            // Supprimer après 3 secondes
+            setTimeout(() => {
+                setFavorites(prev => prev ? prev.filter(bijou => bijou._id !== productId) : prev);
+                setRemovingIds(prev => {
+                    const newSet = new Set(prev);
+                    newSet.delete(productId);
+                    return newSet;
+                });
+            }, 3000);
+        };
+
+        window.addEventListener("favorite-removed", handleFavoriteRemoved);
+        return () => window.removeEventListener("favorite-removed", handleFavoriteRemoved);
+    }, []);
     const isLoading = status === "loading" || (status === "authenticated" && favorites === null);
     return (
         <main className={`favorites ${status === "unauthenticated" ? "unloged" : ""}`}>
@@ -70,7 +95,12 @@ export default function Favorites() {
                     {!isLoading && Array.isArray(favorites) && favorites.length > 0 && (
                     <div className="grid">
                         {favorites.map((bijou) => (
-                        <Card key={bijou._id} bijou={bijou} initialIsFavori={true} />
+                        <div
+                            key={bijou._id}
+                            className={removingIds.has(bijou._id) ? "removing" : ""}
+                        >
+                            <Card bijou={bijou} initialIsFavori={true} />
+                        </div>
                         ))}
                     </div>
                     )}

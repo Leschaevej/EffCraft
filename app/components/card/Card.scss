@@ -7,8 +7,9 @@
     cursor: pointer;
     .card-image {
         position: relative;
+        overflow: hidden;
         img {
-            border-radius: 15%;
+            border-radius: clamp(20px, 15%, 60px);
             width: 100%;
             aspect-ratio: 4 / 5;
             object-fit: cover;
@@ -41,6 +42,7 @@
                 }
             }
         }
+
         .favori {
             position: absolute;
             top: 10%;
@@ -78,9 +80,25 @@
         font-size: 20px;
         font-weight: 400;
     }
+    .price-container {
+        display: flex;
+        flex-direction: row;
+        gap: 10px;
+        align-items: center;
+        justify-content: center;
+    }
     .prix {
         font-size: 24px;
         font-weight: 800;
+        margin: 0;
+    }
+    .reserved-status {
+        font-size: 20px;
+        font-weight: 900;
+        color: var(--reservedColor);
+        text-transform: uppercase;
+        margin: 0;
+        letter-spacing: 1px;
     }
 }
 .card.skeleton {
@@ -89,7 +107,7 @@
         width: 100%;
         aspect-ratio: 4 / 5;
         background-color: var(--thirdBackgroundColor);
-        border-radius: 15%;
+        border-radius: clamp(20px, 15%, 60px);
     }
     .text-placeholder {
         height: 29px;

@@ -13,6 +13,9 @@ export async function GET() {
     const productsWithStringId = products.map((p) => ({
       ...p,
       _id: p._id.toString(),
+      status: p.status || "available",
+      reservedBy: p.reservedBy ? p.reservedBy.toString() : null,
+      reservedUntil: p.reservedUntil || null,
     }));
     return NextResponse.json(productsWithStringId);
   } catch (error) {
@@ -38,6 +41,8 @@ export async function POST(request: Request) {
       description: data.description,
       category: data.category,
       images: [],
+      status: "available",
+      createdAt: new Date(),
     });
 
     const productId = insertedId.toString();

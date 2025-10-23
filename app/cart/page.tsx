@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession, signIn } from "next-auth/react";
 import { nothingYouCouldDo } from "../font";
 import Card from "../components/card/Card";
 import "./page.scss";
@@ -14,27 +15,57 @@ export type Bijou = {
 };
 
 export default function Cart() {
+    const { data: session, status } = useSession();
     const [panier, setCart] = useState<Bijou[]>([]);
     const [loading, setLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    useEffect(() => {
-        const fetchCart = async () => {
+
+    const fetchCart = async () => {
+        if (status !== "authenticated") {
+            setLoading(false);
+            return;
+        }
         try {
             const res = await fetch("/api/user?type=cart", { credentials: "include" });
             const data = await res.json();
             if (res.ok) {
-            setCart(data.cart);
-            setErrorMessage(null);
+                setCart(data.cart);
+                setErrorMessage(null);
             } else {
-            setErrorMessage(data.error || "Erreur lors de la récupération du panier");
+                setErrorMessage(data.error || "Erreur lors de la récupération du panier");
             }
         } catch {
             setErrorMessage("Erreur réseau lors de la récupération du panier");
         } finally {
             setLoading(false);
         }
-        };
+    };
+
+    useEffect(() => {
         fetchCart();
+    }, [status]);
+
+    // Écouter les événements SSE pour mettre à jour le panier automatiquement
+    useEffect(() => {
+        const eventSource = new EventSource("/api/cart");
+
+        eventSource.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+
+            // Quand un produit devient disponible (cleanup), recharger le panier
+            if (data.type === "product_available") {
+                console.log("Produit libéré, rechargement du panier...");
+                fetchCart();
+            }
+        };
+
+        eventSource.onerror = () => {
+            console.error("Erreur SSE sur page panier");
+        };
+
+        return () => {
+            eventSource.close();
+        };
     }, []);
     const handleRemove = async (id: string) => {
         try {
@@ -56,21 +87,44 @@ export default function Cart() {
         }
     };
     const totalPrix = panier.reduce((acc, bijou) => acc + bijou.price, 0);
-    if (loading) {
+    const isLoading = status === "loading" || (status === "authenticated" && loading);
+
+    if (isLoading) {
         return <p>Chargement du panier...</p>;
     }
     return (
-        <main className="cart">
+        <main className={`cart ${status === "unauthenticated" ? "unloged" : ""}`}>
             <div className="conteneur">
                 <h2 className={nothingYouCouldDo.className}>Panier</h2>
-                {errorMessage && (
-                    <div className="error" onClick={() => setErrorMessage(null)}>
-                        {errorMessage}
-                    </div>
-                )}
-                {panier.length === 0 ? (
-                    <p>Votre panier est vide.</p>
+                {status === "unauthenticated" ? (
+                    <>
+                        <div className="loginFav">
+                            <p>Veuillez vous connecter pour voir votre panier !</p>
+
+                            <button className="google" onClick={() => signIn("google")}>
+                                <img src="/google.webp" alt="Google" />
+                                Se connecter avec Google
+                            </button>
+                            <button className="facebook" onClick={() => alert("Connexion Facebook")}>
+                                <img src="/facebook.webp" alt="Facebook" />
+                                Se connecter avec Facebook
+                            </button>
+                            <button className="apple" onClick={() => alert("Connexion Apple")}>
+                                <img src="/apple.webp" alt="Apple" />
+                                Se connecter avec Apple
+                            </button>
+                        </div>
+                    </>
                 ) : (
+                    <>
+                        {errorMessage && (
+                            <div className="error" onClick={() => setErrorMessage(null)}>
+                                {errorMessage}
+                            </div>
+                        )}
+                        {panier.length === 0 ? (
+                            <p>Votre panier est vide.</p>
+                        ) : (
                 <div className="listTotal">
                     <ul className="list">
                         {panier.map((bijou) => (
@@ -99,6 +153,8 @@ export default function Cart() {
                         <button className="valider">Valider la commande</button>
                     </div>
                 </div>
+                        )}
+                    </>
                 )}
             </div>
         </main>

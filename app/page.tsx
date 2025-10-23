@@ -45,13 +45,16 @@ export default function Home() {
     }, []);
     useEffect(() => {
     async function fetchFavorites() {
-        if (status === "authenticated") { 
+        if (status === "authenticated") {
         const pendingId = sessionStorage.getItem("pendingFavori");
         if (pendingId) {
-            await fetch("/api/user/favorites", {
+            await fetch("/api/user", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ productId: pendingId }),
+            body: JSON.stringify({
+                action: "add_favorite",
+                productId: pendingId
+            }),
             });
             sessionStorage.removeItem("pendingFavori");
         }
