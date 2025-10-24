@@ -132,8 +132,7 @@ export default function AddForm({ onProductAdded }: AddFormProps) {
           images: imagesPreview,
         }),
       });
-      const result = await res.json();
-      console.log("Produit ajouté:", result);
+      await res.json();
 
       form.reset();
       setSelectedCategory(null);

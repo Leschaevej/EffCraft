@@ -5,6 +5,42 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import cloudinary from "../../../lib/cloudinary";
 
+export async function GET(
+  req: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  const params = await context.params;
+  const { id } = params;
+
+  if (!id || !ObjectId.isValid(id)) {
+    return NextResponse.json({ error: "ID invalide" }, { status: 400 });
+  }
+
+  try {
+    const client = await clientPromise;
+    const db = client.db("effcraftdatabase");
+
+    const product = await db.collection("products").findOne({ _id: new ObjectId(id) });
+    if (!product) {
+      return NextResponse.json({ error: "Produit non trouvé" }, { status: 404 });
+    }
+
+    return NextResponse.json({
+      _id: product._id.toString(),
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      images: product.images,
+      category: product.category,
+      status: product.status || "available",
+      reservedBy: product.reservedBy ? product.reservedBy.toString() : null,
+    });
+  } catch (error) {
+    console.error("Erreur GET /api/products/[id]:", error);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+  }
+}
+
 export async function DELETE(
   req: Request,
   context: { params: Promise<{ id: string }> }

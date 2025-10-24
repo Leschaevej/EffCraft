@@ -18,8 +18,8 @@ function CartTimer() {
         eventSource.onmessage = (event) => {
             const data = JSON.parse(event.data);
             if (data.type === "product_reserved" && session?.user) {
-                const expiry = new Date(data.data.reservedUntil);
-                setExpiryTime(expiry);
+                // Vérifier le panier pour mettre à jour le timer immédiatement
+                checkCartExpiry();
             } else if (data.type === "product_available") {
                 checkCartExpiry();
             }

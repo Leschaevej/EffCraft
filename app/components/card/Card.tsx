@@ -62,15 +62,19 @@ export default function Card({
     showFavori = true,
 }: CardProps) {
     const { data: session } = useSession();
-    const { reservedProducts, availableProducts } = useReservation();
+    const { reservedProducts, availableProducts, currentUserId } = useReservation();
     const [isFavori, setIsFavori] = useState(initialIsFavori);
     const [loading, setLoading] = useState(false);
     const [currentIndex, setCurrentIndex] = useState(0);
+
     // Si SSE a notifié que le produit est disponible, c'est prioritaire
     // Sinon on se fie au contexte réservé ou au status de la DB
     const isReserved = availableProducts.has(bijou._id)
         ? false
         : (reservedProducts.has(bijou._id) || bijou.status === "reserved");
+
+    // Vérifier si c'est l'utilisateur actuel qui a réservé
+    const isReservedByMe = isReserved && bijou.reservedBy === currentUserId;
     useEffect(() => {
     const addPendingFavori = async () => {
         const pendingId = sessionStorage.getItem("pendingFavori");
@@ -176,7 +180,11 @@ export default function Card({
         {showPrice && (
             <div className="price-container">
                 <p className="prix">{bijou.price} €</p>
-                {isReserved && <p className="reserved-status">RÉSERVÉ</p>}
+                {isReserved && (
+                    <p className="reserved-status">
+                        {isReservedByMe ? "DANS LE PANIER" : "RÉSERVÉ"}
+                    </p>
+                )}
             </div>
         )}
         </div>

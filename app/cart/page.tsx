@@ -54,7 +54,6 @@ export default function Cart() {
 
             // Quand un produit devient disponible (cleanup), recharger le panier
             if (data.type === "product_available") {
-                console.log("Produit libéré, rechargement du panier...");
                 fetchCart();
             }
         };

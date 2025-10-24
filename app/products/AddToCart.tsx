@@ -13,7 +13,13 @@ type Bijou = {
     status?: string;
     reservedBy?: string | null;
 };
-export default function AddToCartButton({ bijou }: { bijou: Bijou }) {
+
+interface AddToCartButtonProps {
+    bijou: Bijou;
+    onAddedToCart?: () => void;
+}
+
+export default function AddToCartButton({ bijou, onAddedToCart }: AddToCartButtonProps) {
     const { data: session } = useSession();
     const [showModal, setShowModal] = useState(false);
     const [showErrorModal, setShowErrorModal] = useState(false);
@@ -41,6 +47,7 @@ export default function AddToCartButton({ bijou }: { bijou: Bijou }) {
                     });
                     const data = await res.json();
                     if (res.ok) {
+                        onAddedToCart?.();
                         setShowModal(true);
                     } else if (res.status === 409) {
                         // Produit déjà réservé par quelqu'un d'autre
@@ -64,6 +71,9 @@ export default function AddToCartButton({ bijou }: { bijou: Bijou }) {
             document.dispatchEvent(new Event("open-login-panel"));
             return;
         }
+
+        // Appeler le callback AVANT l'API pour éviter le flash
+        onAddedToCart?.();
 
         try {
         const res = await fetch("/api/user", {

@@ -29,8 +29,17 @@ export async function GET(request: NextRequest) {
     if (!user) {
         return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
     }
-    console.log("User trouvé:", { email: user.email, favoritesCount: user.favorites?.length, cartCount: user.cart?.length });
     const type = request.nextUrl.searchParams.get("type");
+
+    // Si type=me, retourner juste l'ID et les infos de base
+    if (type === "me") {
+        return NextResponse.json({
+            userId: user._id.toString(),
+            email: user.email,
+            name: user.name
+        });
+    }
+
     const client = await import("../../lib/mongodb").then((mod) => mod.default);
     const db = client.db("effcraftdatabase");
     if (type === "cart") {
@@ -58,12 +67,10 @@ export async function GET(request: NextRequest) {
     }
     if (type === "favorites") {
         const favoritesIds = user.favorites.map((id: mongoose.Types.ObjectId) => new ObjectId(id));
-        console.log("Favorites IDs:", favoritesIds);
         const favorites = await db
         .collection("products")
         .find({ _id: { $in: favoritesIds } })
         .toArray();
-        console.log("Favorites trouvés:", favorites.length);
         const favoritesWithStringId = favorites.map((f) => ({
             ...f,
             _id: f._id.toString(),

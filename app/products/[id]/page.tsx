@@ -1,9 +1,11 @@
-import clientPromise from "../../lib/mongodb";
-import { ObjectId } from "mongodb";
-import { notFound } from "next/navigation";
+"use client";
+
+import { useEffect, useState } from "react";
+import { useParams, notFound } from "next/navigation";
 import "./page.scss";
 import Card from "../../components/card/Card";
 import AddToCartButton from "../AddToCart";
+import { useReservation } from "../../context/ReservationContext";
 
 type Bijou = {
     _id: string;
@@ -15,38 +17,65 @@ type Bijou = {
     status?: string;
     reservedBy?: string | null;
 };
-type Props = {
-    params: { id: string };
-};
-export async function generateStaticParams() {
-    const client = await clientPromise;
-    const db = client.db("effcraftdatabase");
-    const produits = await db
-        .collection("products")
-        .find({}, { projection: { _id: 1 } })
-        .toArray();
-    return produits.map((produit) => ({
-        id: produit._id.toString(),
-    }));
-}
-export default async function ProductPage({ params }: Props) {
-    const { id } = await params;
-    if (!ObjectId.isValid(id)) return notFound();
-    const client = await clientPromise;
-    const db = client.db("effcraftdatabase");
-    const collection = db.collection("products");
-    const bijouRaw = await collection.findOne({ _id: new ObjectId(id) });
-    if (!bijouRaw) return notFound();
-    const bijou: Bijou = {
-        _id: bijouRaw._id.toString(),
-        name: bijouRaw.name,
-        description: bijouRaw.description,
-        price: bijouRaw.price,
-        images: bijouRaw.images,
-        category: bijouRaw.category,
-        status: bijouRaw.status || "available",
-        reservedBy: bijouRaw.reservedBy ? bijouRaw.reservedBy.toString() : null,
+
+export default function ProductPage() {
+    const params = useParams();
+    const id = params.id as string;
+    const [bijou, setBijou] = useState<Bijou | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [justAddedToCart, setJustAddedToCart] = useState(false);
+    const { reservedProducts, availableProducts, currentUserId } = useReservation();
+
+    const fetchProduct = async (silent = false) => {
+        try {
+            const res = await fetch(`/api/products/${id}`);
+            if (!res.ok) {
+                notFound();
+                return;
+            }
+            const data = await res.json();
+            setBijou(data);
+        } catch (error) {
+            console.error("Erreur lors du chargement du produit:", error);
+        } finally {
+            if (!silent) {
+                setLoading(false);
+            }
+        }
     };
+
+    useEffect(() => {
+        fetchProduct();
+    }, [id]);
+
+    // Refetch silencieux le produit quand il est réservé/libéré pour mettre à jour reservedBy
+    useEffect(() => {
+        if (bijou && (reservedProducts.has(bijou._id) || availableProducts.has(bijou._id))) {
+            // Petit délai pour laisser la DB se mettre à jour
+            setTimeout(() => {
+                fetchProduct(true);
+            }, 100);
+        }
+    }, [reservedProducts, availableProducts]);
+
+    if (loading) return <p>Chargement...</p>;
+    if (!bijou) return notFound();
+
+    // Vérifier le statut réservé en temps réel via SSE
+    const isReserved = availableProducts.has(bijou._id)
+        ? false
+        : (reservedProducts.has(bijou._id) || bijou.status === "reserved");
+
+    // Vérifier si c'est l'utilisateur actuel qui a réservé
+    const isReservedByMe = isReserved && (
+        bijou.reservedBy === currentUserId ||
+        justAddedToCart // Si on vient de l'ajouter, c'est forcément nous
+    );
+
+    const handleAddedToCart = () => {
+        setJustAddedToCart(true);
+    };
+
     return (
         <main className="product">
             <div className="conteneur">
@@ -60,12 +89,14 @@ export default async function ProductPage({ params }: Props) {
                     <h3>{bijou.name}</h3>
                     <div className="price-container">
                         <p className="price">{bijou.price} €</p>
-                        {bijou.status === "reserved" && (
-                            <p className="reserved-status">RÉSERVÉ</p>
+                        {isReserved && (
+                            <p className="reserved-status">
+                                {isReservedByMe ? "DANS LE PANIER" : "RÉSERVÉ"}
+                            </p>
                         )}
                     </div>
                     <p className="description">{bijou.description}</p>
-                    <AddToCartButton bijou={bijou} />
+                    <AddToCartButton bijou={bijou} onAddedToCart={handleAddedToCart} />
                 </div>
             </div>
         </main>
