@@ -30,8 +30,6 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
     }
     const type = request.nextUrl.searchParams.get("type");
-
-    // Si type=me, retourner juste l'ID et les infos de base
     if (type === "me") {
         return NextResponse.json({
             userId: user._id.toString(),
@@ -39,7 +37,6 @@ export async function GET(request: NextRequest) {
             name: user.name
         });
     }
-
     const client = await import("../../lib/mongodb").then((mod) => mod.default);
     const db = client.db("effcraftdatabase");
     if (type === "cart") {
@@ -63,7 +60,10 @@ export async function GET(request: NextRequest) {
             };
         })
         .filter(Boolean);
-        return NextResponse.json({ cart: cartDetailed });
+        return NextResponse.json({
+            cart: cartDetailed,
+            cartExpiresAt: user.cartExpiresAt
+        });
     }
     if (type === "favorites") {
         const favoritesIds = user.favorites.map((id: mongoose.Types.ObjectId) => new ObjectId(id));
@@ -94,56 +94,47 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
     }
     if (action === "addCart") {
-        // Vérifier si le produit existe et est disponible
         const product = await Product.findById(productId);
         if (!product) {
             return NextResponse.json({ error: "Produit non trouvé" }, { status: 404 });
         }
-
-        // Vérifier si le produit est déjà réservé par quelqu'un d'autre
         if (product.status === "reserved" && product.reservedBy?.toString() !== user._id.toString()) {
             return NextResponse.json({
                 error: "Ce produit est déjà réservé par un autre utilisateur",
                 reservedUntil: product.reservedUntil
             }, { status: 409 });
         }
-
-        // Vérifier si déjà dans le panier de l'utilisateur
         const exists = user.cart.some(
             (item: CartItem) => item.productId.toString() === productId
         );
-
         if (!exists) {
             const now = new Date();
-            const reservedUntil = new Date(now.getTime() + 15 * 60 * 1000); // +15 minutes
-
-            // Ajouter au panier de l'utilisateur
+            let cartExpiresAt: Date;
+            if (user.cart.length === 0 || !user.cartExpiresAt) {
+                cartExpiresAt = new Date(now.getTime() + 15 * 60 * 1000);
+                user.cartExpiresAt = cartExpiresAt;
+            } else {
+                cartExpiresAt = user.cartExpiresAt;
+            }
             user.cart.push({
                 productId: new mongoose.Types.ObjectId(productId),
                 addedAt: now,
             });
-
-            // Réserver le produit
             product.status = "reserved";
             product.reservedBy = user._id as mongoose.Types.ObjectId;
-            product.reservedUntil = reservedUntil;
             await product.save();
-
             await user.save();
-
-            // Notifier tous les clients connectés qu'un produit a été réservé
             notifyClients({
                 type: "product_reserved",
                 data: {
                     productId: productId,
-                    reservedUntil: reservedUntil.toISOString()
+                    cartExpiresAt: cartExpiresAt.toISOString()
                 }
             });
-
             return NextResponse.json({
                 success: true,
                 cart: user.cart,
-                reservedUntil: reservedUntil.toISOString()
+                expiresAt: cartExpiresAt.toISOString()
             });
         }
     } else if (action === "add_favorite") {
@@ -174,7 +165,6 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
     }
     if (action === "remove_cart") {
-        // Libérer le produit réservé
         const product = await Product.findById(productId);
         if (product && product.reservedBy?.toString() === user._id.toString()) {
             product.status = "available";
@@ -182,12 +172,12 @@ export async function DELETE(request: Request) {
             product.reservedUntil = undefined;
             await product.save();
         }
-
         user.cart = user.cart.filter(
             (item: CartItem) => item.productId.toString() !== productId
         );
-
-        // Notifier tous les clients que le produit est à nouveau disponible
+        if (user.cart.length === 0) {
+            user.cartExpiresAt = undefined;
+        }
         notifyClients({
             type: "product_available",
             data: { productId: productId }

@@ -52,7 +52,6 @@ export const authOptions: NextAuthOptions = {
             }
             return true;
         } catch (error) {
-            console.error("Erreur signIn:", error);
             return false;
         }
         },

@@ -36,7 +36,7 @@ export default function Home() {
             setBijoux(data);
             setDisplayedBijoux(data);
         } catch (error) {
-            console.error(error);
+            // Erreur silencieuse
         } finally {
             setIsLoading(false);
         }

@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useSession, signIn } from "next-auth/react";
 import { nothingYouCouldDo } from "../font";
 import Card from "../components/card/Card";
+import RelayMap from "../components/relayMap/RelayMap";
+import type { RelayPoint } from "../components/relayMap/RelayMap";
 import "./page.scss";
 
 export type Bijou = {
@@ -19,7 +21,34 @@ export default function Cart() {
     const [panier, setCart] = useState<Bijou[]>([]);
     const [loading, setLoading] = useState(true);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
+    const [showCheckout, setShowCheckout] = useState(false);
+    const [showBillingForm, setShowBillingForm] = useState(false);
+    const [showShippingMethod, setShowShippingMethod] = useState(false);
+    const [sameAddress, setSameAddress] = useState(true);
+    const [selectedShippingMethod, setSelectedShippingMethod] = useState<string | null>(null);
+    const [shippingOptions, setShippingOptions] = useState<any[]>([]);
+    const [loadingShipping, setLoadingShipping] = useState(false);
+    const [showRelayMap, setShowRelayMap] = useState(false);
+    const [relayPoints, setRelayPoints] = useState<RelayPoint[]>([]);
+    const [selectedRelayPoint, setSelectedRelayPoint] = useState<RelayPoint | null>(null);
+    const [loadingRelayPoints, setLoadingRelayPoints] = useState(false);
+    const [formData, setFormData] = useState({
+        nom: "",
+        prenom: "",
+        rue: "",
+        complement: "",
+        codePostal: "",
+        ville: "",
+        telephone: "",
+    });
+    const [billingData, setBillingData] = useState({
+        nom: "",
+        prenom: "",
+        rue: "",
+        complement: "",
+        codePostal: "",
+        ville: "",
+    });
     const fetchCart = async () => {
         if (status !== "authenticated") {
             setLoading(false);
@@ -40,32 +69,26 @@ export default function Cart() {
             setLoading(false);
         }
     };
-
     useEffect(() => {
         fetchCart();
     }, [status]);
-
-    // Écouter les événements SSE pour mettre à jour le panier automatiquement
     useEffect(() => {
-        const eventSource = new EventSource("/api/cart");
-
-        eventSource.onmessage = (event) => {
-            const data = JSON.parse(event.data);
-
-            // Quand un produit devient disponible (cleanup), recharger le panier
-            if (data.type === "product_available") {
+        const handleCartUpdate = (event: Event) => {
+            const customEvent = event as CustomEvent<{ type: string; productId: string }>;
+            if (customEvent.detail.type === "product_available") {
                 fetchCart();
+                if (showCheckout) {
+                    setShowCheckout(false);
+                    setShowBillingForm(false);
+                    setErrorMessage("Votre réservation a expiré. Veuillez ajouter à nouveau les produits à votre panier.");
+                }
             }
         };
-
-        eventSource.onerror = () => {
-            console.error("Erreur SSE sur page panier");
-        };
-
+        window.addEventListener("cart-update", handleCartUpdate);
         return () => {
-            eventSource.close();
+            window.removeEventListener("cart-update", handleCartUpdate);
         };
-    }, []);
+    }, [showCheckout]);
     const handleRemove = async (id: string) => {
         try {
         const res = await fetch("/api/user", {
@@ -87,14 +110,140 @@ export default function Cart() {
     };
     const totalPrix = panier.reduce((acc, bijou) => acc + bijou.price, 0);
     const isLoading = status === "loading" || (status === "authenticated" && loading);
-
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
+    const handleBillingInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setBillingData(prev => ({ ...prev, [name]: value }));
+    };
+    const handleValidateOrder = () => {
+        setShowCheckout(true);
+    };
+    const handleBackToCart = () => {
+        setShowCheckout(false);
+        setShowBillingForm(false);
+        setShowShippingMethod(false);
+        setShowRelayMap(false);
+    };
+    const fetchRelayPoints = async (carrier: string) => {
+        setLoadingRelayPoints(true);
+        try {
+            const response = await fetch("/api/shipping/relay", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    address: formData.rue,
+                    zipcode: formData.codePostal,
+                    city: formData.ville,
+                    country: "FR",
+                    carrier: carrier
+                })
+            });
+            if (!response.ok) {
+                const error = await response.json();
+                setErrorMessage(error.error || "Erreur lors de la récupération des points relais");
+                return;
+            }
+            const data = await response.json();
+            setRelayPoints(data.points || []);
+            setShowRelayMap(true);
+        } catch (error) {
+            setErrorMessage("Erreur réseau lors de la récupération des points relais");
+        } finally {
+            setLoadingRelayPoints(false);
+        }
+    };
+    const handleShippingMethodChange = async (optionId: string) => {
+        setSelectedShippingMethod(optionId);
+        setSelectedRelayPoint(null);
+        const selectedOption = shippingOptions.find(opt => opt.id === optionId);
+        if (selectedOption && selectedOption.type === "relay") {
+            await fetchRelayPoints(selectedOption.operator);
+        } else {
+            setShowRelayMap(false);
+        }
+    };
+    const handleSelectRelayPoint = (point: RelayPoint) => {
+        setSelectedRelayPoint(point);
+        setShowRelayMap(false);
+    };
+    const fetchShippingRates = async () => {
+        setLoadingShipping(true);
+        try {
+            const response = await fetch("/api/shipping/price", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    to_address: {
+                        zipcode: formData.codePostal,
+                        city: formData.ville,
+                        address: formData.rue,
+                        country: "FR",
+                        firstname: formData.prenom,
+                        lastname: formData.nom,
+                        email: session?.user?.email || "client@example.com",
+                        phone: formData.telephone
+                    },
+                    items_count: panier.length,
+                    total_value: totalPrix
+                })
+            });
+            if (!response.ok) {
+                const error = await response.json();
+                setErrorMessage(error.error || "Erreur lors du calcul des frais de port");
+                return;
+            }
+            const data = await response.json();
+            setShippingOptions(data.options || []);
+        } catch (error) {
+            setErrorMessage("Erreur réseau lors du calcul des frais de port");
+        } finally {
+            setLoadingShipping(false);
+        }
+    };
+    const handleContinueToBilling = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (sameAddress) {
+            setShowShippingMethod(true);
+            await fetchShippingRates();
+        } else {
+            setShowBillingForm(true);
+        }
+    };
+    const handleContinueToShipping = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setShowShippingMethod(true);
+        await fetchShippingRates();
+    };
+    const handleContinueFromShipping = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedShippingMethod) {
+            setErrorMessage("Veuillez sélectionner un mode de livraison");
+            return;
+        }
+        const selectedOption = shippingOptions.find(opt => opt.id === selectedShippingMethod);
+        if (selectedOption && selectedOption.type === "relay") {
+            if (!selectedRelayPoint) {
+                await fetchRelayPoints(selectedOption.operator);
+                return;
+            }
+        }
+        alert("Commande validée ! (TODO: implémenter le paiement)");
+    };
+    const handleFinalSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+    };
     if (isLoading) {
         return <p>Chargement du panier...</p>;
     }
     return (
         <main className={`cart ${status === "unauthenticated" ? "unloged" : ""}`}>
             <div className="conteneur">
-                <h2 className={nothingYouCouldDo.className}>Panier</h2>
+                <h2 className={nothingYouCouldDo.className}>
+                    {!showCheckout ? "Panier" : showShippingMethod ? "Mode de livraison" : showBillingForm ? "Facturation" : "Livraison"}
+                </h2>
                 {status === "unauthenticated" ? (
                     <>
                         <div className="loginFav">
@@ -123,7 +272,88 @@ export default function Cart() {
                         )}
                         {panier.length === 0 ? (
                             <p>Votre panier est vide.</p>
-                        ) : (
+                        ) : showShippingMethod ? (
+                        <div className="shipping">
+                            <form onSubmit={handleContinueFromShipping}>
+                                {loadingShipping ? (
+                                    <p>Calcul des frais de port en cours...</p>
+                                ) : shippingOptions.length === 0 ? (
+                                    <p>Aucune option de livraison disponible.</p>
+                                ) : (
+                                    <div className="list">
+                                        {shippingOptions.map((option) => (
+                                            <React.Fragment key={option.id}>
+                                                <label
+                                                    className={`method ${selectedShippingMethod === option.id ? 'selected' : ''}`}
+                                                >
+                                                    <input
+                                                        type="radio"
+                                                        name="shippingMethod"
+                                                        value={option.id}
+                                                        checked={selectedShippingMethod === option.id}
+                                                        onChange={(e) => handleShippingMethodChange(e.target.value)}
+                                                        required
+                                                    />
+                                                    <div className="info">
+                                                        {option.logo && <img src={option.logo} alt={option.name} className="logo" />}
+                                                        <p>{option.service}</p>
+                                                        <p className="price">{option.priceWithTax.toFixed(2)} €</p>
+                                                    </div>
+                                                </label>
+                                                {selectedShippingMethod === option.id && option.type === "relay" && (
+                                                    <>
+                                                        {showRelayMap ? (
+                                                            <div className="selector">
+                                                                <h3>Choisissez votre point relais</h3>
+                                                                {loadingRelayPoints ? (
+                                                                    <p>Chargement des points relais...</p>
+                                                                ) : relayPoints.length === 0 ? (
+                                                                    <p>Aucun point relais trouvé à proximité.</p>
+                                                                ) : (
+                                                                    <RelayMap
+                                                                        points={relayPoints}
+                                                                        center={[
+                                                                            relayPoints[0]?.latitude || 43.5297,
+                                                                            relayPoints[0]?.longitude || 5.4474
+                                                                        ]}
+                                                                        onSelectPoint={handleSelectRelayPoint}
+                                                                        selectedPointId={selectedRelayPoint?.id}
+                                                                    />
+                                                                )}
+                                                            </div>
+                                                        ) : selectedRelayPoint && (
+                                                            <div className="selected">
+                                                                <div>
+                                                                    <h4>Point relais sélectionné :</h4>
+                                                                    <p><strong>{selectedRelayPoint.name}</strong></p>
+                                                                    <p>{selectedRelayPoint.address}</p>
+                                                                    <p>{selectedRelayPoint.zipcode} {selectedRelayPoint.city}</p>
+                                                                </div>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setShowRelayMap(true)}
+                                                                >
+                                                                    Changer de point relais
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </React.Fragment>
+                                        ))}
+                                    </div>
+                                )}
+                                <div className="actions">
+                                    <button type="button" onClick={() => setShowShippingMethod(false)} className="back">
+                                        Retour
+                                    </button>
+                                    <button type="submit" className="confirm">
+                                        Continuer
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                        ) : !showCheckout ? (
                 <div className="listTotal">
                     <ul className="list">
                         {panier.map((bijou) => (
@@ -149,8 +379,171 @@ export default function Cart() {
                     </ul>
                     <div className="total">
                         <p>Total : <strong>{totalPrix} €</strong></p>
-                        <button className="valider">Valider la commande</button>
+                        <button className="valider" onClick={handleValidateOrder}>Valider le panier</button>
                     </div>
+                </div>
+                        ) : !showBillingForm ? (
+                <div className="checkout">
+                    <form onSubmit={handleContinueToBilling}>
+                        <div className="name">
+                            <input
+                                type="text"
+                                name="nom"
+                                placeholder="Nom"
+                                value={formData.nom}
+                                onChange={handleInputChange}
+                                autoComplete="family-name"
+                                required
+                            />
+                            <input
+                                type="text"
+                                name="prenom"
+                                placeholder="Prénom"
+                                value={formData.prenom}
+                                onChange={handleInputChange}
+                                autoComplete="given-name"
+                                required
+                            />
+                        </div>
+                        <input
+                            type="text"
+                            name="rue"
+                            placeholder="Rue"
+                            value={formData.rue}
+                            onChange={handleInputChange}
+                            autoComplete="address-line1"
+                            required
+                        />
+                        <div className="street">
+                            <input
+                                type="text"
+                                name="complement"
+                                placeholder="Complément d'adresse (optionnel)"
+                                value={formData.complement}
+                                onChange={handleInputChange}
+                                autoComplete="address-line2"
+                            />
+                            <input
+                                type="text"
+                                name="codePostal"
+                                placeholder="Code postal"
+                                value={formData.codePostal}
+                                onChange={handleInputChange}
+                                autoComplete="postal-code"
+                                required
+                            />
+                        </div>
+                        <div className="city">
+                            <input
+                                type="text"
+                                name="ville"
+                                placeholder="Ville"
+                                value={formData.ville}
+                                onChange={handleInputChange}
+                                autoComplete="address-level2"
+                                required
+                            />
+                            <input
+                                type="tel"
+                                name="telephone"
+                                placeholder="Téléphone"
+                                value={formData.telephone}
+                                onChange={handleInputChange}
+                                autoComplete="tel"
+                                required
+                            />
+                        </div>
+                        <div className="billing">
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    checked={sameAddress}
+                                    onChange={(e) => setSameAddress(e.target.checked)}
+                                />
+                                Utiliser la même adresse pour la facturation
+                            </label>
+                        </div>
+                        <div className="action">
+                            <button type="button" onClick={handleBackToCart} className="back">
+                                Retour
+                            </button>
+                            <button type="submit" className="confirm">
+                                Continuer
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                        ) : (
+                <div className="checkout">
+                    <form onSubmit={handleContinueToShipping}>
+                        <div className="name">
+                            <input
+                                type="text"
+                                name="nom"
+                                placeholder="Nom"
+                                value={billingData.nom}
+                                onChange={handleBillingInputChange}
+                                autoComplete="family-name"
+                                required
+                            />
+                            <input
+                                type="text"
+                                name="prenom"
+                                placeholder="Prénom"
+                                value={billingData.prenom}
+                                onChange={handleBillingInputChange}
+                                autoComplete="given-name"
+                                required
+                            />
+                        </div>
+                        <input
+                            type="text"
+                            name="rue"
+                            placeholder="Rue"
+                            value={billingData.rue}
+                            onChange={handleBillingInputChange}
+                            autoComplete="address-line1"
+                            required
+                        />
+                        <div className="street">
+                            <input
+                                type="text"
+                                name="complement"
+                                placeholder="Complément d'adresse (optionnel)"
+                                value={billingData.complement}
+                                onChange={handleBillingInputChange}
+                                autoComplete="address-line2"
+                            />
+                            <input
+                                type="text"
+                                name="codePostal"
+                                placeholder="Code postal"
+                                value={billingData.codePostal}
+                                onChange={handleBillingInputChange}
+                                autoComplete="postal-code"
+                                required
+                            />
+                        </div>
+                        <div className="city">
+                            <input
+                                type="text"
+                                name="ville"
+                                placeholder="Ville"
+                                value={billingData.ville}
+                                onChange={handleBillingInputChange}
+                                autoComplete="address-level2"
+                                required
+                            />
+                        </div>
+                        <div className="action">
+                            <button type="button" onClick={() => setShowBillingForm(false)} className="back">
+                                Retour
+                            </button>
+                            <button type="submit" className="confirm">
+                                Continuer
+                            </button>
+                        </div>
+                    </form>
                 </div>
                         )}
                     </>

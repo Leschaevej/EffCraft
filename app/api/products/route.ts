@@ -19,7 +19,6 @@ export async function GET() {
     }));
     return NextResponse.json(productsWithStringId);
   } catch (error) {
-    console.error("Erreur GET /api/products:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
@@ -69,7 +68,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ insertedId: productId, images: savedImages });
   } catch (error) {
-    console.error("Erreur POST /api/products:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

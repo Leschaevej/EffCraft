@@ -15,12 +15,10 @@ type Bijou = {
     category: string;
     images: string[];
 };
-
 export default function Favorites() {
     const { data: session, status } = useSession();
-    const [favorites, setFavorites] = useState<Bijou[] | null>(null); // null = pas encore chargé
+    const [favorites, setFavorites] = useState<Bijou[] | null>(null);
     const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
-
     useEffect(() => {
         if (status !== "authenticated") return;
         const fetchFavorites = async () => {
@@ -30,22 +28,16 @@ export default function Favorites() {
             const data = await res.json();
             setFavorites(data.favorites || []);
         } catch (err) {
-            console.error(err);
             setFavorites([]);
         }
         };
         fetchFavorites();
     }, [status]);
-
     useEffect(() => {
         const handleFavoriteRemoved = (e: Event) => {
             const customEvent = e as CustomEvent<{ productId: string }>;
             const productId = customEvent.detail.productId;
-
-            // Marquer comme "en cours de suppression"
             setRemovingIds(prev => new Set(prev).add(productId));
-
-            // Supprimer après 3 secondes
             setTimeout(() => {
                 setFavorites(prev => prev ? prev.filter(bijou => bijou._id !== productId) : prev);
                 setRemovingIds(prev => {
@@ -55,9 +47,8 @@ export default function Favorites() {
                 });
             }, 3000);
         };
-
-        window.addEventListener("favorite-removed", handleFavoriteRemoved);
-        return () => window.removeEventListener("favorite-removed", handleFavoriteRemoved);
+        window.addEventListener("removed", handleFavoriteRemoved);
+        return () => window.removeEventListener("removed", handleFavoriteRemoved);
     }, []);
     const isLoading = status === "loading" || (status === "authenticated" && favorites === null);
     return (

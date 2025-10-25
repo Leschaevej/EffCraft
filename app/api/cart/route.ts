@@ -3,21 +3,33 @@ import mongoose from "mongoose";
 import Product from "../../lib/models/Product";
 import User from "../../lib/models/User";
 
-const clients = new Set<ReadableStreamDefaultController>();
+declare global {
+    var _sseClients: Set<ReadableStreamDefaultController> | undefined;
+}
+const getClients = () => {
+    if (!globalThis._sseClients) {
+        globalThis._sseClients = new Set<ReadableStreamDefaultController>();
+    }
+    return globalThis._sseClients;
+};
 function addClient(controller: ReadableStreamDefaultController) {
+    const clients = getClients();
     clients.add(controller);
 }
 function removeClient(controller: ReadableStreamDefaultController) {
+    const clients = getClients();
     clients.delete(controller);
 }
 export function notifyClients(event: { type: string; data: Record<string, unknown> }) {
+    const clients = getClients();
     const message = `data: ${JSON.stringify(event)}\n\n`;
-
+    if (clients.size === 0) {
+        return;
+    }
     clients.forEach(controller => {
         try {
             controller.enqueue(new TextEncoder().encode(message));
         } catch (error) {
-            console.error("Erreur envoi SSE:", error);
             clients.delete(controller);
         }
     });
@@ -67,48 +79,45 @@ async function handleCleanup() {
     try {
         await dbConnect();
         const now = new Date();
-        const expiredProducts = await Product.find({
-            status: "reserved",
-            reservedUntil: { $lt: now }
+        const expiredUsers = await User.find({
+            cartExpiresAt: { $exists: true, $lt: now },
+            cart: { $exists: true, $ne: [] }
         });
-        if (expiredProducts.length === 0) {
+        if (expiredUsers.length === 0) {
             return NextResponse.json({
-                message: "Aucune réservation expirée",
+                message: "Aucun panier expiré",
                 cleaned: 0
             });
         }
-        const userIds = expiredProducts
-            .filter(p => p.reservedBy)
-            .map(p => p.reservedBy);
-        const productIds = expiredProducts.map(p => p._id);
-        await Product.updateMany(
-            { _id: { $in: productIds } },
-            {
-                $set: { status: "available" },
-                $unset: { reservedBy: "", reservedUntil: "" }
+        let totalProductsFreed = 0;
+        for (const user of expiredUsers) {
+            if (user.cart.length > 0) {
+                const userCartProductIds = user.cart.map((item: any) => item.productId);
+                totalProductsFreed += userCartProductIds.length;
+                await Product.updateMany(
+                    { _id: { $in: userCartProductIds } },
+                    {
+                        $set: { status: "available" },
+                        $unset: { reservedBy: "" }
+                    }
+                );
+                user.cart = [];
+                user.cartExpiresAt = undefined;
+                await user.save();
+                userCartProductIds.forEach((productId: any) => {
+                    notifyClients({
+                        type: "product_available",
+                        data: { productId: productId.toString() }
+                    });
+                });
             }
-        );
-        await User.updateMany(
-            { _id: { $in: userIds } },
-            {
-                $pull: {
-                    cart: { productId: { $in: productIds } }
-                }
-            }
-        );
-        productIds.forEach(productId => {
-            notifyClients({
-                type: "product_available",
-                data: { productId: productId.toString() }
-            });
-        });
+        }
         return NextResponse.json({
-            message: "Réservations expirées nettoyées",
-            cleaned: expiredProducts.length,
-            productIds: productIds.map(id => id.toString())
+            message: "Paniers expirés nettoyés",
+            usersAffected: expiredUsers.length,
+            productsFreed: totalProductsFreed
         });
     } catch (error) {
-        console.error("Erreur nettoyage réservations:", error);
         return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
     }
 }

@@ -145,7 +145,7 @@ export default function AddForm({ onProductAdded }: AddFormProps) {
 
       if (onProductAdded) onProductAdded();
     } catch (err) {
-      console.error("Erreur lors de l'envoi du produit:", err);
+      // Erreur silencieuse
     } finally {
       setIsSubmitting(false);
     }

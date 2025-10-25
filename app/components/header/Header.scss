@@ -25,7 +25,7 @@
             padding: 10px 0;
         }
     }
-    .right-section {
+    .right {
         display: flex;
         align-items: center;
         gap: 50px;
@@ -130,7 +130,7 @@
         }
     }
 }
-.cart-timer {
+.timer {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -141,12 +141,10 @@
     font-size: 14px;
     font-weight: 600;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-
-    .timer-icon {
+    .icon {
         font-size: 18px;
     }
-
-    .timer-text {
+    .text {
         white-space: nowrap;
     }
 }

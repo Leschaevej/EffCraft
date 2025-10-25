@@ -36,7 +36,6 @@ export async function GET(
       reservedBy: product.reservedBy ? product.reservedBy.toString() : null,
     });
   } catch (error) {
-    console.error("Erreur GET /api/products/[id]:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }
@@ -83,7 +82,6 @@ export async function DELETE(
 
     return NextResponse.json({ message: "Produit et images supprimés" }, { status: 200 });
   } catch (error) {
-    console.error("Erreur DELETE /api/products/[id]:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

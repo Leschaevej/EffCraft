@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import "./Card.scss";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { useReservation } from "../../context/ReservationContext";
+import { useReservation } from "../../context/Reservation";
 import ArrowButton from "../../components/Arrow";
 
 type Bijou = {
@@ -66,14 +66,9 @@ export default function Card({
     const [isFavori, setIsFavori] = useState(initialIsFavori);
     const [loading, setLoading] = useState(false);
     const [currentIndex, setCurrentIndex] = useState(0);
-
-    // Si SSE a notifié que le produit est disponible, c'est prioritaire
-    // Sinon on se fie au contexte réservé ou au status de la DB
     const isReserved = availableProducts.has(bijou._id)
         ? false
         : (reservedProducts.has(bijou._id) || bijou.status === "reserved");
-
-    // Vérifier si c'est l'utilisateur actuel qui a réservé
     const isReservedByMe = isReserved && bijou.reservedBy === currentUserId;
     useEffect(() => {
     const addPendingFavori = async () => {
@@ -93,12 +88,9 @@ export default function Card({
                 setIsFavori(true);
             }
             sessionStorage.removeItem("pendingFavori");
-            } else {
-            const data = await res.json();
-            console.error("Erreur favori après login :", data.error);
             }
         } catch (err) {
-            console.error("Erreur réseau favori après login :", err);
+            // Erreur silencieuse
         }
         }
     };
@@ -131,15 +123,13 @@ export default function Card({
             throw new Error(data.error || "Erreur lors de la requête");
         }
         setIsFavori(!isFavori);
-
-        // Émettre un événement si le favori a été retiré
         if (isFavori) {
-            window.dispatchEvent(new CustomEvent("favorite-removed", {
+            window.dispatchEvent(new CustomEvent("removed", {
                 detail: { productId: bijou._id }
             }));
         }
         } catch (error) {
-        console.error(error);
+        // Erreur silencieuse
         }
         setLoading(false);
     };

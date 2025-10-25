@@ -10,6 +10,7 @@ interface IUser extends Document {
     role: string;
     favorites: mongoose.Types.ObjectId[];
     cart: CartItem[];
+    cartExpiresAt?: Date;
 }
 const CartItemSchema = new Schema<CartItem>({
     productId: { type: Schema.Types.ObjectId, required: true },
@@ -21,6 +22,7 @@ const UserSchema = new Schema<IUser>({
     role: String,
     favorites: [{ type: Schema.Types.ObjectId, ref: "Product" }],
     cart: { type: [CartItemSchema], default: [] },
+    cartExpiresAt: { type: Date },
 });
 const User = mongoose.models.User || model<IUser>("User", UserSchema);
 export default User;
