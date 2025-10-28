@@ -5,7 +5,7 @@
     justify-content: space-between;
     gap: 10px;
     cursor: pointer;
-    .card-image {
+    .image {
         position: relative;
         overflow: hidden;
         img {
@@ -42,7 +42,6 @@
                 }
             }
         }
-
         .favori {
             position: absolute;
             top: 10%;
@@ -67,11 +66,11 @@
             &:hover svg {
                 stroke: var(--favoryColor);
             }
-            &.favori-active svg {
+            &.active svg {
                 stroke: var(--favoryColor);
                 fill: var(--favoryColor);
             }
-            &.favori-active:hover svg {
+            &.active:hover svg {
                 filter: brightness(0.8);
             }
         }
@@ -80,7 +79,7 @@
         font-size: 20px;
         font-weight: 400;
     }
-    .price-container {
+    .price {
         display: flex;
         flex-direction: row;
         gap: 10px;
@@ -92,7 +91,7 @@
         font-weight: 800;
         margin: 0;
     }
-    .reserved-status {
+    .reserved {
         font-size: 20px;
         font-weight: 900;
         color: var(--reservedColor);
@@ -103,22 +102,22 @@
 }
 .card.skeleton {
     pointer-events: none;
-    .image-placeholder {
+    .placeholder {
         width: 100%;
         aspect-ratio: 4 / 5;
         background-color: var(--thirdBackgroundColor);
         border-radius: var(--productImageRadius);
     }
-    .text-placeholder {
+    .text {
         height: 29px;
         background-color: var(--thirdBackgroundColor);
         border-radius: 10px;
     }
-    .text-placeholder.short {
+    .text.short {
         width: 80%;
         margin: 0 auto;
     }
-    .text-placeholder.long {
+    .text.long {
         width: 30%;
         margin: 0 auto;
     }

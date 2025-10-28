@@ -47,8 +47,27 @@ export default function Favorites() {
                 });
             }, 3000);
         };
+        const handleRealtimeUpdate = (e: Event) => {
+            const customEvent = e as CustomEvent;
+            const { type, productId } = customEvent.detail;
+            if (type === "product_deleted") {
+                setRemovingIds(prev => new Set(prev).add(productId));
+                setTimeout(() => {
+                    setFavorites(prev => prev ? prev.filter(bijou => bijou._id !== productId) : prev);
+                    setRemovingIds(prev => {
+                        const newSet = new Set(prev);
+                        newSet.delete(productId);
+                        return newSet;
+                    });
+                }, 3000);
+            }
+        };
         window.addEventListener("removed", handleFavoriteRemoved);
-        return () => window.removeEventListener("removed", handleFavoriteRemoved);
+        window.addEventListener("cart-update", handleRealtimeUpdate);
+        return () => {
+            window.removeEventListener("removed", handleFavoriteRemoved);
+            window.removeEventListener("cart-update", handleRealtimeUpdate);
+        };
     }, []);
     const isLoading = status === "loading" || (status === "authenticated" && favorites === null);
     return (
@@ -59,7 +78,6 @@ export default function Favorites() {
                     <>
                         <div className="loginFav">
                         <p>Veuillez vous connecter pour voir vos favoris !</p>
-
                         <button className="google" onClick={() => signIn("google")}>
                             <img src="/google.webp" alt="Google" />
                             Se connecter avec Google

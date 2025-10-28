@@ -1,14 +1,14 @@
 "use client";
 
 import { SessionProvider } from "next-auth/react";
-import { ReservationProvider } from "../context/Reservation";
+import { RealtimeProvider } from "../context/Realtime";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <SessionProvider>
-      <ReservationProvider>
+      <RealtimeProvider>
         {children}
-      </ReservationProvider>
+      </RealtimeProvider>
     </SessionProvider>
   );
 }

@@ -1,10 +1,9 @@
-.payment-form {
+.payment {
     display: flex;
     flex-direction: column;
     gap: 30px;
     width: 100%;
-
-    .error-message {
+    .error {
         padding: 15px;
         background-color: var(--secondErrorColor);
         color: white;
@@ -12,8 +11,7 @@
         font-size: 18px;
         text-align: center;
     }
-
-    .pay-button {
+    .button {
         width: 100%;
         padding: 20px;
         font-size: 28px;
@@ -24,12 +22,10 @@
         color: var(--secondTextColor);
         cursor: pointer;
         transition: background-color 0.3s ease;
-
         &:hover:not(:disabled) {
             background-color: var(--secondColor);
             color: var(--mainTextColor);
         }
-
         &:disabled {
             opacity: 0.6;
             cursor: not-allowed;

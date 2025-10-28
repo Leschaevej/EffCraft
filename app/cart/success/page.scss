@@ -1,32 +1,26 @@
-.payment-success {
+.success {
     padding: 50px 0;
     min-height: 60vh;
-
     .conteneur {
         margin: 0 50px;
         padding: 50px;
         background-color: var(--secondBackgroundColor);
         border-radius: 50px;
         text-align: center;
-
         .message {
             font-size: 24px;
             margin: 30px 0;
             color: var(--mainTextColor);
         }
-
-        .success-content,
-        .error-content {
+        .content {
             display: flex;
             flex-direction: column;
             gap: 30px;
             align-items: center;
-
             p {
                 font-size: 20px;
                 color: var(--mainTextColor);
             }
-
             .button {
                 padding: 15px 40px;
                 font-size: 24px;
@@ -36,7 +30,6 @@
                 color: var(--secondTextColor);
                 text-decoration: none;
                 transition: background-color 0.3s ease;
-
                 &:hover {
                     background-color: var(--secondColor);
                     color: var(--mainTextColor);

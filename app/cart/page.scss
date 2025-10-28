@@ -5,7 +5,7 @@
         padding: 50px;
         background-color: var(--secondBackgroundColor);
         border-radius: 50px;
-        .loginFav {
+        .login {
             display: flex;
             flex-direction: column;
             gap: 30px;
@@ -32,7 +32,7 @@
                 }
             }
         }
-        .listTotal {
+        .content {
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -300,7 +300,7 @@
         .recap {
             display: flex;
             gap: 50px;
-            .recapContent {
+            .wrapper {
                 flex: 1;
                 display: flex;
                 flex-direction: column;
@@ -309,14 +309,14 @@
                     display: flex;
                     flex-direction: column;
                     gap: 20px;
-                    .productLine {
+                    .product {
                         display: flex;
                         align-items: center;
                         gap: 20px;
                         padding: 15px;
                         background-color: rgba(255, 255, 255, 0.05);
                         border-radius: 20px;
-                        .productImage {
+                        .image {
                             width: 80px;
                             height: 100px;
                             display: flex;
@@ -331,13 +331,13 @@
                                 border-radius: var(--productImageRadius);
                             }
                         }
-                        .productName {
+                        .name {
                             flex: 1;
                             font-size: 20px;
                             color: var(--mainTextColor);
                             margin: 0;
                         }
-                        .productPrice {
+                        .price {
                             font-size: 22px;
                             font-weight: 700;
                             color: var(--mainColor);
@@ -378,7 +378,7 @@
                 display: flex;
                 flex-direction: column;
                 gap: 30px;
-                .summaryLine {
+                .line {
                     display: flex;
                     justify-content: space-between;
                     font-size: 24px;
@@ -389,7 +389,7 @@
                         font-weight: 700;
                     }
                 }
-                .loading-payment {
+                .loading {
                     padding: 20px;
                     text-align: center;
                     font-size: 20px;

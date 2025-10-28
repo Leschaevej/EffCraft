@@ -26,23 +26,46 @@ export default function Home() {
     const [displayedBijoux, setDisplayedBijoux] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [favorites, setFavorites] = useState<string[]>([]);
-    useEffect(() => {
-        async function fetchBijoux() {
+    const [showDeletedMessage, setShowDeletedMessage] = useState(false);
+    const fetchBijoux = async () => {
         try {
             setIsLoading(true);
             const res = await fetch("/api/products");
             if (!res.ok) throw new Error("Erreur lors du chargement des bijoux");
             const data = await res.json();
             setBijoux(data);
-            setDisplayedBijoux(data);
+            const productsForCarousel = filter === "all"
+                ? data.slice(3)
+                : data.filter((b: any) => b.category === filter).slice(3);
+            setDisplayedBijoux(productsForCarousel);
         } catch (error) {
-            // Erreur silencieuse
         } finally {
             setIsLoading(false);
         }
-        }
+    };
+    useEffect(() => {
         fetchBijoux();
     }, []);
+    useEffect(() => {
+        const handleRealtimeUpdate = (e: Event) => {
+            const customEvent = e as CustomEvent;
+            const { type, productId } = customEvent.detail;
+            if (type === "product_deleted") {
+                setBijoux(prev => {
+                    const updated = prev.filter(b => b._id !== productId);
+                    const productsForCarousel = filter === "all"
+                        ? updated.slice(3)
+                        : updated.filter((b: any) => b.category === filter).slice(3);
+                    setDisplayedBijoux(productsForCarousel);
+                    return updated;
+                });
+            } else if (type === "product_created") {
+                fetchBijoux();
+            }
+        };
+        window.addEventListener("cart-update", handleRealtimeUpdate);
+        return () => window.removeEventListener("cart-update", handleRealtimeUpdate);
+    }, [filter]);
     useEffect(() => {
     async function fetchFavorites() {
         if (status === "authenticated") {
@@ -73,11 +96,10 @@ export default function Home() {
         setTimeout(() => {
         setFilter(newFilter);
         setPageIndex(0);
-        setDisplayedBijoux(
-            newFilter === "all"
-            ? bijoux
-            : bijoux.filter((b) => b.category === newFilter)
-        );
+        const productsForCarousel = newFilter === "all"
+            ? bijoux.slice(3)
+            : bijoux.filter((b) => b.category === newFilter).slice(3);
+        setDisplayedBijoux(productsForCarousel);
         setIsFading(false);
         }, 500);
     };
@@ -92,6 +114,12 @@ export default function Home() {
     useEffect(() => {
         const id = sessionStorage.getItem("scrollToId");
         const filterFromFooter = sessionStorage.getItem("filterFromFooter") as Category | null;
+        const deletedMessage = sessionStorage.getItem("productDeletedMessage");
+        if (deletedMessage) {
+            setShowDeletedMessage(true);
+            sessionStorage.removeItem("productDeletedMessage");
+            setTimeout(() => setShowDeletedMessage(false), 5000);
+        }
         if (filterFromFooter) {
         handleFilterChange(filterFromFooter);
         sessionStorage.removeItem("filterFromFooter");
@@ -108,6 +136,17 @@ export default function Home() {
     }, []);
     return (
         <>
+        {showDeletedMessage && (
+            <div className="deleted" onClick={() => setShowDeletedMessage(false)}>
+                <div className="modal" onClick={(e) => e.stopPropagation()}>
+                    <h3>Désolé !</h3>
+                    <p>Ce produit vient d'être vendu.</p>
+                    <div className="buttons">
+                        <button onClick={() => setShowDeletedMessage(false)}>J'ai compris</button>
+                    </div>
+                </div>
+            </div>
+        )}
         <main>
             <section className="landing">
                 <img src="/acceuil.webp" alt="Boucle d'oreille en bois sculpté" />

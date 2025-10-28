@@ -12,7 +12,6 @@ import { getStripePromise } from "../lib/stripe";
 import "./page.scss";
 
 const stripePromise = getStripePromise();
-
 export type Bijou = {
     _id: string;
     name: string;
@@ -20,7 +19,6 @@ export type Bijou = {
     images: string[];
     addedAt?: string;
 };
-
 export default function Cart() {
     const { data: session, status } = useSession();
     const [panier, setCart] = useState<Bijou[]>([]);
@@ -248,19 +246,27 @@ export default function Cart() {
             const selectedOption = shippingOptions.find(opt => opt.id === selectedShippingMethod);
             const shippingPrice = selectedOption?.priceWithTax || 0;
             const totalAmount = totalPrix + shippingPrice;
-
+            const orderData = {
+                products: panier,
+                shippingData: {
+                    ...formData,
+                    relayPoint: selectedRelayPoint,
+                },
+                billingData: sameAddress ? formData : billingData,
+                shippingMethod: selectedOption,
+                totalAmount: totalAmount,
+            };
+            localStorage.setItem('pendingOrder', JSON.stringify(orderData));
             const response = await fetch("/api/payment", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ amount: totalAmount }),
             });
-
             if (!response.ok) {
                 const error = await response.json();
                 setErrorMessage(error.error || "Erreur lors de la création du paiement");
                 return;
             }
-
             const data = await response.json();
             setClientSecret(data.clientSecret);
         } catch (error) {
@@ -283,9 +289,8 @@ export default function Cart() {
                 </h2>
                 {status === "unauthenticated" ? (
                     <>
-                        <div className="loginFav">
+                        <div className="login">
                             <p>Veuillez vous connecter pour voir votre panier !</p>
-
                             <button className="google" onClick={() => signIn("google")}>
                                 <img src="/google.webp" alt="Google" />
                                 Se connecter avec Google
@@ -311,15 +316,15 @@ export default function Cart() {
                             <p>Votre panier est vide.</p>
                         ) : showRecap ? (
                         <div className="recap">
-                            <div className="recapContent">
+                            <div className="wrapper">
                                 <div className="products">
                                     {panier.map((bijou) => (
-                                        <div key={bijou._id} className="productLine">
-                                            <div className="productImage">
+                                        <div key={bijou._id} className="product">
+                                            <div className="image">
                                                 <img src={bijou.images[0]} alt={bijou.name} />
                                             </div>
-                                            <p className="productName">{bijou.name}</p>
-                                            <p className="productPrice">{bijou.price} €</p>
+                                            <p className="name">{bijou.name}</p>
+                                            <p className="price">{bijou.price} €</p>
                                         </div>
                                     ))}
                                 </div>
@@ -361,11 +366,11 @@ export default function Cart() {
                                 </div>
                             </div>
                             <div className="summary">
-                                <div className="summaryLine">
+                                <div className="line">
                                     <span>Articles</span>
                                     <span>{totalPrix.toFixed(2)} €</span>
                                 </div>
-                                <div className="summaryLine">
+                                <div className="line">
                                     <span>Livraison</span>
                                     <span>
                                         {selectedShippingMethod ?
@@ -373,7 +378,7 @@ export default function Cart() {
                                             : "0.00"} €
                                     </span>
                                 </div>
-                                <div className="summaryLine total">
+                                <div className="line total">
                                     <span><strong>Total</strong></span>
                                     <span>
                                         <strong>{(totalPrix + (selectedShippingMethod ?
@@ -382,7 +387,7 @@ export default function Cart() {
                                     </span>
                                 </div>
                                 {loadingPayment ? (
-                                    <div className="loading-payment">Préparation du paiement...</div>
+                                    <div className="loading">Préparation du paiement...</div>
                                 ) : clientSecret && stripePromise ? (
                                     <Elements
                                         stripe={stripePromise}
@@ -391,36 +396,36 @@ export default function Cart() {
                                             loader: 'never',
                                             appearance: {
                                                 variables: {
-                                                    colorPrimary: '#6F826A',
-                                                    colorBackground: 'transparent',
-                                                    colorText: '#24191C',
-                                                    colorDanger: '#df1b41',
+                                                    colorPrimary: getComputedStyle(document.documentElement).getPropertyValue('--mainColor').trim() || '#6F826A',
+                                                    colorBackground: getComputedStyle(document.documentElement).getPropertyValue('--secondBackgroundColor').trim() || '#ffffff',
+                                                    colorText: getComputedStyle(document.documentElement).getPropertyValue('--mainTextColor').trim() || '#24191C',
+                                                    colorDanger: getComputedStyle(document.documentElement).getPropertyValue('--secondErrorColor').trim() || '#df1b41',
                                                     borderRadius: '20px',
                                                     spacingUnit: '4px',
                                                 },
                                                 rules: {
                                                     '.AccordionItem': {
-                                                        border: '3px solid #6F826A',
+                                                        border: `3px solid ${getComputedStyle(document.documentElement).getPropertyValue('--mainColor').trim() || '#6F826A'}`,
                                                         backgroundColor: 'transparent',
-                                                        color: '#24191C',
+                                                        color: getComputedStyle(document.documentElement).getPropertyValue('--mainTextColor').trim() || '#24191C',
                                                         boxShadow: 'none',
                                                     },
                                                     '.AccordionItem:hover': {
                                                         backgroundColor: 'rgba(111, 130, 106, 0.1)',
                                                     },
                                                     '.AccordionItem--selected': {
-                                                        backgroundColor: '#6F826A',
-                                                        color: '#ffffff',
-                                                        border: '3px solid #6F826A',
+                                                        backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--mainColor').trim() || '#6F826A',
+                                                        color: getComputedStyle(document.documentElement).getPropertyValue('--secondTextColor').trim() || '#ffffff',
+                                                        border: `3px solid ${getComputedStyle(document.documentElement).getPropertyValue('--mainColor').trim() || '#6F826A'}`,
                                                     },
                                                     '.AccordionItem--selected:hover': {
-                                                        backgroundColor: '#6F826A',
+                                                        backgroundColor: getComputedStyle(document.documentElement).getPropertyValue('--mainColor').trim() || '#6F826A',
                                                     },
                                                     '.Label': {
-                                                        color: '#ffffff',
+                                                        color: getComputedStyle(document.documentElement).getPropertyValue('--secondTextColor').trim() || '#ffffff',
                                                     },
                                                     '.Input': {
-                                                        color: '#24191C',
+                                                        color: getComputedStyle(document.documentElement).getPropertyValue('--mainTextColor').trim() || '#24191C',
                                                     },
                                                 },
                                             },
@@ -438,7 +443,7 @@ export default function Cart() {
                                         />
                                     </Elements>
                                 ) : !stripePromise ? (
-                                    <div className="loading-payment">Configuration Stripe en attente...</div>
+                                    <div className="loading">Configuration Stripe en attente...</div>
                                 ) : null}
                             </div>
                         </div>
@@ -524,7 +529,7 @@ export default function Cart() {
                             </form>
                         </div>
                         ) : !showCheckout ? (
-                <div className="listTotal">
+                <div className="content">
                     <ul className="list">
                         {panier.map((bijou) => (
                             <li key={bijou._id} className="item">

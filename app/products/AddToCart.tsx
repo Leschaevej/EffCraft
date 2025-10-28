@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useReservation } from "../context/Reservation";
+import { useRealtime } from "../context/Realtime";
 
 type Bijou = {
     _id: string;
@@ -22,7 +22,7 @@ export default function AddToCartButton({ bijou, onAddedToCart }: AddToCartButto
     const [showModal, setShowModal] = useState(false);
     const [showErrorModal, setShowErrorModal] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const { reservedProducts, availableProducts } = useReservation();
+    const { reservedProducts, availableProducts } = useRealtime();
     const isReserved = availableProducts.has(bijou._id)
         ? false
         : (reservedProducts.has(bijou._id) || bijou.status === "reserved");

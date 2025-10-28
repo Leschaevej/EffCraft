@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, notFound } from "next/navigation";
+import { useParams, notFound, useRouter } from "next/navigation";
 import "./page.scss";
 import Card from "../../components/card/Card";
 import AddToCartButton from "../AddToCart";
-import { useReservation } from "../../context/Reservation";
+import { useRealtime } from "../../context/Realtime";
 
 type Bijou = {
     _id: string;
@@ -19,11 +19,12 @@ type Bijou = {
 };
 export default function ProductPage() {
     const params = useParams();
+    const router = useRouter();
     const id = params.id as string;
     const [bijou, setBijou] = useState<Bijou | null>(null);
     const [loading, setLoading] = useState(true);
     const [justAddedToCart, setJustAddedToCart] = useState(false);
-    const { reservedProducts, availableProducts, currentUserId } = useReservation();
+    const { reservedProducts, availableProducts, currentUserId } = useRealtime();
     const fetchProduct = async (silent = false) => {
         try {
             const res = await fetch(`/api/products/${id}`);
@@ -34,7 +35,6 @@ export default function ProductPage() {
             const data = await res.json();
             setBijou(data);
         } catch (error) {
-            // Erreur silencieuse
         } finally {
             if (!silent) {
                 setLoading(false);
@@ -51,6 +51,18 @@ export default function ProductPage() {
             }, 100);
         }
     }, [reservedProducts, availableProducts]);
+    useEffect(() => {
+        const handleRealtimeUpdate = (e: Event) => {
+            const customEvent = e as CustomEvent;
+            const { type, productId } = customEvent.detail;
+            if (type === "product_deleted" && productId === id) {
+                sessionStorage.setItem("productDeletedMessage", "Ce produit vient d'être vendu");
+                router.push("/");
+            }
+        };
+        window.addEventListener("cart-update", handleRealtimeUpdate);
+        return () => window.removeEventListener("cart-update", handleRealtimeUpdate);
+    }, [id, router]);
     if (loading) return <p>Chargement...</p>;
     if (!bijou) return notFound();
     const isReserved = availableProducts.has(bijou._id)

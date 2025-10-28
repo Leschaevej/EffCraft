@@ -10,23 +10,18 @@ type PaymentFormProps = {
     onSuccess?: () => void;
     onError?: (error: string) => void;
 };
-
 export default function PaymentForm({ clientSecret, userEmail, onSuccess, onError }: PaymentFormProps) {
     const stripe = useStripe();
     const elements = useElements();
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-
         if (!stripe || !elements) {
             return;
         }
-
         setIsProcessing(true);
         setErrorMessage(null);
-
         try {
             const { error } = await stripe.confirmPayment({
                 elements,
@@ -34,7 +29,6 @@ export default function PaymentForm({ clientSecret, userEmail, onSuccess, onErro
                     return_url: `${window.location.origin}/cart/success`,
                 },
             });
-
             if (error) {
                 setErrorMessage(error.message || "Une erreur est survenue");
                 if (onError) {
@@ -54,9 +48,8 @@ export default function PaymentForm({ clientSecret, userEmail, onSuccess, onErro
             setIsProcessing(false);
         }
     };
-
     return (
-        <form onSubmit={handleSubmit} className="payment-form">
+        <form onSubmit={handleSubmit} className="payment">
             <PaymentElement
                 options={{
                     layout: {
@@ -76,8 +69,8 @@ export default function PaymentForm({ clientSecret, userEmail, onSuccess, onErro
                     },
                 }}
             />
-            {errorMessage && <div className="error-message">{errorMessage}</div>}
-            <button type="submit" disabled={!stripe || isProcessing} className="pay-button">
+            {errorMessage && <div className="error">{errorMessage}</div>}
+            <button type="submit" disabled={!stripe || isProcessing} className="button">
                 {isProcessing ? "Traitement..." : "Payer maintenant"}
             </button>
         </form>

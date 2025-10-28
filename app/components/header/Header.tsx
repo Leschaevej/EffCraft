@@ -43,7 +43,6 @@ function CartTimer() {
             const expiry = new Date(data.cartExpiresAt);
             setExpiryTime(expiry);
         } catch (error) {
-            // Erreur silencieuse
         }
     };
     useEffect(() => {

@@ -3,19 +3,19 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 
-type ReservationContextType = {
+type RealtimeContextType = {
     reservedProducts: Set<string>;
     availableProducts: Set<string>;
     isProductReserved: (productId: string) => boolean;
     currentUserId: string | null;
 };
-const ReservationContext = createContext<ReservationContextType>({
+const RealtimeContext = createContext<RealtimeContextType>({
     reservedProducts: new Set(),
     availableProducts: new Set(),
     isProductReserved: () => false,
     currentUserId: null,
 });
-export function ReservationProvider({ children }: { children: React.ReactNode }) {
+export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     const [reservedProducts, setReservedProducts] = useState<Set<string>>(new Set());
     const [availableProducts, setAvailableProducts] = useState<Set<string>>(new Set());
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -46,7 +46,6 @@ export function ReservationProvider({ children }: { children: React.ReactNode })
                     }
                 }
             } catch (error) {
-                // Erreur silencieuse
             }
         };
         fetchInitialData();
@@ -102,6 +101,24 @@ export function ReservationProvider({ children }: { children: React.ReactNode })
                     window.dispatchEvent(new CustomEvent("cart-update", {
                         detail: { type: "product_available", productId: data.data.productId }
                     }));
+                } else if (data.type === "product_deleted") {
+                    setReservedProducts(prev => {
+                        const newSet = new Set(prev);
+                        newSet.delete(data.data.productId);
+                        return newSet;
+                    });
+                    setAvailableProducts(prev => {
+                        const newSet = new Set(prev);
+                        newSet.delete(data.data.productId);
+                        return newSet;
+                    });
+                    window.dispatchEvent(new CustomEvent("cart-update", {
+                        detail: { type: "product_deleted", productId: data.data.productId }
+                    }));
+                } else if (data.type === "product_created") {
+                    window.dispatchEvent(new CustomEvent("cart-update", {
+                        detail: { type: "product_created", productId: data.data.productId }
+                    }));
                 }
             };
             eventSource.onerror = () => {
@@ -124,11 +141,11 @@ export function ReservationProvider({ children }: { children: React.ReactNode })
         return reservedProducts.has(productId);
     };
     return (
-        <ReservationContext.Provider value={{ reservedProducts, availableProducts, isProductReserved, currentUserId }}>
+        <RealtimeContext.Provider value={{ reservedProducts, availableProducts, isProductReserved, currentUserId }}>
             {children}
-        </ReservationContext.Provider>
+        </RealtimeContext.Provider>
     );
 }
-export function useReservation() {
-    return useContext(ReservationContext);
+export function useRealtime() {
+    return useContext(RealtimeContext);
 }

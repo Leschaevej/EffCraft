@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import "./Card.scss";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { useReservation } from "../../context/Reservation";
+import { useRealtime } from "../../context/Realtime";
 import ArrowButton from "../../components/Arrow";
 
 type Bijou = {
@@ -62,7 +62,7 @@ export default function Card({
     showFavori = true,
 }: CardProps) {
     const { data: session } = useSession();
-    const { reservedProducts, availableProducts, currentUserId } = useReservation();
+    const { reservedProducts, availableProducts, currentUserId } = useRealtime();
     const [isFavori, setIsFavori] = useState(initialIsFavori);
     const [loading, setLoading] = useState(false);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -90,7 +90,6 @@ export default function Card({
             sessionStorage.removeItem("pendingFavori");
             }
         } catch (err) {
-            // Erreur silencieuse
         }
         }
     };
@@ -129,7 +128,6 @@ export default function Card({
             }));
         }
         } catch (error) {
-        // Erreur silencieuse
         }
         setLoading(false);
     };
@@ -145,7 +143,7 @@ export default function Card({
     };
     const content = (
         <div className="card">
-        <div className="card-image">
+        <div className="image">
             {imageReplacement ? (
             imageReplacement
             ) : (
@@ -157,7 +155,7 @@ export default function Card({
             )}
             {showFavori && (
             <button
-                className={`favori ${isFavori ? "favori-active" : ""}`}
+                className={`favori ${isFavori ? "active" : ""}`}
                 onClick={toggleFavori}
                 aria-label={isFavori ? "Retirer des favoris" : "Ajouter aux favoris"}
                 disabled={loading}
@@ -168,10 +166,10 @@ export default function Card({
         </div>
         {showName && <h3>{bijou.name}</h3>}
         {showPrice && (
-            <div className="price-container">
+            <div className="price">
                 <p className="prix">{bijou.price} €</p>
                 {isReserved && (
-                    <p className="reserved-status">
+                    <p className="reserved">
                         {isReservedByMe ? "DANS LE PANIER" : "RÉSERVÉ"}
                     </p>
                 )}

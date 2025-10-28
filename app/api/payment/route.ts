@@ -4,16 +4,14 @@ import { stripe } from "../../lib/stripe-server";
 export async function POST(req: NextRequest) {
     try {
         const { amount, currency = "eur" } = await req.json();
-
         if (!amount || amount <= 0) {
             return NextResponse.json(
                 { error: "Le montant est invalide" },
                 { status: 400 }
             );
         }
-
         const paymentIntent = await stripe.paymentIntents.create({
-            amount: Math.round(amount * 100), // Stripe utilise les centimes
+            amount: Math.round(amount * 100),
             currency,
             payment_method_types: ['card', 'paypal', 'revolut_pay'],
             payment_method_options: {
@@ -25,7 +23,6 @@ export async function POST(req: NextRequest) {
                 enabled: false,
             },
         });
-
         return NextResponse.json({
             clientSecret: paymentIntent.client_secret,
         });
