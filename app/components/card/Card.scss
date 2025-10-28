@@ -9,7 +9,7 @@
         position: relative;
         overflow: hidden;
         img {
-            border-radius: clamp(20px, 15%, 60px);
+            border-radius: var(--productImageRadius);
             width: 100%;
             aspect-ratio: 4 / 5;
             object-fit: cover;
@@ -107,7 +107,7 @@
         width: 100%;
         aspect-ratio: 4 / 5;
         background-color: var(--thirdBackgroundColor);
-        border-radius: clamp(20px, 15%, 60px);
+        border-radius: var(--productImageRadius);
     }
     .text-placeholder {
         height: 29px;

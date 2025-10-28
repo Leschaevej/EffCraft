@@ -6,7 +6,12 @@ import { nothingYouCouldDo } from "../font";
 import Card from "../components/card/Card";
 import RelayMap from "../components/relayMap/RelayMap";
 import type { RelayPoint } from "../components/relayMap/RelayMap";
+import { Elements } from "@stripe/react-stripe-js";
+import PaymentForm from "../components/payment/PaymentForm";
+import { getStripePromise } from "../lib/stripe";
 import "./page.scss";
+
+const stripePromise = getStripePromise();
 
 export type Bijou = {
     _id: string;
@@ -24,6 +29,7 @@ export default function Cart() {
     const [showCheckout, setShowCheckout] = useState(false);
     const [showBillingForm, setShowBillingForm] = useState(false);
     const [showShippingMethod, setShowShippingMethod] = useState(false);
+    const [showRecap, setShowRecap] = useState(false);
     const [sameAddress, setSameAddress] = useState(true);
     const [selectedShippingMethod, setSelectedShippingMethod] = useState<string | null>(null);
     const [shippingOptions, setShippingOptions] = useState<any[]>([]);
@@ -32,6 +38,8 @@ export default function Cart() {
     const [relayPoints, setRelayPoints] = useState<RelayPoint[]>([]);
     const [selectedRelayPoint, setSelectedRelayPoint] = useState<RelayPoint | null>(null);
     const [loadingRelayPoints, setLoadingRelayPoints] = useState(false);
+    const [clientSecret, setClientSecret] = useState<string | null>(null);
+    const [loadingPayment, setLoadingPayment] = useState(false);
     const [formData, setFormData] = useState({
         nom: "",
         prenom: "",
@@ -125,6 +133,7 @@ export default function Cart() {
         setShowCheckout(false);
         setShowBillingForm(false);
         setShowShippingMethod(false);
+        setShowRecap(false);
         setShowRelayMap(false);
     };
     const fetchRelayPoints = async (carrier: string) => {
@@ -230,7 +239,35 @@ export default function Cart() {
                 return;
             }
         }
-        alert("Commande validée ! (TODO: implémenter le paiement)");
+        setShowRecap(true);
+        await createPaymentIntent();
+    };
+    const createPaymentIntent = async () => {
+        setLoadingPayment(true);
+        try {
+            const selectedOption = shippingOptions.find(opt => opt.id === selectedShippingMethod);
+            const shippingPrice = selectedOption?.priceWithTax || 0;
+            const totalAmount = totalPrix + shippingPrice;
+
+            const response = await fetch("/api/payment", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ amount: totalAmount }),
+            });
+
+            if (!response.ok) {
+                const error = await response.json();
+                setErrorMessage(error.error || "Erreur lors de la création du paiement");
+                return;
+            }
+
+            const data = await response.json();
+            setClientSecret(data.clientSecret);
+        } catch (error) {
+            setErrorMessage("Erreur réseau lors de la création du paiement");
+        } finally {
+            setLoadingPayment(false);
+        }
     };
     const handleFinalSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -242,7 +279,7 @@ export default function Cart() {
         <main className={`cart ${status === "unauthenticated" ? "unloged" : ""}`}>
             <div className="conteneur">
                 <h2 className={nothingYouCouldDo.className}>
-                    {!showCheckout ? "Panier" : showShippingMethod ? "Mode de livraison" : showBillingForm ? "Facturation" : "Livraison"}
+                    {!showCheckout ? "Panier" : showRecap ? "Récapitulatif" : showShippingMethod ? "Mode de livraison" : showBillingForm ? "Facturation" : "Livraison"}
                 </h2>
                 {status === "unauthenticated" ? (
                     <>
@@ -272,6 +309,139 @@ export default function Cart() {
                         )}
                         {panier.length === 0 ? (
                             <p>Votre panier est vide.</p>
+                        ) : showRecap ? (
+                        <div className="recap">
+                            <div className="recapContent">
+                                <div className="products">
+                                    {panier.map((bijou) => (
+                                        <div key={bijou._id} className="productLine">
+                                            <div className="productImage">
+                                                <img src={bijou.images[0]} alt={bijou.name} />
+                                            </div>
+                                            <p className="productName">{bijou.name}</p>
+                                            <p className="productPrice">{bijou.price} €</p>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="addresses">
+                                    <div className="address">
+                                        <h3>Adresse de livraison</h3>
+                                        <p>{formData.prenom} {formData.nom}</p>
+                                        <p>{formData.rue}</p>
+                                        {formData.complement && <p>{formData.complement}</p>}
+                                        <p>{formData.codePostal} {formData.ville}</p>
+                                        <p>{formData.telephone}</p>
+                                        {selectedRelayPoint && (
+                                            <>
+                                                <h4>Point relais :</h4>
+                                                <p><strong>{selectedRelayPoint.name}</strong></p>
+                                                <p>{selectedRelayPoint.address}</p>
+                                                <p>{selectedRelayPoint.zipcode} {selectedRelayPoint.city}</p>
+                                            </>
+                                        )}
+                                    </div>
+                                    <div className="address">
+                                        <h3>Adresse de facturation</h3>
+                                        {sameAddress ? (
+                                            <>
+                                                <p>{formData.prenom} {formData.nom}</p>
+                                                <p>{formData.rue}</p>
+                                                {formData.complement && <p>{formData.complement}</p>}
+                                                <p>{formData.codePostal} {formData.ville}</p>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <p>{billingData.prenom} {billingData.nom}</p>
+                                                <p>{billingData.rue}</p>
+                                                {billingData.complement && <p>{billingData.complement}</p>}
+                                                <p>{billingData.codePostal} {billingData.ville}</p>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="summary">
+                                <div className="summaryLine">
+                                    <span>Articles</span>
+                                    <span>{totalPrix.toFixed(2)} €</span>
+                                </div>
+                                <div className="summaryLine">
+                                    <span>Livraison</span>
+                                    <span>
+                                        {selectedShippingMethod ?
+                                            shippingOptions.find(opt => opt.id === selectedShippingMethod)?.priceWithTax.toFixed(2)
+                                            : "0.00"} €
+                                    </span>
+                                </div>
+                                <div className="summaryLine total">
+                                    <span><strong>Total</strong></span>
+                                    <span>
+                                        <strong>{(totalPrix + (selectedShippingMethod ?
+                                            shippingOptions.find(opt => opt.id === selectedShippingMethod)?.priceWithTax || 0
+                                            : 0)).toFixed(2)} €</strong>
+                                    </span>
+                                </div>
+                                {loadingPayment ? (
+                                    <div className="loading-payment">Préparation du paiement...</div>
+                                ) : clientSecret && stripePromise ? (
+                                    <Elements
+                                        stripe={stripePromise}
+                                        options={{
+                                            clientSecret,
+                                            loader: 'never',
+                                            appearance: {
+                                                variables: {
+                                                    colorPrimary: '#6F826A',
+                                                    colorBackground: 'transparent',
+                                                    colorText: '#24191C',
+                                                    colorDanger: '#df1b41',
+                                                    borderRadius: '20px',
+                                                    spacingUnit: '4px',
+                                                },
+                                                rules: {
+                                                    '.AccordionItem': {
+                                                        border: '3px solid #6F826A',
+                                                        backgroundColor: 'transparent',
+                                                        color: '#24191C',
+                                                        boxShadow: 'none',
+                                                    },
+                                                    '.AccordionItem:hover': {
+                                                        backgroundColor: 'rgba(111, 130, 106, 0.1)',
+                                                    },
+                                                    '.AccordionItem--selected': {
+                                                        backgroundColor: '#6F826A',
+                                                        color: '#ffffff',
+                                                        border: '3px solid #6F826A',
+                                                    },
+                                                    '.AccordionItem--selected:hover': {
+                                                        backgroundColor: '#6F826A',
+                                                    },
+                                                    '.Label': {
+                                                        color: '#ffffff',
+                                                    },
+                                                    '.Input': {
+                                                        color: '#24191C',
+                                                    },
+                                                },
+                                            },
+                                        }}
+                                    >
+                                        <PaymentForm
+                                            clientSecret={clientSecret}
+                                            userEmail={session?.user?.email || ''}
+                                            onSuccess={() => {
+                                                alert("Paiement réussi !");
+                                            }}
+                                            onError={(error) => {
+                                                setErrorMessage(error);
+                                            }}
+                                        />
+                                    </Elements>
+                                ) : !stripePromise ? (
+                                    <div className="loading-payment">Configuration Stripe en attente...</div>
+                                ) : null}
+                            </div>
+                        </div>
                         ) : showShippingMethod ? (
                         <div className="shipping">
                             <form onSubmit={handleContinueFromShipping}>
