@@ -20,26 +20,31 @@
             top: 45%;
             background: transparent;
             border: none;
-            pointer-events: none;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            padding: 0;
+            opacity: 1;
+            pointer-events: auto;
+            z-index: 10;
             &.left {
                 left: 15px;
             }
             &.right {
                 right: 15px;
             }
-            svg {
-                width: 20px;
-                height: 40px;
+            .chevron {
+                height: 50px;
+                width: 50px;
                 color: var(--mainColor);
-                pointer-events: none;
-                path {
-                pointer-events: auto;
                 cursor: pointer;
-                transition: color 0.3s ease;
-                }
-                &:hover path {
-                    color: var(--secondColor);
-                }
+            }
+            &:hover .chevron {
+                color: var(--secondColor);
             }
         }
         .favori {

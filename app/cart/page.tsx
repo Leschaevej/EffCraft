@@ -137,16 +137,17 @@ export default function Cart() {
     const fetchRelayPoints = async (carrier: string) => {
         setLoadingRelayPoints(true);
         try {
-            const response = await fetch("/api/shipping/relay", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    address: formData.rue,
-                    zipcode: formData.codePostal,
-                    city: formData.ville,
-                    country: "FR",
-                    carrier: carrier
-                })
+            const params = new URLSearchParams({
+                action: 'relay',
+                address: formData.rue,
+                zipcode: formData.codePostal,
+                city: formData.ville,
+                country: "FR",
+                carrier: carrier
+            });
+            const response = await fetch(`/api/shipping?${params.toString()}`, {
+                method: "GET",
+                headers: { "Content-Type": "application/json" }
             });
             if (!response.ok) {
                 const error = await response.json();
@@ -179,23 +180,9 @@ export default function Cart() {
     const fetchShippingRates = async () => {
         setLoadingShipping(true);
         try {
-            const response = await fetch("/api/shipping/price", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    to_address: {
-                        zipcode: formData.codePostal,
-                        city: formData.ville,
-                        address: formData.rue,
-                        country: "FR",
-                        firstname: formData.prenom,
-                        lastname: formData.nom,
-                        email: session?.user?.email || "client@example.com",
-                        phone: formData.telephone
-                    },
-                    items_count: panier.length,
-                    total_value: totalPrix
-                })
+            const response = await fetch("/api/shipping", {
+                method: "GET",
+                headers: { "Content-Type": "application/json" }
             });
             if (!response.ok) {
                 const error = await response.json();
@@ -244,7 +231,7 @@ export default function Cart() {
         setLoadingPayment(true);
         try {
             const selectedOption = shippingOptions.find(opt => opt.id === selectedShippingMethod);
-            const shippingPrice = selectedOption?.priceWithTax || 0;
+            const shippingPrice = selectedOption?.price || 0;
             const totalAmount = totalPrix + shippingPrice;
             const orderData = {
                 products: panier,
@@ -320,11 +307,14 @@ export default function Cart() {
                                 <div className="products">
                                     {panier.map((bijou) => (
                                         <div key={bijou._id} className="product">
-                                            <div className="image">
-                                                <img src={bijou.images[0]} alt={bijou.name} />
-                                            </div>
-                                            <p className="name">{bijou.name}</p>
-                                            <p className="price">{bijou.price} €</p>
+                                            <Card
+                                                bijou={bijou as any}
+                                                clickable={false}
+                                                showName={true}
+                                                showPrice={true}
+                                                showFavori={false}
+                                                showArrows={false}
+                                            />
                                         </div>
                                     ))}
                                 </div>
@@ -374,7 +364,7 @@ export default function Cart() {
                                     <span>Livraison</span>
                                     <span>
                                         {selectedShippingMethod ?
-                                            shippingOptions.find(opt => opt.id === selectedShippingMethod)?.priceWithTax.toFixed(2)
+                                            shippingOptions.find(opt => opt.id === selectedShippingMethod)?.price.toFixed(2)
                                             : "0.00"} €
                                     </span>
                                 </div>
@@ -382,7 +372,7 @@ export default function Cart() {
                                     <span><strong>Total</strong></span>
                                     <span>
                                         <strong>{(totalPrix + (selectedShippingMethod ?
-                                            shippingOptions.find(opt => opt.id === selectedShippingMethod)?.priceWithTax || 0
+                                            shippingOptions.find(opt => opt.id === selectedShippingMethod)?.price || 0
                                             : 0)).toFixed(2)} €</strong>
                                     </span>
                                 </div>
@@ -472,7 +462,7 @@ export default function Cart() {
                                                     <div className="info">
                                                         {option.logo && <img src={option.logo} alt={option.name} className="logo" />}
                                                         <p>{option.service}</p>
-                                                        <p className="price">{option.priceWithTax.toFixed(2)} €</p>
+                                                        <p className="price">{option.price.toFixed(2)} €</p>
                                                     </div>
                                                 </label>
                                                 {selectedShippingMethod === option.id && option.type === "relay" && (
@@ -533,22 +523,19 @@ export default function Cart() {
                     <ul className="list">
                         {panier.map((bijou) => (
                             <li key={bijou._id} className="item">
-                                <div className="image">
                                     <Card
                                     bijou={bijou as any}
                                     clickable={false}
                                     showName={false}
                                     showPrice={false}
                                     showFavori={false}
+                                    showArrows={false}
                                     />
-                                </div>
-                                <div className="info">
                                     <h3>{bijou.name}</h3>
                                     <p>{bijou.price} €</p>
                                     <button onClick={() => handleRemove(bijou._id)} className="remove">
                                     Supprimer
                                     </button>
-                                </div>
                             </li>
                         ))}
                     </ul>

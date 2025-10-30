@@ -6,6 +6,94 @@ import { ObjectId } from "mongodb";
 import cloudinary from "../../lib/cloudinary";
 import { notifyClients } from "../cart/route";
 
+export async function GET(req: NextRequest) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session?.user?.email || session.user.role !== "admin") {
+            return NextResponse.json(
+                { error: "Non autorisé" },
+                { status: 403 }
+            );
+        }
+        const { searchParams } = new URL(req.url);
+        const status = searchParams.get('status') || 'paid';
+
+        const client = await clientPromise;
+        const db = client.db("effcraftdatabase");
+        const ordersCollection = db.collection("orders");
+        const orders = await ordersCollection
+            .find({ status })
+            .sort({ createdAt: -1 })
+            .toArray();
+        return NextResponse.json({ orders });
+    } catch (error: any) {
+        console.error("Erreur récupération commandes:", error);
+        return NextResponse.json(
+            { error: error.message || "Erreur lors de la récupération des commandes" },
+            { status: 500 }
+        );
+    }
+}
+
+export async function PATCH(req: NextRequest) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session?.user?.email || session.user.role !== "admin") {
+            return NextResponse.json(
+                { error: "Non autorisé" },
+                { status: 403 }
+            );
+        }
+
+        const { orderId, action } = await req.json();
+        if (!orderId || !action) {
+            return NextResponse.json(
+                { error: "Paramètres manquants" },
+                { status: 400 }
+            );
+        }
+
+        const client = await clientPromise;
+        const db = client.db("effcraftdatabase");
+        const ordersCollection = db.collection("orders");
+
+        let updateData: any = {};
+
+        switch (action) {
+            case "cancel":
+                updateData = {
+                    status: "cancelled",
+                    cancelledAt: new Date()
+                };
+                break;
+            case "return":
+                updateData = {
+                    status: "returned",
+                    returnedAt: new Date()
+                };
+                break;
+            default:
+                return NextResponse.json(
+                    { error: "Action invalide" },
+                    { status: 400 }
+                );
+        }
+
+        await ordersCollection.updateOne(
+            { _id: new ObjectId(orderId) },
+            { $set: updateData }
+        );
+
+        return NextResponse.json({ success: true });
+    } catch (error: any) {
+        console.error("Erreur mise à jour commande:", error);
+        return NextResponse.json(
+            { error: error.message || "Erreur lors de la mise à jour" },
+            { status: 500 }
+        );
+    }
+}
+
 export async function POST(req: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
@@ -94,6 +182,7 @@ export async function POST(req: NextRequest) {
             createdAt: new Date(),
         };
         const result = await ordersCollection.insertOne(order);
+
         return NextResponse.json({
             success: true,
             orderId: result.insertedId,

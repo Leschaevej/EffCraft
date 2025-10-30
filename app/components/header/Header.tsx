@@ -311,7 +311,7 @@ export default function Header() {
                             ) : (
                                 <button className="commande" onClick={() => {
                                     closeAllMenus();
-                                    router.push("/commande");
+                                    router.push("/order");
                                 }}>
                                     Commande
                                 </button>

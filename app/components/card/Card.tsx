@@ -5,7 +5,7 @@ import "./Card.scss";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRealtime } from "../../context/Realtime";
-import ArrowButton from "../../components/Arrow";
+import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 
 type Bijou = {
     _id: string;
@@ -25,6 +25,7 @@ type CardProps = {
     imageReplacement?: React.ReactNode;
     initialIsFavori?: boolean;
     showFavori?: boolean;
+    showArrows?: boolean;
 };
 const HeartOutline = (props: React.SVGProps<SVGSVGElement>) => (
     <svg
@@ -60,6 +61,7 @@ export default function Card({
     imageReplacement,
     initialIsFavori = false,
     showFavori = true,
+    showArrows = true,
 }: CardProps) {
     const { data: session } = useSession();
     const { reservedProducts, availableProducts, currentUserId } = useRealtime();
@@ -148,9 +150,25 @@ export default function Card({
             imageReplacement
             ) : (
             <>
-                <ArrowButton direction="left" onClick={prevImage} />
+                {showArrows && bijou.images && bijou.images.length > 1 && (
+                    <button
+                        onClick={prevImage}
+                        aria-label="Image précédente"
+                        className="button left"
+                    >
+                        <FaChevronLeft className="chevron" />
+                    </button>
+                )}
                 <img src={bijou.images?.[currentIndex] ?? "/default.jpg"} alt={bijou.name} />
-                <ArrowButton direction="right" onClick={nextImage} />
+                {showArrows && bijou.images && bijou.images.length > 1 && (
+                    <button
+                        onClick={nextImage}
+                        aria-label="Image suivante"
+                        className="button right"
+                    >
+                        <FaChevronRight className="chevron" />
+                    </button>
+                )}
             </>
             )}
             {showFavori && (

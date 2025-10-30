@@ -2,7 +2,7 @@
 
 import React, { ReactElement, useEffect, useRef } from "react";
 import "./Carousel.scss";
-import ArrowButton from "../Arrow";
+import { IoChevronBack, IoChevronForward } from "react-icons/io5";
 
 interface CarouselProps {
     children: ReactElement[];
@@ -62,8 +62,48 @@ export default function Carousel({
     return (
         <div className="carousel">
             <div className="controls">
-                <ArrowButton direction="left" onClick={handlePrev} />
-                <ArrowButton direction="right" onClick={handleNext} />
+                <button
+                    onClick={handlePrev}
+                    aria-label="Page précédente"
+                    className="arrow left"
+                    style={{
+                        background: "transparent",
+                        border: "none",
+                        borderRadius: "50%",
+                        width: "40px",
+                        height: "40px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        padding: 0,
+                        color: "var(--mainColor)",
+                        fontSize: "20px",
+                    }}
+                >
+                    <IoChevronBack />
+                </button>
+                <button
+                    onClick={handleNext}
+                    aria-label="Page suivante"
+                    className="arrow right"
+                    style={{
+                        background: "transparent",
+                        border: "none",
+                        borderRadius: "50%",
+                        width: "40px",
+                        height: "40px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        padding: 0,
+                        color: "var(--mainColor)",
+                        fontSize: "20px",
+                    }}
+                >
+                    <IoChevronForward />
+                </button>
             </div>
             <div className="items">
                 <div

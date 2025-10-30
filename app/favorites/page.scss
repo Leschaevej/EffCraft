@@ -1,6 +1,9 @@
 .favorites {
     padding: 50px 0 50px 0;
     .conteneur {
+        display: flex;
+        flex-direction: column;
+        gap: 50px;
         margin: 0 50px;
         padding: 50px;
         background-color: var(--secondBackgroundColor);

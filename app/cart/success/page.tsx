@@ -8,14 +8,24 @@ import "./page.scss";
 export default function PaymentSuccess() {
     const searchParams = useSearchParams();
     const [paymentStatus, setPaymentStatus] = useState<'loading' | 'success' | 'error'>('loading');
+    const [isProcessing, setIsProcessing] = useState(false);
     const paymentIntent = searchParams.get('payment_intent');
     useEffect(() => {
-        if (paymentIntent) {
+        if (paymentIntent && !isProcessing) {
             const pendingOrderStr = localStorage.getItem('pendingOrder');
             if (!pendingOrderStr) {
                 setPaymentStatus('error');
                 return;
             }
+
+            // Vérifier si la commande a déjà été créée pour ce payment_intent
+            const processedPayments = JSON.parse(localStorage.getItem('processedPayments') || '[]');
+            if (processedPayments.includes(paymentIntent)) {
+                setPaymentStatus('success');
+                return;
+            }
+
+            setIsProcessing(true);
             const pendingOrder = JSON.parse(pendingOrderStr);
             fetch(`/api/payment/verify?payment_intent=${paymentIntent}`)
                 .then(res => res.json())
@@ -34,12 +44,19 @@ export default function PaymentSuccess() {
                         });
                     } else {
                         setPaymentStatus('error');
+                        setIsProcessing(false);
                     }
                 })
                 .then(res => res?.json())
                 .then(orderData => {
                     if (orderData?.success) {
                         setPaymentStatus('success');
+
+                        // Marquer ce payment_intent comme traité
+                        const processedPayments = JSON.parse(localStorage.getItem('processedPayments') || '[]');
+                        processedPayments.push(paymentIntent);
+                        localStorage.setItem('processedPayments', JSON.stringify(processedPayments));
+
                         localStorage.removeItem('pendingOrder');
                         localStorage.removeItem('panier');
                         window.dispatchEvent(new Event('storage'));
@@ -47,8 +64,12 @@ export default function PaymentSuccess() {
                     } else {
                         setPaymentStatus('error');
                     }
+                    setIsProcessing(false);
                 })
-                .catch(() => setPaymentStatus('error'));
+                .catch(() => {
+                    setPaymentStatus('error');
+                    setIsProcessing(false);
+                });
         }
     }, [paymentIntent]);
     return (

@@ -11,7 +11,7 @@ export default function Calendar({ date, time }: CalendarProps) {
     const month = d.toLocaleString('fr-FR', { month: 'long' });
 
     return (
-        <div className="wrapper">
+        <div className="box">
             <div className="calendar">
                 <div className="month">{month}</div>
                 <div className="day">{day}</div>
