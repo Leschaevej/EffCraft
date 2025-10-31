@@ -354,6 +354,9 @@ export default function Cart() {
                                         )}
                                     </div>
                                 </div>
+                                <button type="button" onClick={() => setShowRecap(false)}>
+                                    Retour
+                                </button>
                             </div>
                             <div className="summary">
                                 <div className="line">
@@ -447,10 +450,8 @@ export default function Cart() {
                                 ) : (
                                     <div className="list">
                                         {shippingOptions.map((option) => (
-                                            <React.Fragment key={option.id}>
-                                                <label
-                                                    className={`method ${selectedShippingMethod === option.id ? 'selected' : ''}`}
-                                                >
+                                            <div key={option.id} className={`method ${selectedShippingMethod === option.id ? 'selected' : ''}`}>
+                                                <label className="head">
                                                     <input
                                                         type="radio"
                                                         name="shippingMethod"
@@ -487,7 +488,7 @@ export default function Cart() {
                                                                 )}
                                                             </div>
                                                         ) : selectedRelayPoint && (
-                                                            <div className="selected">
+                                                            <div className="relaySelected">
                                                                 <div>
                                                                     <h4>Point relais sélectionné :</h4>
                                                                     <p><strong>{selectedRelayPoint.name}</strong></p>
@@ -504,12 +505,12 @@ export default function Cart() {
                                                         )}
                                                     </>
                                                 )}
-                                            </React.Fragment>
+                                            </div>
                                         ))}
                                     </div>
                                 )}
                                 <div className="actions">
-                                    <button type="button" onClick={() => setShowShippingMethod(false)} className="back">
+                                    <button type="button" onClick={() => setShowShippingMethod(false)}>
                                         Retour
                                     </button>
                                     <button type="submit" className="confirm">
@@ -626,7 +627,7 @@ export default function Cart() {
                             </label>
                         </div>
                         <div className="action">
-                            <button type="button" onClick={handleBackToCart} className="back">
+                            <button type="button" onClick={handleBackToCart}>
                                 Retour
                             </button>
                             <button type="submit" className="confirm">
@@ -698,7 +699,7 @@ export default function Cart() {
                             />
                         </div>
                         <div className="action">
-                            <button type="button" onClick={() => setShowBillingForm(false)} className="back">
+                            <button type="button" onClick={() => setShowBillingForm(false)}>
                                 Retour
                             </button>
                             <button type="submit" className="confirm">

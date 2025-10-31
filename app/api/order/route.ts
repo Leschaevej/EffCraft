@@ -21,8 +21,14 @@ export async function GET(req: NextRequest) {
         const client = await clientPromise;
         const db = client.db("effcraftdatabase");
         const ordersCollection = db.collection("orders");
+
+        // Si status === 'history', récupérer toutes les commandes sauf 'paid'
+        const query = status === 'history'
+            ? { status: { $ne: 'paid' } }
+            : { status };
+
         const orders = await ordersCollection
-            .find({ status })
+            .find(query)
             .sort({ createdAt: -1 })
             .toArray();
         return NextResponse.json({ orders });

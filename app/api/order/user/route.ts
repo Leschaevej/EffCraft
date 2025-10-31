@@ -21,44 +21,11 @@ export async function GET(req: NextRequest) {
         const db = client.db("effcraftdatabase");
         const ordersCollection = db.collection("orders");
 
-        let query: any = {
+        // Simple query: récupérer toutes les commandes avec les statuts demandés
+        const query: any = {
             userEmail: session.user.email,
             status: { $in: statuses }
         };
-
-        // Si on demande les commandes "delivered" pour la section Commandes
-        // On filtre celles livrées depuis moins de 24h
-        if (statuses.includes('delivered') && statuses.includes('paid')) {
-            const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-            query = {
-                userEmail: session.user.email,
-                $or: [
-                    { status: { $in: statuses.filter(s => s !== 'delivered') } },
-                    {
-                        status: 'delivered',
-                        deliveredAt: { $gte: twentyFourHoursAgo }
-                    }
-                ]
-            };
-        }
-        // Si on demande l'historique, on prend les delivered de plus de 24h + cancelled + returned
-        else if (statuses.includes('delivered') && statuses.includes('cancelled')) {
-            const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-            query = {
-                userEmail: session.user.email,
-                $or: [
-                    { status: { $in: ['cancelled', 'returned'] } },
-                    {
-                        status: 'delivered',
-                        deliveredAt: { $lt: twentyFourHoursAgo }
-                    },
-                    {
-                        status: 'delivered',
-                        deliveredAt: { $exists: false }
-                    }
-                ]
-            };
-        }
 
         const orders = await ordersCollection
             .find(query)

@@ -17,14 +17,12 @@
                 align-items: center;
                 justify-content: center;
                 padding: 20px 50px;
-                font-size: 32px;
+                font-size: 40px;
                 border-radius: 50px;
+                background-color: var(--secondBackgroundColor);
                 border: 3px solid transparent;
                 box-shadow: -4px 4px 4px rgba(0, 0, 0, 0.3);
-                cursor: pointer;
                 transition: border-color 0.3s ease;
-                background-color: var(--secondBackgroundColor);
-                width: 100%;
                 img {
                     height: 40px;
                     width: auto;
@@ -158,13 +156,19 @@
                 .action{
                     display: flex;
                     justify-content: space-around;
-                    button{
-                        font-size: 36px;
-                        padding: 20px;
-                        border-radius: 30px;
+                    button {
+                        padding: 15px 30px;
                         background-color: var(--mainColor);
-                        border: none;
                         color: var(--secondTextColor);
+                        border: none;
+                        border-radius: 25px;
+                        font-size: 24px;
+                        cursor: pointer;
+                        transition: color 0.3s ease, background-color 0.3s ease;
+                        &:hover {
+                            background-color: var(--secondColor);
+                            color: var(--mainTextColor);
+                        }
                     }
                 }
             }
@@ -180,47 +184,92 @@
                     gap: 30px;
                     .method {
                         display: flex;
-                        align-items: center;
-                        padding: 20px;
+                        flex-direction: column;
                         border: 3px solid var(--mainColor);
                         border-radius: 30px;
-                        cursor: pointer;
                         transition: all 0.3s ease;
                         background-color: var(--secondBackgroundColor);
-                        input[type="radio"] {
-                            appearance: none;
-                            -webkit-appearance: none;
-                            width: 30px;
-                            height: 30px;
-                            margin-right: 20px;
+                        .head {
+                            display: flex;
+                            align-items: center;
+                            padding: 30px;
                             cursor: pointer;
-                            border: 2px solid var(--mainColor);
-                            border-radius: 50%;
-                            transition: all 0.2s ease;
-                            &:checked {
-                                background-color: var(--mainColor);
+                            input[type="radio"] {
+                                appearance: none;
+                                -webkit-appearance: none;
+                                width: 30px;
+                                height: 30px;
+                                margin-right: 20px;
+                                cursor: pointer;
+                                border: 2px solid var(--mainColor);
+                                border-radius: 50%;
+                                transition: all 0.2s ease;
+                                &:checked {
+                                    background-color: var(--mainColor);
+                                }
+                            }
+                            .info {
+                                display: flex;
+                                flex-direction: row;
+                                align-items: center;
+                                justify-content: space-between;
+                                width: 100%;
+                                gap: 20px;
+                                img.logo {
+                                    height: 50px;
+                                    width: auto;
+                                    object-fit: contain;
+                                }
+                                p {
+                                    margin: 0;
+                                    font-size: 20px;
+                                    flex: 1;
+                                    &.price {
+                                        font-size: 24px;
+                                        font-weight: 700;
+                                        text-align: right;
+                                    }
+                                }
                             }
                         }
-                        .info {
+                        .selector {
+                            padding: 0 30px 30px 30px;
+                            h3 {
+                                color: var(--mainColor);
+                                margin-bottom: 20px;
+                                font-size: 28px;
+                            }
+                        }
+                        .relaySelected {
                             display: flex;
-                            flex-direction: row;
                             align-items: center;
                             justify-content: space-between;
-                            width: 100%;
-                            gap: 20px;
-                            img.logo {
-                                height: 50px;
-                                width: auto;
-                                object-fit: contain;
+                            padding: 0 20px 20px 20px;
+                            > div {
+                                flex: 1;
+                            }
+                            h4 {
+                                color: var(--mainColor);
+                                margin-bottom: 10px;
+                                font-size: 22px;
                             }
                             p {
-                                margin: 0;
-                                font-size: 20px;
-                                flex: 1;
-                                &.price {
-                                    font-size: 24px;
-                                    font-weight: 700;
-                                    text-align: right;
+                                margin: 5px 0;
+                                font-size: 18px;
+                                color: var(--mainTextColor);
+                            }
+                            button {
+                                padding: 15px 30px;
+                                background-color: var(--mainColor);
+                                color: var(--secondTextColor);
+                                border: none;
+                                border-radius: 25px;
+                                font-size: 24px;
+                                cursor: pointer;
+                                transition: color 0.3s ease, background-color 0.3s ease;
+                                &:hover {
+                                    background-color: var(--secondColor);
+                                    color: var(--mainTextColor);
                                 }
                             }
                         }
@@ -231,67 +280,17 @@
                     justify-content: space-around;
                     margin-top: 20px;
                     button {
-                        font-size: 36px;
-                        padding: 20px;
-                        border-radius: 30px;
+                        padding: 15px 30px;
                         background-color: var(--mainColor);
-                        border: none;
                         color: var(--secondTextColor);
+                        border: none;
+                        border-radius: 25px;
+                        font-size: 24px;
                         cursor: pointer;
-                        transition: background-color 0.3s ease;
+                        transition: color 0.3s ease, background-color 0.3s ease;
                         &:hover {
                             background-color: var(--secondColor);
-                        }
-                        &.back {
-                            background-color: transparent;
-                            border: 3px solid var(--mainColor);
-                            color: var(--mainColor);
-                        }
-                    }
-                }
-                .selector {
-                    margin: 30px 0;
-                    h3 {
-                        color: var(--mainColor);
-                        margin-bottom: 20px;
-                        font-size: 28px;
-                    }
-                }
-                .selected {
-                    display: flex;
-                    align-items: center;
-                    justify-content: space-between;
-                    padding: 20px;
-                    background-color: rgba(255, 255, 255, 0.1);
-                    border: 2px solid var(--mainColor);
-                    border-radius: 30px;
-                    > div {
-                        flex: 1;
-                    }
-                    h4 {
-                        color: var(--mainColor);
-                        margin-bottom: 10px;
-                        font-size: 22px;
-                    }
-                    p {
-                        margin: 5px 0;
-                        font-size: 18px;
-                        color: var(--mainTextColor);
-                    }
-                    button {
-                        padding: 10px 20px;
-                        background-color: var(--secondColor);
-                        color: black;
-                        border: none;
-                        border-radius: 20px;
-                        cursor: pointer;
-                        font-size: 16px;
-                        font-weight: 600;
-                        transition: background-color 0.3s ease;
-                        white-space: nowrap;
-                        &:hover {
-                            background-color: var(--mainColor);
-                            color: white;
+                            color: var(--mainTextColor);
                         }
                     }
                 }
@@ -305,6 +304,21 @@
                 display: flex;
                 flex-direction: column;
                 gap: 50px;
+                button {
+                    padding: 15px 30px;
+                    background-color: var(--mainColor);
+                    color: var(--secondTextColor);
+                    border: none;
+                    border-radius: 25px;
+                    font-size: 24px;
+                    cursor: pointer;
+                    transition: color 0.3s ease, background-color 0.3s ease;
+                    width: fit-content;
+                    &:hover {
+                        background-color: var(--secondColor);
+                        color: var(--mainTextColor);
+                    }
+                }
                 .products {
                     display: flex;
                     flex-direction: column;

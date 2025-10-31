@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { nothingYouCouldDo } from "../font";
+import { FaCheck, FaBoxOpen, FaWarehouse, FaTruck, FaTruckMoving, FaHome } from "react-icons/fa";
 import "./page.scss";
 import AddForm from "../components/addForm/AddForm";
 import DeleteForm from "../components/deleteForm/DeleteForm";
@@ -14,7 +15,6 @@ interface Product {
     images: string[];
     price: number;
 }
-
 interface Order {
     _id: string;
     products: Product[];
@@ -24,10 +24,41 @@ interface Order {
     shippingMethod: any;
     createdAt: string;
     userEmail: string;
+    status: string;
     boxtalStatus?: string;
     boxtalShipmentId?: string;
+    trackingNumber?: string;
+    deliveredAt?: string;
 }
 
+const TRACKING_STEPS = [
+    { label: "Commande confirmée", icon: <FaCheck /> },
+    { label: "En cours de préparation", icon: <FaBoxOpen /> },
+    { label: "Remis au transporteur", icon: <FaWarehouse /> },
+    { label: "En transit", icon: <FaTruck /> },
+    { label: "En livraison", icon: <FaTruckMoving /> },
+    { label: "Livré", icon: <FaHome /> }
+];
+
+const STATUS_STEPS: { [key: string]: number } = {
+    paid: 1,
+    preparing: 2,
+    ready: 3,
+    in_transit: 4,
+    out_for_delivery: 5,
+    delivered: 6
+};
+
+const STATUS_LABELS: { [key: string]: string } = {
+    paid: "Commande confirmée",
+    preparing: "En préparation",
+    ready: "Prêt à être récupéré",
+    in_transit: "En transit",
+    out_for_delivery: "En cours de livraison",
+    delivered: "Livré",
+    cancelled: "Annulé",
+    returned: "Retourné"
+};
 export default function Backoffice() {
     const { data: session, status } = useSession();
     const router = useRouter();
@@ -36,27 +67,25 @@ export default function Backoffice() {
     const [orderView, setOrderView] = useState<"pending" | "history">("pending");
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(false);
+    const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
     useEffect(() => {
         if (status === "loading") return;
         if (!session || session.user.role !== "admin") {
         router.replace("/");
         }
     }, [session, status, router]);
-
     useEffect(() => {
         if (activeSection === "orders" && session?.user?.role === "admin") {
             fetchOrders();
         }
     }, [activeSection, orderView, session]);
-
     const fetchOrders = async (syncStatus: boolean = false) => {
         setLoading(true);
         try {
-            const status = orderView === "pending" ? "paid" : "preparing";
+            const status = orderView === "pending" ? "paid" : "history";
             const response = await fetch(`/api/order?status=${status}`);
             if (response.ok) {
                 const data = await response.json();
-                // Synchroniser les statuts Boxtal seulement si demandé
                 if (syncStatus && orderView === "history") {
                     const ordersWithStatus = await Promise.all(
                         data.orders.map(async (order: Order) => {
@@ -80,57 +109,38 @@ export default function Backoffice() {
                 }
             }
         } catch (error) {
-            console.error("Erreur chargement commandes:", error);
         } finally {
             setLoading(false);
         }
     };
-
     const handlePrintLabel = async (order: Order) => {
         try {
-            console.log("Traitement bordereau pour commande:", order._id);
-
-            // Si pas encore de boxtalShipmentId, créer l'expédition d'abord
             if (!order.boxtalShipmentId) {
-                console.log("Création expédition Boxtal...");
                 const createResponse = await fetch("/api/shipping", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ orderId: order._id }),
                 });
-
                 if (!createResponse.ok) {
                     const error = await createResponse.json();
                     alert("Erreur lors de la création de l'expédition: " + (error.error || "Erreur inconnue"));
                     return;
                 }
-
-                console.log("Expédition Boxtal créée avec succès, attente génération bordereau...");
-                // Attendre 2 secondes que Boxtal génère le bordereau
                 await new Promise(resolve => setTimeout(resolve, 2000));
             }
-
-            // Récupérer le PDF du bordereau depuis Boxtal
             const response = await fetch("/api/shipping?action=label", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ orderId: order._id }),
             });
-
-            console.log("Statut de la réponse:", response.status);
-
             if (response.ok) {
-                // Ouvrir le PDF dans un nouvel onglet
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 window.open(url, '_blank');
-
-                // Rafraîchir la liste des commandes
                 fetchOrders();
             } else {
                 const contentType = response.headers.get("content-type");
                 let errorMessage = "Erreur inconnue";
-
                 if (contentType && contentType.includes("application/json")) {
                     const error = await response.json();
                     console.error("Erreur JSON:", error);
@@ -140,7 +150,6 @@ export default function Backoffice() {
                     console.error("Erreur texte:", errorText);
                     errorMessage = errorText;
                 }
-
                 alert("Erreur lors de la récupération du bordereau: " + errorMessage);
             }
         } catch (error) {
@@ -148,19 +157,16 @@ export default function Backoffice() {
             alert("Erreur lors de l'impression du bordereau: " + error);
         }
     };
-
     const handleCancelOrder = async (order: Order) => {
         if (!confirm(`Êtes-vous sûr de vouloir annuler la commande de ${order.userEmail} ?`)) {
             return;
         }
-
         try {
             const response = await fetch("/api/order", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ orderId: order._id, action: "cancel" }),
             });
-
             if (response.ok) {
                 alert("Commande annulée avec succès");
                 fetchOrders();
@@ -178,14 +184,12 @@ export default function Backoffice() {
         if (!confirm(`Marquer cette commande comme retournée ?`)) {
             return;
         }
-
         try {
             const response = await fetch("/api/order", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ orderId: order._id, action: "return" }),
             });
-
             if (response.ok) {
                 alert("Commande marquée comme retournée");
                 fetchOrders();
@@ -198,142 +202,200 @@ export default function Backoffice() {
             alert("Erreur: " + error);
         }
     };
+
+    const getTrackingStep = (order: Order): number => STATUS_STEPS[order.status] || 1;
+
+    const getStatusIcon = (status: string) => {
+        const iconMap: { [key: string]: React.ReactNode } = {
+            paid: <FaCheck />,
+            preparing: <FaBoxOpen />,
+            ready: <FaWarehouse />,
+            in_transit: <FaTruck />,
+            out_for_delivery: <FaTruckMoving />,
+            delivered: <FaHome />,
+            cancelled: <FaCheck />,
+            returned: <FaCheck />
+        };
+        return iconMap[status] || <FaCheck />;
+    };
     if (status === "loading" || !session || session.user.role !== "admin") {
         return <p>Chargement...</p>;
     }
     return (
         <main className="backoffice">
-        <section className="toolbar">
-            <button
-            className={activeSection === "manage" ? "active" : ""}
-            onClick={() => setActiveSection("manage")}
-            >
-            Gérer Produits
-            </button>
-            <button
-            className={activeSection === "orders" ? "active" : ""}
-            onClick={() => setActiveSection("orders")}
-            >
-            Commandes
-            </button>
-        </section>
-        {activeSection === "manage" && (
-            <section className="manage">
-            <div className="addDell">
+            <section className="toolbar">
                 <button
-                className={activeView === "add" ? "active" : ""}
-                onClick={() => setActiveView("add")}
-                >
-                Ajouter
+                    className={activeSection === "manage" ? "active" : ""}
+                    onClick={() => setActiveSection("manage")}
+                    >
+                    Gérer Produits
                 </button>
                 <button
-                className={activeView === "delete" ? "active" : ""}
-                onClick={() => setActiveView("delete")}
-                >
-                Supprimer
+                    className={activeSection === "orders" ? "active" : ""}
+                    onClick={() => setActiveSection("orders")}
+                    >
+                    Commandes
                 </button>
-            </div>
-            <div className="conteneur">
-                <h2 className={nothingYouCouldDo.className}>
-                {activeView === "add" ? "Ajouter" : "Supprimer"}
-                </h2>
-                {activeView === "add" && <AddForm />}
-                {activeView === "delete" && <DeleteForm />}
-            </div>
             </section>
-        )}
-        {activeSection === "orders" && (
-            <section className="orders">
-            <div className="switch">
-                <button
-                    className={orderView === "pending" ? "active" : ""}
-                    onClick={() => setOrderView("pending")}
-                >
-                    En attente
-                </button>
-                <button
-                    className={orderView === "history" ? "active" : ""}
-                    onClick={() => setOrderView("history")}
-                >
-                    Historique
-                </button>
-            </div>
-            <div className="conteneur">
-                <h2 className={nothingYouCouldDo.className}>
-                    {orderView === "pending" ? "En attente" : "Historique"}
-                </h2>
-                {loading ? (
-                    <p className="loading">Chargement des commandes...</p>
-                ) : orders.length === 0 ? (
-                    <p className="empty">Aucune commande en attente</p>
-                ) : (
-                    <div className="list">
-                        {orders.map((order) => (
-                            <div key={order._id} className="order">
-                                <div className="products">
-                                    {order.products.map((product) => (
-                                        <div key={product._id} className="item">
-                                            <div className="image">
-                                                {product.images && product.images.length > 0 && (
-                                                    <img
-                                                        src={product.images[0]}
-                                                        alt={product.name}
-                                                    />
+            {activeSection === "manage" && (
+                <section className="manage">
+                <div className="addDell">
+                    <button
+                        className={activeView === "add" ? "active" : ""}
+                        onClick={() => setActiveView("add")}
+                        >
+                        Ajouter
+                    </button>
+                    <button
+                        className={activeView === "delete" ? "active" : ""}
+                        onClick={() => setActiveView("delete")}
+                        >
+                        Supprimer
+                    </button>
+                </div>
+                <div className="conteneur">
+                    <h2 className={nothingYouCouldDo.className}>
+                    {activeView === "add" ? "Ajouter" : "Supprimer"}
+                    </h2>
+                    {activeView === "add" && <AddForm />}
+                    {activeView === "delete" && <DeleteForm />}
+                </div>
+                </section>
+            )}
+            {activeSection === "orders" && (
+                <section className="orders">
+                <div className="switch">
+                    <button
+                        className={orderView === "pending" ? "active" : ""}
+                        onClick={() => setOrderView("pending")}
+                        >
+                        En attente
+                    </button>
+                    <button
+                        className={orderView === "history" ? "active" : ""}
+                        onClick={() => setOrderView("history")}
+                        >
+                        Historique
+                    </button>
+                </div>
+                <div className="conteneur">
+                    <h2 className={nothingYouCouldDo.className}>
+                        {orderView === "pending" ? "En attente" : "Historique"}
+                    </h2>
+                    {loading ? (
+                        <p className="loading">Chargement des commandes...</p>
+                    ) : orders.length === 0 ? (
+                        <p className="empty">Aucune commande</p>
+                    ) : (
+                        <div className="list">
+                            {orders.map((order) => (
+                                <div key={order._id} className={`item ${expandedOrderId === order._id ? "expanded" : ""}`}>
+                                    <div className="head">
+                                        <div className="info">
+                                            <div className="preview">
+                                                {order.products[0]?.images && order.products[0].images.length > 0 && (
+                                                    <img src={order.products[0].images[0]} alt={order.products[0].name} />
                                                 )}
                                             </div>
-                                            <p className="name">{product.name}</p>
+                                            <div className="name">
+                                                <p>{order.shippingData?.nom || ''}</p>
+                                                <p>{order.shippingData?.prenom || ''}</p>
+                                            </div>
+                                            <p>{new Date(order.createdAt).toLocaleDateString()}</p>
+                                            <p className="total">{order.totalPrice}€</p>
+                                            <div className="status">
+                                                <div className="icon">
+                                                    {getStatusIcon(order.status)}
+                                                </div>
+                                                <p className="label">{STATUS_LABELS[order.status] || order.status}</p>
+                                            </div>
                                         </div>
-                                    ))}
-                                </div>
-                                <div className="actions">
-                                    {orderView === "pending" ? (
-                                        <>
-                                            <button
-                                                className="print"
-                                                onClick={() => handlePrintLabel(order)}
-                                            >
-                                                Bordereau
-                                            </button>
-                                            <button
-                                                className="cancel"
-                                                onClick={() => handleCancelOrder(order)}
-                                            >
-                                                Annuler
-                                            </button>
-                                        </>
-                                    ) : (
-                                        order.boxtalStatus === "IN_TRANSIT" || order.boxtalStatus === "DELIVERED" ? (
-                                            <button
-                                                className="return"
-                                                onClick={() => handleReturnOrder(order)}
-                                            >
-                                                Retour
-                                            </button>
-                                        ) : (
-                                            <>
+                                        <div className="buttons">
+                                            {orderView === "pending" && (
                                                 <button
                                                     className="print"
                                                     onClick={() => handlePrintLabel(order)}
                                                 >
                                                     Bordereau
                                                 </button>
-                                                <button
-                                                    className="cancel"
-                                                    onClick={() => handleCancelOrder(order)}
-                                                >
-                                                    Annuler
-                                                </button>
-                                            </>
-                                        )
+                                            )}
+                                            <button onClick={() => setExpandedOrderId(expandedOrderId === order._id ? null : order._id)}>
+                                                {expandedOrderId === order._id ? "Fermer" : "Details"}
+                                            </button>
+                                        </div>
+                                    </div>
+                                    {expandedOrderId === order._id && (
+                                        <div className="details">
+                                            <div className="content">
+                                                <div className="infos">
+                                                    <div className="info">
+                                                        <h3>Informations de commande</h3>
+                                                        <p>Email : {order.userEmail}</p>
+                                                        <p>Date de commande : {new Date(order.createdAt).toLocaleDateString()}</p>
+                                                        <p>Total : {order.totalPrice}€</p>
+                                                        <p>Mode de livraison : {order.shippingMethod?.name}</p>
+                                                        <p>N° de suivi : {order.trackingNumber || "En attente"}</p>
+                                                    </div>
+                                                    <div className="info">
+                                                        <h3>Livraison</h3>
+                                                        {order.shippingData && (
+                                                            <>
+                                                                <p>{order.shippingData.nom || ''} {order.shippingData.prenom || ''}</p>
+                                                                <p>{order.shippingData.rue || ''}</p>
+                                                                <p>{order.shippingData.codePostal || ''} {order.shippingData.ville || ''}</p>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                    <div className="info">
+                                                        <h3>Point relais</h3>
+                                                        {order.shippingData?.relayPoint && (
+                                                            <>
+                                                                <p>{order.shippingData.relayPoint.name} </p>
+                                                                <p>{order.shippingData.relayPoint.address}</p>
+                                                                <p>{order.shippingData.relayPoint.zipcode} {order.shippingData.relayPoint.city}</p>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="products">
+                                                    {order.products.map((product) => (
+                                                        <div key={product._id} className="product">
+                                                            {product.images && product.images.length > 0 && (
+                                                                <img src={product.images[0]} alt={product.name} />
+                                                            )}
+                                                            <p className="name">{product.name}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="actions">
+                                                {orderView === "pending" ? (
+                                                    <button
+                                                        className="cancel"
+                                                        onClick={() => handleCancelOrder(order)}
+                                                    >
+                                                        Annuler
+                                                    </button>
+                                                ) : (
+                                                    ["ready", "in_transit", "out_for_delivery", "delivered"].includes(order.status) && (
+                                                        <button
+                                                            className="return"
+                                                            onClick={() => handleReturnOrder(order)}
+                                                        >
+                                                            Retour
+                                                        </button>
+                                                    )
+                                                )}
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-            </section>
-        )}
+                            ))}
+                        </div>
+                    )}
+                </div>
+                </section>
+            )}
         </main>
     );
 }

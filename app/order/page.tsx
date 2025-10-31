@@ -24,6 +24,7 @@ interface Order {
     status: string;
     boxtalStatus?: string;
     trackingNumber?: string;
+    deliveredAt?: string;
 }
 
 const TRACKING_STEPS = [
@@ -44,13 +45,24 @@ const STATUS_STEPS: { [key: string]: number } = {
     delivered: 6
 };
 
+const STATUS_LABELS: { [key: string]: string } = {
+    paid: "Commande confirmée",
+    preparing: "En préparation",
+    ready: "Prêt à être récupéré",
+    in_transit: "En transit",
+    out_for_delivery: "En cours de livraison",
+    delivered: "Livré",
+    cancelled: "Annulé",
+    returned: "Retourné"
+};
+
 export default function OrderPage() {
     const { data: session, status: authStatus } = useSession();
     const router = useRouter();
     const [currentOrders, setCurrentOrders] = useState<Order[]>([]);
     const [historyOrders, setHistoryOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(false);
-    const [trackingView, setTrackingView] = useState<Order | null>(null);
+    const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
     useEffect(() => {
         if (authStatus === "loading") return;
@@ -68,8 +80,8 @@ export default function OrderPage() {
     const fetchOrders = async () => {
         setLoading(true);
         try {
-            // Récupérer les commandes en cours
-            const currentResponse = await fetch(`/api/order/user?statuses=paid,preparing,ready,in_transit,out_for_delivery,delivered`);
+            // Récupérer les commandes en cours (sans 'delivered')
+            const currentResponse = await fetch(`/api/order/user?statuses=paid,preparing,ready,in_transit,out_for_delivery`);
             if (currentResponse.ok) {
                 const data = await currentResponse.json();
 
@@ -94,7 +106,7 @@ export default function OrderPage() {
                 setCurrentOrders(ordersWithSync);
             }
 
-            // Récupérer l'historique
+            // Récupérer l'historique (avec 'delivered')
             const historyResponse = await fetch(`/api/order/user?statuses=delivered,cancelled,returned`);
             if (historyResponse.ok) {
                 const data = await historyResponse.json();
@@ -109,6 +121,20 @@ export default function OrderPage() {
 
     const getTrackingStep = (order: Order): number => STATUS_STEPS[order.status] || 1;
 
+    const getStatusIcon = (status: string) => {
+        const iconMap: { [key: string]: React.ReactNode } = {
+            paid: <FaCheck />,
+            preparing: <FaBoxOpen />,
+            ready: <FaWarehouse />,
+            in_transit: <FaTruck />,
+            out_for_delivery: <FaTruckMoving />,
+            delivered: <FaHome />,
+            cancelled: <FaCheck />,
+            returned: <FaCheck />
+        };
+        return iconMap[status] || <FaCheck />;
+    };
+
     if (authStatus === "loading" || !session) {
         return <p>Chargement...</p>;
     }
@@ -116,89 +142,107 @@ export default function OrderPage() {
     return (
         <main className="order">
             <section className="suivi">
-                {trackingView ? (
-                    <div className="conteneur">
-                        <div className="tracking">
-                            <h2 className={nothingYouCouldDo.className}>Suivi</h2>
-                            <div className="steps">
-                                {TRACKING_STEPS.map((step, index) => {
-                                    const currentStep = getTrackingStep(trackingView);
-                                    return (
-                                        <div
-                                            key={index}
-                                            className={`step ${index + 1 <= currentStep ? "active" : ""}`}
-                                        >
-                                            <div className="icon">{step.icon}</div>
-                                            <p className="label">{step.label}</p>
-                                            {index < TRACKING_STEPS.length - 1 && <div className="line"></div>}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            <div className="details-wrapper">
-                                <div className="infos">
-                                    <h3>Détails de la commande</h3>
-                                    <p>Date : {new Date(trackingView.createdAt).toLocaleDateString()}</p>
-                                    <p>Total : {trackingView.totalPrice}€</p>
-                                    <p>Mode de livraison : {trackingView.shippingMethod?.name}</p>
-                                    <p>
-                                        {trackingView.trackingNumber
-                                            ? `N° de suivi : ${trackingView.trackingNumber}`
-                                            : "En attente du numéro de suivi"}
-                                    </p>
-                                </div>
-                                <div className="products">
-                                    <h3>Produits</h3>
-                                    <div className="products-list">
-                                        {trackingView.products.map((product) => (
-                                            <div key={product._id} className="product">
-                                                <div className="image">
-                                                    {product.images && product.images.length > 0 && (
-                                                        <img src={product.images[0]} alt={product.name} />
-                                                    )}
-                                                </div>
-                                                <p className="name">{product.name}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                            <button className="back" onClick={() => setTrackingView(null)}>
-                                Retour
-                            </button>
-                        </div>
-                    </div>
-                ) : (
-                    <div className="conteneur">
-                        <h2 className={nothingYouCouldDo.className}>Commandes</h2>
-                        {loading ? (
-                            <p className="loading">Chargement...</p>
-                        ) : currentOrders.length === 0 ? (
-                            <p className="empty">Aucune commande</p>
-                        ) : (
-                            <div className="list">
-                                {currentOrders.map((order) => (
-                                    <div key={order._id} className="item">
+                <div className="conteneur">
+                    <h2 className={nothingYouCouldDo.className}>Commandes</h2>
+                    {loading ? (
+                        <p className="loading">Chargement...</p>
+                    ) : currentOrders.length === 0 ? (
+                        <p className="empty">Aucune commande</p>
+                    ) : (
+                        <div className="list">
+                            {currentOrders.map((order) => (
+                                <div key={order._id} className={`item ${expandedOrderId === order._id ? "expanded" : ""}`}>
+                                    <div className="head">
                                         <div className="info">
                                             <div className="preview">
                                                 {order.products[0]?.images && order.products[0].images.length > 0 && (
                                                     <img src={order.products[0].images[0]} alt={order.products[0].name} />
                                                 )}
                                             </div>
-                                            <div className="details">
-                                                <p>{new Date(order.createdAt).toLocaleDateString()}</p>
-                                                <p className="total">{order.totalPrice}€</p>
+                                            <p>{new Date(order.createdAt).toLocaleDateString()}</p>
+                                            <p className="total">{order.totalPrice}€</p>
+                                            <div className="status">
+                                                <div className="icon">
+                                                    {getStatusIcon(order.status)}
+                                                </div>
+                                                <p className="label">{STATUS_LABELS[order.status] || order.status}</p>
                                             </div>
                                         </div>
-                                        <button onClick={() => setTrackingView(order)}>
-                                            Suivre mon colis
+                                        <button onClick={() => setExpandedOrderId(expandedOrderId === order._id ? null : order._id)}>
+                                            {expandedOrderId === order._id ? "Fermer" : "Details"}
                                         </button>
                                     </div>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
+                                    {expandedOrderId === order._id && (
+                                        <div className="details">
+                                            <div className="tracking">
+                                                {TRACKING_STEPS.map((step, index) => {
+                                                    const currentStep = getTrackingStep(order);
+                                                    const isActive = index + 1 <= currentStep;
+                                                    const isConnectorActive = index + 1 <= currentStep;
+                                                    return (
+                                                        <React.Fragment key={index}>
+                                                            <div className={`step ${isActive ? "active" : ""}`}>
+                                                                <div className="icon">{step.icon}</div>
+                                                                <p className="label">{step.label}</p>
+                                                            </div>
+                                                            {index < TRACKING_STEPS.length - 1 && (
+                                                                <div className={`connector ${isConnectorActive ? "active" : ""}`}></div>
+                                                            )}
+                                                        </React.Fragment>
+                                                    );
+                                                })}
+                                            </div>
+                                            <div className="content">
+                                                <div className="infos">
+                                                    <div className="info">
+                                                        <h3>Informations de commande</h3>
+                                                        <p>Date de commande : {new Date(order.createdAt).toLocaleDateString()}</p>
+                                                        <p>Total : {order.totalPrice}€</p>
+                                                        <p>Mode de livraison : {order.shippingMethod?.name}</p>
+                                                        <p>
+                                                            N° de suivi : {order.trackingNumber || "En attente"}
+                                                        </p>
+                                                    </div>
+                                                    <div className="info">
+                                                        <h3>Livraison</h3>
+                                                        {order.shippingData && (
+                                                            <>
+                                                            <p>{order.shippingData.nom || ''} {order.shippingData.prenom || ''}</p>
+                                                            <p>{order.shippingData.rue || ''}</p>
+                                                            <p>{order.shippingData.codePostal || ''} {order.shippingData.ville || ''}</p>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                    <div className="info">
+                                                        <h3>Point relais</h3>
+                                                        {order.shippingData?.relayPoint && (
+                                                            <>
+                                                            <p>{order.shippingData.relayPoint.name} </p>
+                                                            <p>{order.shippingData.relayPoint.address}</p>
+                                                            <p>{order.shippingData.relayPoint.zipcode} {order.shippingData.relayPoint.city}</p>
+                                                            </>
+                                                            
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="products">
+                                                    {order.products.map((product) => (
+                                                        <div key={product._id} className="product">
+                                                            {product.images && product.images.length > 0 && (
+                                                                <img src={product.images[0]} alt={product.name} />
+                                                            )}
+                                                            <p className="name">{product.name}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </section>
             <section className="historique">
                 <div className="conteneur">
@@ -210,18 +254,78 @@ export default function OrderPage() {
                     ) : (
                         <div className="list">
                             {historyOrders.map((order) => (
-                                <div key={order._id} className="item">
-                                    <div className="info">
-                                        <div className="preview">
-                                            {order.products[0]?.images && order.products[0].images.length > 0 && (
-                                                <img src={order.products[0].images[0]} alt={order.products[0].name} />
-                                            )}
-                                        </div>
-                                        <div className="details">
+                                <div key={order._id} className={`item ${expandedOrderId === order._id ? "expanded" : ""}`}>
+                                    <div className="head">
+                                        <div className="info">
+                                            <div className="preview">
+                                                {order.products[0]?.images && order.products[0].images.length > 0 && (
+                                                    <img src={order.products[0].images[0]} alt={order.products[0].name} />
+                                                )}
+                                            </div>
                                             <p>{new Date(order.createdAt).toLocaleDateString()}</p>
                                             <p className="total">{order.totalPrice}€</p>
+                                            <div className="status">
+                                                <div className="icon">
+                                                    {getStatusIcon(order.status)}
+                                                </div>
+                                                <p className="label">{STATUS_LABELS[order.status] || order.status}</p>
+                                            </div>
+                                        </div>
+                                        <div className="buttons">
+                                            <button className="invoice">Facture</button>
+                                            <button onClick={() => setExpandedOrderId(expandedOrderId === order._id ? null : order._id)}>
+                                                {expandedOrderId === order._id ? "Fermer" : "Details"}
+                                            </button>
                                         </div>
                                     </div>
+                                    {expandedOrderId === order._id && (
+                                        <div className="details">
+                                            <div className="content">
+                                                <div className="infos">
+                                                    <div className="info">
+                                                        <h3>Informations de commande</h3>
+                                                        <p>Date de commande : {new Date(order.createdAt).toLocaleDateString()}</p>
+                                                        <p>Total : {order.totalPrice}€</p>
+                                                        <p>Mode de livraison : {order.shippingMethod?.name}</p>
+                                                        <p>
+                                                            N° de suivi : {order.trackingNumber || "En attente"}
+                                                        </p>
+                                                    </div>
+                                                    <div className="info">
+                                                        <h3>Livraison</h3>
+                                                        {order.shippingData && (
+                                                            <>
+                                                            <p>{order.shippingData.nom || ''} {order.shippingData.prenom || ''}</p>
+                                                            <p>{order.shippingData.rue || ''}</p>
+                                                            <p>{order.shippingData.codePostal || ''} {order.shippingData.ville || ''}</p>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                    <div className="info">
+                                                        <h3>Point relais</h3>
+                                                        {order.shippingData?.relayPoint && (
+                                                            <>
+                                                            <p>{order.shippingData.relayPoint.name} </p>
+                                                            <p>{order.shippingData.relayPoint.address}</p>
+                                                            <p>{order.shippingData.relayPoint.zipcode} {order.shippingData.relayPoint.city}</p>
+                                                            </>
+                                                            
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="products">
+                                                    {order.products.map((product) => (
+                                                        <div key={product._id} className="product">
+                                                            {product.images && product.images.length > 0 && (
+                                                                <img src={product.images[0]} alt={product.name} />
+                                                            )}
+                                                            <p className="name">{product.name}</p>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
