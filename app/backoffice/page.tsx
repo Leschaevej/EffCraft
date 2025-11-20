@@ -29,8 +29,10 @@ interface Order {
     boxtalShipmentId?: string;
     trackingNumber?: string;
     deliveredAt?: string;
+    refundReason?: string;
+    cancelledAt?: string;
+    returnedAt?: string;
 }
-
 const TRACKING_STEPS = [
     { label: "Commande confirmée", icon: <FaCheck /> },
     { label: "En cours de préparation", icon: <FaBoxOpen /> },
@@ -39,7 +41,6 @@ const TRACKING_STEPS = [
     { label: "En livraison", icon: <FaTruckMoving /> },
     { label: "Livré", icon: <FaHome /> }
 ];
-
 const STATUS_STEPS: { [key: string]: number } = {
     paid: 1,
     preparing: 2,
@@ -48,7 +49,6 @@ const STATUS_STEPS: { [key: string]: number } = {
     out_for_delivery: 5,
     delivered: 6
 };
-
 const STATUS_LABELS: { [key: string]: string } = {
     paid: "Commande confirmée",
     preparing: "En préparation",
@@ -56,8 +56,9 @@ const STATUS_LABELS: { [key: string]: string } = {
     in_transit: "En transit",
     out_for_delivery: "En cours de livraison",
     delivered: "Livré",
-    cancelled: "Annulé",
-    returned: "Retourné"
+    cancelled: "Remboursé",
+    return_requested: "Retour demandé",
+    returned: "Remboursé"
 };
 export default function Backoffice() {
     const { data: session, status } = useSession();
@@ -68,6 +69,7 @@ export default function Backoffice() {
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(false);
     const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+    const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
     useEffect(() => {
         if (status === "loading") return;
         if (!session || session.user.role !== "admin") {
@@ -77,36 +79,50 @@ export default function Backoffice() {
     useEffect(() => {
         if (activeSection === "orders" && session?.user?.role === "admin") {
             fetchOrders();
+            const handleOrderUpdate = (event: Event) => {
+                const customEvent = event as CustomEvent;
+                if (customEvent.detail?.type === "order_status_updated" && customEvent.detail?.data) {
+                    const { orderId, status } = customEvent.detail.data;
+                    setOrders(prev => prev.map(order =>
+                        order._id === orderId ? { ...order, status } : order
+                    ));
+                } else if (
+                    customEvent.detail?.type === "order_created" ||
+                    customEvent.detail?.type === "order_deleted"
+                ) {
+                    fetchOrders();
+                }
+            };
+            window.addEventListener("cart-update", handleOrderUpdate);
+            return () => {
+                window.removeEventListener("cart-update", handleOrderUpdate);
+            };
         }
     }, [activeSection, orderView, session]);
-    const fetchOrders = async (syncStatus: boolean = false) => {
+    const fetchOrders = async () => {
         setLoading(true);
         try {
-            const status = orderView === "pending" ? "paid" : "history";
+            const status = orderView === "pending" ? "pending" : "history";
             const response = await fetch(`/api/order?status=${status}`);
             if (response.ok) {
                 const data = await response.json();
-                if (syncStatus && orderView === "history") {
-                    const ordersWithStatus = await Promise.all(
-                        data.orders.map(async (order: Order) => {
-                            if (order.boxtalShipmentId) {
-                                try {
-                                    const syncResponse = await fetch(`/api/shipping?action=sync-status&orderId=${order._id}`);
-                                    if (syncResponse.ok) {
-                                        const syncData = await syncResponse.json();
-                                        return { ...order, boxtalStatus: syncData.boxtalStatus };
-                                    }
-                                } catch (error) {
-                                    console.error("Erreur sync statut:", error);
+                const ordersWithStatus = await Promise.all(
+                    data.orders.map(async (order: Order) => {
+                        if (order.boxtalShipmentId && (order.status === "preparing" || orderView === "history")) {
+                            try {
+                                const syncResponse = await fetch(`/api/shipping?action=sync-status&orderId=${order._id}`);
+                                if (syncResponse.ok) {
+                                    const syncData = await syncResponse.json();
+                                    return { ...order, status: syncData.status, boxtalStatus: syncData.boxtalStatus };
                                 }
+                            } catch (error) {
+                                console.error("Erreur sync statut:", error);
                             }
-                            return order;
-                        })
-                    );
-                    setOrders(ordersWithStatus);
-                } else {
-                    setOrders(data.orders);
-                }
+                        }
+                        return order;
+                    })
+                );
+                setOrders(ordersWithStatus);
             }
         } catch (error) {
         } finally {
@@ -114,7 +130,11 @@ export default function Backoffice() {
         }
     };
     const handlePrintLabel = async (order: Order) => {
+        if (printingOrderId) {
+            return;
+        }
         try {
+            setPrintingOrderId(order._id);
             if (!order.boxtalShipmentId) {
                 const createResponse = await fetch("/api/shipping", {
                     method: "POST",
@@ -137,7 +157,6 @@ export default function Backoffice() {
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 window.open(url, '_blank');
-                fetchOrders();
             } else {
                 const contentType = response.headers.get("content-type");
                 let errorMessage = "Erreur inconnue";
@@ -155,6 +174,8 @@ export default function Backoffice() {
         } catch (error) {
             console.error("Erreur impression bordereau:", error);
             alert("Erreur lors de l'impression du bordereau: " + error);
+        } finally {
+            setPrintingOrderId(null);
         }
     };
     const handleCancelOrder = async (order: Order) => {
@@ -179,32 +200,77 @@ export default function Backoffice() {
             alert("Erreur lors de l'annulation: " + error);
         }
     };
-
     const handleReturnOrder = async (order: Order) => {
-        if (!confirm(`Marquer cette commande comme retournée ?`)) {
+        if (!confirm(`Générer un bon de retour pour cette commande ?`)) {
             return;
         }
         try {
             const response = await fetch("/api/order", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ orderId: order._id, action: "return" }),
+                body: JSON.stringify({ orderId: order._id, action: "request-return" }),
             });
-            if (response.ok) {
-                alert("Commande marquée comme retournée");
-                fetchOrders();
-            } else {
+            if (!response.ok) {
                 const error = await response.json();
-                alert("Erreur: " + (error.error || "Erreur inconnue"));
+                alert("Erreur lors de la demande de retour: " + (error.error || "Erreur inconnue"));
+                return;
             }
+            const returnData = await response.json();
+            if (returnData.boxtalShipmentId || order.boxtalShipmentId) {
+                const labelResponse = await fetch("/api/shipping?action=return-label", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ orderId: order._id }),
+                });
+
+                if (labelResponse.ok) {
+                    const blob = await labelResponse.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    window.open(url, '_blank');
+                    alert("Bon de retour généré avec succès");
+                } else {
+                    const contentType = labelResponse.headers.get("content-type");
+                    let errorMessage = "Erreur inconnue";
+                    if (contentType && contentType.includes("application/json")) {
+                        const error = await labelResponse.json();
+                        errorMessage = error.error || JSON.stringify(error);
+                    } else {
+                        errorMessage = await labelResponse.text();
+                    }
+                    alert("Erreur lors de la génération du bordereau: " + errorMessage);
+                }
+            } else {
+                alert("Pas d'expédition Boxtal associée à cette commande");
+            }
+            fetchOrders();
         } catch (error) {
-            console.error("Erreur retour:", error);
+            console.error("Erreur génération bon de retour:", error);
             alert("Erreur: " + error);
         }
     };
-
+    const handleRefundReturn = async (order: Order) => {
+        if (!confirm(`Confirmer le remboursement pour cette commande retournée ?`)) {
+            return;
+        }
+        try {
+            const response = await fetch("/api/order", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderId: order._id, action: "refund-return" }),
+            });
+            if (response.ok) {
+                alert("Client remboursé avec succès");
+                fetchOrders();
+            } else {
+                const error = await response.json();
+                alert("Erreur lors du remboursement: " + (error.error || "Erreur inconnue"));
+            }
+        } catch (error) {
+            console.error("Erreur remboursement:", error);
+            alert("Erreur lors du remboursement: " + error);
+        }
+    };
     const getTrackingStep = (order: Order): number => STATUS_STEPS[order.status] || 1;
-
     const getStatusIcon = (status: string) => {
         const iconMap: { [key: string]: React.ReactNode } = {
             paid: <FaCheck />,
@@ -269,7 +335,7 @@ export default function Backoffice() {
                         className={orderView === "pending" ? "active" : ""}
                         onClick={() => setOrderView("pending")}
                         >
-                        En attente
+                        En cours
                     </button>
                     <button
                         className={orderView === "history" ? "active" : ""}
@@ -280,7 +346,7 @@ export default function Backoffice() {
                 </div>
                 <div className="conteneur">
                     <h2 className={nothingYouCouldDo.className}>
-                        {orderView === "pending" ? "En attente" : "Historique"}
+                        {orderView === "pending" ? "En cours" : "Historique"}
                     </h2>
                     {loading ? (
                         <p className="loading">Chargement des commandes...</p>
@@ -297,12 +363,14 @@ export default function Backoffice() {
                                                     <img src={order.products[0].images[0]} alt={order.products[0].name} />
                                                 )}
                                             </div>
-                                            <div className="name">
-                                                <p>{order.shippingData?.nom || ''}</p>
-                                                <p>{order.shippingData?.prenom || ''}</p>
-                                            </div>
+                                            {order.shippingData && (
+                                                <div className="name">
+                                                    <p>{order.shippingData.nom || ''}</p>
+                                                    <p>{order.shippingData.prenom || ''}</p>
+                                                </div>
+                                            )}
                                             <p>{new Date(order.createdAt).toLocaleDateString()}</p>
-                                            <p className="total">{order.totalPrice}€</p>
+                                            <p className="total">{order.totalPrice.toFixed(2)}€</p>
                                             <div className="status">
                                                 <div className="icon">
                                                     {getStatusIcon(order.status)}
@@ -311,13 +379,16 @@ export default function Backoffice() {
                                             </div>
                                         </div>
                                         <div className="buttons">
-                                            {orderView === "pending" && (
+                                            {orderView === "pending" ? (
                                                 <button
                                                     className="print"
                                                     onClick={() => handlePrintLabel(order)}
+                                                    disabled={printingOrderId === order._id}
                                                 >
-                                                    Bordereau
+                                                    {printingOrderId === order._id ? "Traitement..." : "Bordereau"}
                                                 </button>
+                                            ) : (
+                                                <button className="invoice">Facture</button>
                                             )}
                                             <button onClick={() => setExpandedOrderId(expandedOrderId === order._id ? null : order._id)}>
                                                 {expandedOrderId === order._id ? "Fermer" : "Details"}
@@ -331,31 +402,39 @@ export default function Backoffice() {
                                                     <div className="info">
                                                         <h3>Informations de commande</h3>
                                                         <p>Email : {order.userEmail}</p>
-                                                        <p>Date de commande : {new Date(order.createdAt).toLocaleDateString()}</p>
-                                                        <p>Total : {order.totalPrice}€</p>
-                                                        <p>Mode de livraison : {order.shippingMethod?.name}</p>
-                                                        <p>N° de suivi : {order.trackingNumber || "En attente"}</p>
-                                                    </div>
-                                                    <div className="info">
-                                                        <h3>Livraison</h3>
-                                                        {order.shippingData && (
+                                                        <p>Date de commande : {new Date(order.createdAt).toLocaleDateString()} à {new Date(order.createdAt).toLocaleTimeString()}</p>
+                                                        <p>Total : {order.totalPrice.toFixed(2)}€</p>
+                                                        {order.refundReason && (
                                                             <>
+                                                                <p>Motif de remboursement : {order.refundReason}</p>
+                                                                <p>Date de remboursement : {new Date(order.cancelledAt || order.returnedAt || order.createdAt).toLocaleDateString()} à {new Date(order.cancelledAt || order.returnedAt || order.createdAt).toLocaleTimeString()}</p>
+                                                            </>
+                                                        )}
+                                                        {!order.refundReason && (
+                                                            <>
+                                                                <p>Mode de livraison : {order.shippingMethod?.name}</p>
+                                                                <p>N° de suivi : {order.trackingNumber || "En attente"}</p>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                    {order.shippingData && (
+                                                        <>
+                                                            <div className="info">
+                                                                <h3>Livraison</h3>
                                                                 <p>{order.shippingData.nom || ''} {order.shippingData.prenom || ''}</p>
                                                                 <p>{order.shippingData.rue || ''}</p>
                                                                 <p>{order.shippingData.codePostal || ''} {order.shippingData.ville || ''}</p>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                    <div className="info">
-                                                        <h3>Point relais</h3>
-                                                        {order.shippingData?.relayPoint && (
-                                                            <>
-                                                                <p>{order.shippingData.relayPoint.name} </p>
-                                                                <p>{order.shippingData.relayPoint.address}</p>
-                                                                <p>{order.shippingData.relayPoint.zipcode} {order.shippingData.relayPoint.city}</p>
-                                                            </>
-                                                        )}
-                                                    </div>
+                                                            </div>
+                                                            {order.shippingData.relayPoint && (
+                                                                <div className="info">
+                                                                    <h3>Point relais</h3>
+                                                                    <p>{order.shippingData.relayPoint.name} </p>
+                                                                    <p>{order.shippingData.relayPoint.address}</p>
+                                                                    <p>{order.shippingData.relayPoint.zipcode} {order.shippingData.relayPoint.city}</p>
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    )}
                                                 </div>
                                                 <div className="products">
                                                     {order.products.map((product) => (
@@ -369,22 +448,29 @@ export default function Backoffice() {
                                                 </div>
                                             </div>
                                             <div className="actions">
-                                                {orderView === "pending" ? (
+                                                {["paid", "preparing"].includes(order.status) && (
                                                     <button
                                                         className="cancel"
                                                         onClick={() => handleCancelOrder(order)}
                                                     >
-                                                        Annuler
+                                                        Annuler commande
                                                     </button>
-                                                ) : (
-                                                    ["ready", "in_transit", "out_for_delivery", "delivered"].includes(order.status) && (
-                                                        <button
-                                                            className="return"
-                                                            onClick={() => handleReturnOrder(order)}
-                                                        >
-                                                            Retour
-                                                        </button>
-                                                    )
+                                                )}
+                                                {["ready", "in_transit", "out_for_delivery", "delivered"].includes(order.status) && (
+                                                    <button
+                                                        className="return"
+                                                        onClick={() => handleReturnOrder(order)}
+                                                    >
+                                                        Générer bon de retour
+                                                    </button>
+                                                )}
+                                                {order.status === "return_requested" && (
+                                                    <button
+                                                        className="refund"
+                                                        onClick={() => handleRefundReturn(order)}
+                                                    >
+                                                        Rembourser
+                                                    </button>
                                                 )}
                                             </div>
                                         </div>

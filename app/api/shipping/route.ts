@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 import clientPromise from "../../lib/mongodb";
 import { ObjectId } from "mongodb";
+import cloudinary from "../../lib/cloudinary";
 
 const getBoxtalApiUrl = () => {
     return process.env.BOXTAL_ENV === "production"
@@ -99,34 +100,27 @@ async function syncBoxtalStatus(searchParams: URLSearchParams) {
                 { status: 400 }
             );
         }
-
         const client = await clientPromise;
         const db = client.db("effcraftdatabase");
         const ordersCollection = db.collection("orders");
         const order = await ordersCollection.findOne({ _id: new ObjectId(orderId) });
-
         if (!order || !order.boxtalShipmentId) {
             return NextResponse.json(
                 { error: "Commande ou expédition Boxtal introuvable" },
                 { status: 404 }
             );
         }
-
         const isProduction = process.env.BOXTAL_ENV === "production";
         const apiKey = isProduction ? process.env.BOXTAL_V3_PROD_KEY : process.env.BOXTAL_V3_TEST_KEY;
         const apiSecret = isProduction ? process.env.BOXTAL_V3_PROD_SECRET : process.env.BOXTAL_V3_TEST_SECRET;
-
         if (!apiKey || !apiSecret) {
             return NextResponse.json(
                 { error: "Configuration Boxtal manquante" },
                 { status: 500 }
             );
         }
-
         const authString = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
         const apiUrl = getBoxtalApiUrl();
-
-        // Récupérer les infos de l'expédition
         const response = await fetch(
             `${apiUrl}/shipping/v3.1/shipping-order/${order.boxtalShipmentId}`,
             {
@@ -137,7 +131,6 @@ async function syncBoxtalStatus(searchParams: URLSearchParams) {
                 }
             }
         );
-
         if (!response.ok) {
             const errorText = await response.text();
             console.error("Erreur récupération statut Boxtal:", errorText);
@@ -146,11 +139,8 @@ async function syncBoxtalStatus(searchParams: URLSearchParams) {
                 { status: response.status }
             );
         }
-
         const shipmentData = await response.json();
         const boxtalStatus = shipmentData.content?.status;
-
-        // Récupérer le tracking détaillé
         const trackingResponse = await fetch(
             `${apiUrl}/shipping/v3.1/shipping-order/${order.boxtalShipmentId}/tracking`,
             {
@@ -161,15 +151,11 @@ async function syncBoxtalStatus(searchParams: URLSearchParams) {
                 }
             }
         );
-
         let ourStatus = order.status;
         const updateData: any = { boxtalStatus };
-
         if (trackingResponse.ok) {
             const trackingData = await trackingResponse.json();
             const trackingStatus = trackingData.content?.[0]?.status;
-
-            // Mapper les statuts Boxtal vers nos statuts
             if (trackingStatus === "DELIVERED") {
                 ourStatus = "delivered";
                 updateData.status = "delivered";
@@ -183,20 +169,57 @@ async function syncBoxtalStatus(searchParams: URLSearchParams) {
                 ourStatus = "in_transit";
                 updateData.status = "in_transit";
             } else if (boxtalStatus === "PENDING" && order.status === "preparing") {
-                // Le colis a été scanné au point relais
                 ourStatus = "ready";
                 updateData.status = "ready";
                 if (!order.readyAt) {
                     updateData.readyAt = new Date();
                 }
             }
-        }
+            if (order.status === "preparing" && ourStatus !== "preparing") {
+                if (order.products && order.products.length > 0) {
+                    const imagesToDelete: string[] = [];
+                    order.products.forEach((p: any) => {
+                        if (p.images && p.images.length > 1) {
+                            imagesToDelete.push(...p.images.slice(1));
+                        }
+                    });
+                    if (imagesToDelete.length > 0) {
+                        for (const imageUrl of imagesToDelete) {
+                            try {
+                                const match = imageUrl.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
+                                if (match && match[1]) {
+                                    const publicId = match[1];
+                                    await cloudinary.uploader.destroy(publicId);
+                                }
+                            } catch (error) {
+                                console.error("Erreur suppression image Cloudinary:", error);
+                            }
+                        }
+                    }
+                    const cleanedProducts = order.products.map((p: any) => ({
+                        name: p.name,
+                        price: p.price,
+                        images: p.images && p.images.length > 0 ? [p.images[0]] : []
+                    }));
 
+                    updateData.products = cleanedProducts;
+                }
+            }
+        }
+        const updateQuery: any = { $set: updateData };
+        if (ourStatus === "delivered") {
+            updateQuery.$unset = {
+                shippingData: "",
+                billingData: "",
+                boxtalShipmentId: "",
+                boxtalStatus: "",
+                trackingNumber: ""
+            };
+        }
         await ordersCollection.updateOne(
             { _id: new ObjectId(orderId) },
-            { $set: updateData }
+            updateQuery
         );
-
         return NextResponse.json({
             success: true,
             boxtalStatus,
@@ -210,7 +233,6 @@ async function syncBoxtalStatus(searchParams: URLSearchParams) {
         );
     }
 }
-
 async function getRelayPoints(searchParams: URLSearchParams) {
     try {
         const zipcode = searchParams.get('zipcode');
@@ -314,6 +336,9 @@ export async function POST(req: NextRequest) {
     if (action === 'label') {
         return getShippingLabel(req);
     }
+    if (action === 'return-label') {
+        return getReturnLabel(req);
+    }
     return createShipment(req);
 }
 async function createShipment(req: NextRequest) {
@@ -373,8 +398,8 @@ async function createShipment(req: NextRequest) {
                         phone: process.env.SHIPPER_PHONE
                     },
                     location: {
+                        number: process.env.SHIPPER_NUMBER,
                         street: decodeURIComponent(process.env.SHIPPER_STREET || ""),
-                        number: 1,
                         city: process.env.SHIPPER_CITY,
                         postalCode: process.env.SHIPPER_POSTAL_CODE || "13100",
                         countryIsoCode: process.env.SHIPPER_COUNTRY
@@ -405,8 +430,8 @@ async function createShipment(req: NextRequest) {
                         phone: process.env.SHIPPER_PHONE
                     },
                     location: {
+                        number: process.env.SHIPPER_NUMBER,
                         street: decodeURIComponent(process.env.SHIPPER_STREET || ""),
-                        number: 1,
                         city: process.env.SHIPPER_CITY,
                         postalCode: process.env.SHIPPER_POSTAL_CODE || "13100",
                         countryIsoCode: process.env.SHIPPER_COUNTRY
@@ -552,15 +577,25 @@ async function getShippingLabel(req: NextRequest) {
             );
         }
         const pdfBuffer = await pdfResponse.arrayBuffer();
-        await ordersCollection.updateOne(
-            { _id: new ObjectId(orderId) },
-            {
-                $set: {
-                    status: "preparing",
-                    preparingAt: new Date()
+        if (order.status !== "preparing") {
+            await ordersCollection.updateOne(
+                { _id: new ObjectId(orderId) },
+                {
+                    $set: {
+                        status: "preparing",
+                        preparingAt: new Date()
+                    }
                 }
-            }
-        );
+            );
+            const { notifyClients } = await import("../cart/route");
+            notifyClients({
+                type: "order_status_updated",
+                data: {
+                    orderId: orderId,
+                    status: "preparing"
+                }
+            });
+        }
         return new NextResponse(pdfBuffer, {
             headers: {
                 'Content-Type': 'application/pdf',
@@ -571,6 +606,100 @@ async function getShippingLabel(req: NextRequest) {
         console.error("Erreur récupération bordereau:", error);
         return NextResponse.json(
             { error: error.message || "Erreur lors de la récupération du bordereau" },
+            { status: 500 }
+        );
+    }
+}
+async function getReturnLabel(req: NextRequest) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session?.user?.email || session.user.role !== "admin") {
+            return NextResponse.json(
+                { error: "Non autorisé" },
+                { status: 403 }
+            );
+        }
+        const { orderId } = await req.json();
+        if (!orderId) {
+            return NextResponse.json(
+                { error: "ID de commande manquant" },
+                { status: 400 }
+            );
+        }
+        const client = await clientPromise;
+        const db = client.db("effcraftdatabase");
+        const ordersCollection = db.collection("orders");
+        const order = await ordersCollection.findOne({ _id: new ObjectId(orderId) });
+        if (!order) {
+            return NextResponse.json(
+                { error: "Commande introuvable" },
+                { status: 404 }
+            );
+        }
+        if (!order.boxtalShipmentId) {
+            return NextResponse.json(
+                { error: "Aucune expédition Boxtal associée à cette commande" },
+                { status: 404 }
+            );
+        }
+        const isProduction = process.env.BOXTAL_ENV === "production";
+        const apiKey = isProduction ? process.env.BOXTAL_V3_PROD_KEY : process.env.BOXTAL_V3_TEST_KEY;
+        const apiSecret = isProduction ? process.env.BOXTAL_V3_PROD_SECRET : process.env.BOXTAL_V3_TEST_SECRET;
+        if (!apiKey || !apiSecret) {
+            return NextResponse.json(
+                { error: "Configuration Boxtal manquante" },
+                { status: 500 }
+            );
+        }
+        const authString = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
+        const apiUrl = getBoxtalApiUrl();
+        const labelResponse = await fetch(
+            `${apiUrl}/shipping/v3.1/shipping-order/${order.boxtalShipmentId}/shipping-document`,
+            {
+                method: "GET",
+                headers: {
+                    "Authorization": `Basic ${authString}`,
+                    "Accept": "application/json"
+                }
+            }
+        );
+        if (!labelResponse.ok) {
+            const errorText = await labelResponse.text();
+            console.error("Erreur récupération documents Boxtal:", errorText);
+            return NextResponse.json(
+                { error: "Impossible de récupérer les documents", details: errorText },
+                { status: labelResponse.status }
+            );
+        }
+        const documentsData = await labelResponse.json();
+        console.log("Documents Boxtal pour retour:", JSON.stringify(documentsData, null, 2));
+        const returnDocument = documentsData.content?.find((doc: any) =>
+            doc.type === "RETURN_LABEL" || doc.type === "RETURN"
+        );
+        if (!returnDocument?.url) {
+            return NextResponse.json(
+                { error: "Aucun bordereau de retour disponible pour cette commande" },
+                { status: 404 }
+            );
+        }
+        const pdfResponse = await fetch(returnDocument.url);
+        if (!pdfResponse.ok) {
+            return NextResponse.json(
+                { error: "Erreur lors du téléchargement du bordereau de retour" },
+                { status: 500 }
+            );
+        }
+        const pdfBuffer = await pdfResponse.arrayBuffer();
+        return new NextResponse(pdfBuffer, {
+            headers: {
+                'Content-Type': 'application/pdf',
+                'Content-Disposition': `inline; filename="bordereau-retour-${orderId}.pdf"`,
+            },
+        });
+    } catch (error: any) {
+        console.error("Erreur récupération bordereau retour:", error);
+        return NextResponse.json(
+            { error: error.message || "Erreur lors de la récupération du bordereau de retour" },
             { status: 500 }
         );
     }

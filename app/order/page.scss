@@ -4,6 +4,36 @@
     gap: 50px;
     padding: 50px 0 50px 0;
     .suivi {
+        padding: 0 0 50px 0;
+        .tabs {
+            margin: 0 auto 50px auto;
+            display: flex;
+            justify-content: space-between;
+            gap: 30px;
+            padding: 20px;
+            border-radius: 50px;
+            background-color: var(--secondBackgroundColor);
+            width: fit-content;
+            color: var(--mainTextColor);
+            button {
+                padding: 10px 20px;
+                border: none;
+                background-color: var(--secondColor);
+                cursor: pointer;
+                border-radius: 20px;
+                font-size: 24px;
+                font-weight: 600;
+                transition: filter 0.3s ease, background-color 0.3s ease, color 0.3s ease;
+                &.active {
+                    background-color: var(--mainColor);
+                    color: var(--secondTextColor);
+                    cursor: default;
+                }
+                &:hover:not(.active) {
+                    filter: brightness(0.8);
+                }
+            }
+        }
         .conteneur {
             display: flex;
             flex-direction: column;
@@ -169,6 +199,37 @@
                                 }
                             }
                         }
+                        .actions {
+                            display: flex;
+                            gap: 30px;
+                            justify-content: center;
+                            button {
+                                padding: 15px 30px;
+                                background-color: var(--mainColor);
+                                color: var(--secondTextColor);
+                                border: none;
+                                border-radius: 25px;
+                                font-size: 24px;
+                                cursor: pointer;
+                                transition: color 0.3s ease, background-color 0.3s ease;
+                                &:hover {
+                                    background-color: var(--secondColor);
+                                    color: var(--mainTextColor);
+                                }
+                                &.cancel {
+                                    background-color: #ff6b6b;
+                                    &:hover {
+                                        background-color: #ff5252;
+                                    }
+                                }
+                                &.return {
+                                    background-color: #ffa500;
+                                    &:hover {
+                                        background-color: #ff8c00;
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -290,6 +351,37 @@
                                     img {
                                         height: 200px;
                                         border-radius: 10px;
+                                    }
+                                }
+                            }
+                        }
+                        .actions {
+                            display: flex;
+                            gap: 30px;
+                            justify-content: center;
+                            button {
+                                padding: 15px 30px;
+                                background-color: var(--mainColor);
+                                color: var(--secondTextColor);
+                                border: none;
+                                border-radius: 25px;
+                                font-size: 24px;
+                                cursor: pointer;
+                                transition: color 0.3s ease, background-color 0.3s ease;
+                                &:hover {
+                                    background-color: var(--secondColor);
+                                    color: var(--mainTextColor);
+                                }
+                                &.cancel {
+                                    background-color: #ff6b6b;
+                                    &:hover {
+                                        background-color: #ff5252;
+                                    }
+                                }
+                                &.return {
+                                    background-color: #ffa500;
+                                    &:hover {
+                                        background-color: #ff8c00;
                                     }
                                 }
                             }

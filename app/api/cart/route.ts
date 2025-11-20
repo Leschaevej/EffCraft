@@ -41,10 +41,45 @@ async function dbConnect() {
         });
     }
 }
+let cleanupTimeout: NodeJS.Timeout | null = null;
+let nextCleanupTime: Date | null = null;
+export async function scheduleNextCleanup() {
+    if (cleanupTimeout) {
+        clearTimeout(cleanupTimeout);
+        cleanupTimeout = null;
+    }
+    try {
+        await dbConnect();
+        const nextExpiring = await User.findOne({
+            cartExpiresAt: { $exists: true, $gt: new Date() },
+            cart: { $exists: true, $ne: [] }
+        })
+        .sort({ cartExpiresAt: 1 })
+        .select('cartExpiresAt');
+        if (!nextExpiring || !nextExpiring.cartExpiresAt) {
+            nextCleanupTime = null;
+            return;
+        }
+        const expiryDate = nextExpiring.cartExpiresAt;
+        nextCleanupTime = expiryDate;
+        const now = new Date();
+        const delay = Math.max(0, expiryDate.getTime() - now.getTime() + 1000);
+        cleanupTimeout = setTimeout(async () => {
+            await handleCleanup(false);
+            await scheduleNextCleanup();
+        }, delay);
+    } catch (error) {
+        console.error("Erreur lors de la planification du nettoyage:", error);
+        cleanupTimeout = setTimeout(() => scheduleNextCleanup(), 60000);
+    }
+}
 export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     if (url.searchParams.get("action") === "cleanup") {
         return handleCleanup();
+    }
+    if (!cleanupTimeout) {
+        scheduleNextCleanup();
     }
     const stream = new ReadableStream({
         start(controller) {
@@ -75,7 +110,7 @@ export async function GET(request: NextRequest) {
         },
     });
 }
-async function handleCleanup() {
+async function handleCleanup(returnResponse: boolean = true) {
     try {
         await dbConnect();
         const now = new Date();
@@ -84,10 +119,13 @@ async function handleCleanup() {
             cart: { $exists: true, $ne: [] }
         });
         if (expiredUsers.length === 0) {
-            return NextResponse.json({
-                message: "Aucun panier expiré",
-                cleaned: 0
-            });
+            if (returnResponse) {
+                return NextResponse.json({
+                    message: "Aucun panier expiré",
+                    cleaned: 0
+                });
+            }
+            return;
         }
         let totalProductsFreed = 0;
         for (const user of expiredUsers) {
@@ -112,13 +150,17 @@ async function handleCleanup() {
                 });
             }
         }
-        return NextResponse.json({
-            message: "Paniers expirés nettoyés",
-            usersAffected: expiredUsers.length,
-            productsFreed: totalProductsFreed
-        });
+        if (returnResponse) {
+            return NextResponse.json({
+                message: "Paniers expirés nettoyés",
+                usersAffected: expiredUsers.length,
+                productsFreed: totalProductsFreed
+            });
+        }
     } catch (error) {
-        return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+        if (returnResponse) {
+            return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+        }
     }
 }
 export async function POST() {

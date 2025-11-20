@@ -6,7 +6,7 @@ import User from "../../lib/models/User";
 import Product from "../../lib/models/Product";
 import { ObjectId } from "mongodb";
 import { NextRequest } from "next/server";
-import { notifyClients } from "../cart/route";
+import { notifyClients, scheduleNextCleanup } from "../cart/route";
 
 interface CartItem {
     productId: mongoose.Types.ObjectId;
@@ -131,6 +131,7 @@ export async function POST(request: Request) {
                     cartExpiresAt: cartExpiresAt.toISOString()
                 }
             });
+            scheduleNextCleanup();
             return NextResponse.json({
                 success: true,
                 cart: user.cart,

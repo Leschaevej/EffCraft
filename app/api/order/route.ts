@@ -5,6 +5,7 @@ import clientPromise from "../../lib/mongodb";
 import { ObjectId } from "mongodb";
 import cloudinary from "../../lib/cloudinary";
 import { notifyClients } from "../cart/route";
+import { stripe } from "../../lib/stripe-server";
 
 export async function GET(req: NextRequest) {
     try {
@@ -17,16 +18,17 @@ export async function GET(req: NextRequest) {
         }
         const { searchParams } = new URL(req.url);
         const status = searchParams.get('status') || 'paid';
-
         const client = await clientPromise;
         const db = client.db("effcraftdatabase");
         const ordersCollection = db.collection("orders");
-
-        // Si status === 'history', récupérer toutes les commandes sauf 'paid'
-        const query = status === 'history'
-            ? { status: { $ne: 'paid' } }
-            : { status };
-
+        let query: any;
+        if (status === 'history') {
+            query = { status: { $in: ['delivered', 'cancelled', 'returned'] } };
+        } else if (status === 'pending') {
+            query = { status: { $nin: ['delivered', 'cancelled', 'returned'] } };
+        } else {
+            query = { status };
+        }
         const orders = await ordersCollection
             .find(query)
             .sort({ createdAt: -1 })
@@ -40,7 +42,6 @@ export async function GET(req: NextRequest) {
         );
     }
 }
-
 export async function PATCH(req: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
@@ -50,7 +51,6 @@ export async function PATCH(req: NextRequest) {
                 { status: 403 }
             );
         }
-
         const { orderId, action } = await req.json();
         if (!orderId || !action) {
             return NextResponse.json(
@@ -58,39 +58,212 @@ export async function PATCH(req: NextRequest) {
                 { status: 400 }
             );
         }
-
         const client = await clientPromise;
         const db = client.db("effcraftdatabase");
         const ordersCollection = db.collection("orders");
-
         let updateData: any = {};
-
         switch (action) {
             case "cancel":
-                updateData = {
-                    status: "cancelled",
-                    cancelledAt: new Date()
-                };
-                break;
-            case "return":
-                updateData = {
-                    status: "returned",
-                    returnedAt: new Date()
-                };
-                break;
+                const order = await ordersCollection.findOne({ _id: new ObjectId(orderId) });
+                if (!order) {
+                    return NextResponse.json(
+                        { error: "Commande introuvable" },
+                        { status: 404 }
+                    );
+                }
+                if (order.boxtalShipmentId) {
+                    try {
+                        const isProduction = process.env.BOXTAL_ENV === "production";
+                        const apiKey = isProduction ? process.env.BOXTAL_V3_PROD_KEY : process.env.BOXTAL_V3_TEST_KEY;
+                        const apiSecret = isProduction ? process.env.BOXTAL_V3_PROD_SECRET : process.env.BOXTAL_V3_TEST_SECRET;
+                        if (apiKey && apiSecret) {
+                            const authString = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
+                            const apiUrl = process.env.BOXTAL_ENV === "production"
+                                ? "https://api.boxtal.com"
+                                : "https://api.boxtal.build";
+                            const deleteResponse = await fetch(
+                                `${apiUrl}/shipping/v3.1/shipping-order/${order.boxtalShipmentId}`,
+                                {
+                                    method: "DELETE",
+                                    headers: {
+                                        "Authorization": `Basic ${authString}`,
+                                        "Accept": "application/json"
+                                    }
+                                }
+                            );
+                            if (deleteResponse.ok) {
+                                console.log("✅ Expédition Boxtal annulée:", order.boxtalShipmentId);
+                            } else {
+                                const errorText = await deleteResponse.text();
+                                console.warn("⚠️ Impossible d'annuler l'expédition Boxtal:", errorText);
+                            }
+                        }
+                    } catch (boxtalError) {
+                        console.error("❌ Erreur lors de l'annulation Boxtal:", boxtalError);
+                    }
+                }
+                try {
+                    if (order.paymentIntentId) {
+                        console.log("🔄 Tentative de remboursement pour Payment Intent:", order.paymentIntentId);
+                        const refund = await stripe.refunds.create({
+                            payment_intent: order.paymentIntentId,
+                        });
+                        console.log("✅ Remboursement créé avec succès:", {
+                            refundId: refund.id,
+                            amount: refund.amount,
+                            currency: refund.currency,
+                            status: refund.status,
+                            paymentIntent: order.paymentIntentId
+                        });
+                    } else {
+                        console.warn("⚠️ Aucun Payment Intent ID trouvé pour cette commande");
+                    }
+                } catch (stripeError: any) {
+                    console.error("❌ Erreur remboursement Stripe:", stripeError);
+                    return NextResponse.json(
+                        { error: "Erreur lors du remboursement: " + stripeError.message },
+                        { status: 500 }
+                    );
+                }
+                const productsCollection = db.collection("products");
+                if (order.products && order.products.length > 0) {
+                    for (const product of order.products) {
+                        const restoredProduct = {
+                            name: product.name,
+                            price: product.price,
+                            description: product.description,
+                            category: product.category,
+                            images: product.images || [],
+                            status: "available",
+                            createdAt: new Date(),
+                        };
+                        const insertResult = await productsCollection.insertOne(restoredProduct);
+                        notifyClients({
+                            type: "product_created",
+                            data: { productId: insertResult.insertedId.toString() }
+                        });
+                    }
+                }
+                await ordersCollection.updateOne(
+                    { _id: new ObjectId(orderId) },
+                    {
+                        $set: {
+                            status: "cancelled",
+                            cancelledAt: new Date(),
+                            refundReason: "annulation de la commande"
+                        },
+                        $unset: {
+                            shippingData: "",
+                            billingData: "",
+                            shippingMethod: "",
+                            boxtalShipmentId: "",
+                            boxtalStatus: "",
+                            trackingNumber: "",
+                            preparingAt: ""
+                        }
+                    }
+                );
+                notifyClients({
+                    type: "order_status_updated",
+                    data: {
+                        orderId: orderId,
+                        status: "cancelled"
+                    }
+                });
+                return NextResponse.json({
+                    success: true,
+                    message: "Commande annulée, client remboursé et produits remis en ligne"
+                });
+
+            case "request-return":
+                const returnRequestOrder = await ordersCollection.findOne({ _id: new ObjectId(orderId) });
+                if (!returnRequestOrder) {
+                    return NextResponse.json(
+                        { error: "Commande introuvable" },
+                        { status: 404 }
+                    );
+                }
+                await ordersCollection.updateOne(
+                    { _id: new ObjectId(orderId) },
+                    {
+                        $set: {
+                            status: "return_requested",
+                            returnRequestedAt: new Date()
+                        }
+                    }
+                );
+                notifyClients({
+                    type: "order_status_updated",
+                    data: {
+                        orderId: orderId,
+                        status: "return_requested"
+                    }
+                });
+                return NextResponse.json({
+                    success: true,
+                    boxtalShipmentId: returnRequestOrder.boxtalShipmentId
+                });
+            case "refund-return":
+                const refundOrder = await ordersCollection.findOne({ _id: new ObjectId(orderId) });
+                if (!refundOrder) {
+                    return NextResponse.json(
+                        { error: "Commande introuvable" },
+                        { status: 404 }
+                    );
+                }
+                try {
+                    if (refundOrder.paymentIntentId) {
+                        console.log("🔄 Remboursement retour pour Payment Intent:", refundOrder.paymentIntentId);
+                        const refund = await stripe.refunds.create({
+                            payment_intent: refundOrder.paymentIntentId,
+                        });
+                        console.log("✅ Remboursement retour créé:", {
+                            refundId: refund.id,
+                            amount: refund.amount,
+                            status: refund.status
+                        });
+                    }
+                } catch (stripeError: any) {
+                    console.error("❌ Erreur remboursement retour:", stripeError);
+                    return NextResponse.json(
+                        { error: "Erreur lors du remboursement: " + stripeError.message },
+                        { status: 500 }
+                    );
+                }
+                await ordersCollection.updateOne(
+                    { _id: new ObjectId(orderId) },
+                    {
+                        $set: {
+                            status: "returned",
+                            returnedAt: new Date(),
+                            refundReason: "retour du colis"
+                        },
+                        $unset: {
+                            shippingData: "",
+                            billingData: "",
+                            boxtalShipmentId: "",
+                            boxtalStatus: "",
+                            trackingNumber: ""
+                        }
+                    }
+                );
+                notifyClients({
+                    type: "order_status_updated",
+                    data: {
+                        orderId: orderId,
+                        status: "returned"
+                    }
+                });
+                return NextResponse.json({
+                    success: true,
+                    message: "Client remboursé avec succès"
+                });
             default:
                 return NextResponse.json(
                     { error: "Action invalide" },
                     { status: 400 }
                 );
         }
-
-        await ordersCollection.updateOne(
-            { _id: new ObjectId(orderId) },
-            { $set: updateData }
-        );
-
-        return NextResponse.json({ success: true });
     } catch (error: any) {
         console.error("Erreur mise à jour commande:", error);
         return NextResponse.json(
@@ -99,7 +272,6 @@ export async function PATCH(req: NextRequest) {
         );
     }
 }
-
 export async function POST(req: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
@@ -127,30 +299,19 @@ export async function POST(req: NextRequest) {
         const usersCollection = db.collection("users");
         const productsCollection = db.collection("products");
         const productIds = products.map((p: any) => new ObjectId(p._id));
-        const imagesToDelete: string[] = [];
-        products.forEach((p: any) => {
-            if (p.images && p.images.length > 1) {
-                imagesToDelete.push(...p.images.slice(1));
-            }
-        });
-        if (imagesToDelete.length > 0) {
-            for (const imageUrl of imagesToDelete) {
-                try {
-                    const match = imageUrl.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
-                    if (match && match[1]) {
-                        const publicId = match[1];
-                        await cloudinary.uploader.destroy(publicId);
-                    }
-                } catch (error) {
-                    console.error("Erreur suppression image Cloudinary:", error);
-                }
-            }
-        }
-        const productsForOrder = products.map((p: any) => ({
-            ...p,
-            images: p.images && p.images.length > 0 ? [p.images[0]] : []
+        const fullProducts = await productsCollection.find({
+            _id: { $in: productIds }
+        }).toArray();
+        const productsForOrder = fullProducts.map((p: any) => ({
+            _id: p._id,
+            name: p.name,
+            price: p.price,
+            description: p.description,
+            category: p.category,
+            images: p.images || [],
         }));
-        const totalPrice = products.reduce((acc: number, product: any) => acc + product.price, 0);
+        const productsTotalPrice = products.reduce((acc: number, product: any) => acc + product.price, 0);
+        const totalPrice = productsTotalPrice + (shippingMethod.price || 0);
         await productsCollection.deleteMany({
             _id: { $in: productIds }
         });
@@ -188,7 +349,10 @@ export async function POST(req: NextRequest) {
             createdAt: new Date(),
         };
         const result = await ordersCollection.insertOne(order);
-
+        notifyClients({
+            type: "order_created",
+            data: { orderId: result.insertedId.toString() }
+        });
         return NextResponse.json({
             success: true,
             orderId: result.insertedId,

@@ -119,6 +119,18 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
                     window.dispatchEvent(new CustomEvent("cart-update", {
                         detail: { type: "product_created", productId: data.data.productId }
                     }));
+                } else if (data.type === "order_created") {
+                    window.dispatchEvent(new CustomEvent("cart-update", {
+                        detail: { type: "order_created", orderId: data.data.orderId }
+                    }));
+                } else if (data.type === "order_deleted") {
+                    window.dispatchEvent(new CustomEvent("cart-update", {
+                        detail: { type: "order_deleted", orderId: data.data.orderId }
+                    }));
+                } else if (data.type === "order_status_updated") {
+                    window.dispatchEvent(new CustomEvent("cart-update", {
+                        detail: { type: "order_status_updated", data: { orderId: data.data.orderId, status: data.data.status } }
+                    }));
                 }
             };
             eventSource.onerror = () => {
