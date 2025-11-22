@@ -1,48 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 
-const BOXTAL_WEBHOOK_SECRET = process.env.BOXTAL_TEST_SECRET || "";
-
-function verifySignature(body: string, signature: string, secret: string): boolean {
-    if (!secret) {
-        console.warn("⚠️ BOXTAL_WEBHOOK_SECRET non défini");
-        return true; // En test, on accepte si pas de secret configuré
-    }
-
-    const hmac = crypto.createHmac('sha256', secret);
-    hmac.update(body);
-    const expectedSignature = hmac.digest('hex');
-
-    console.log("Signature reçue:", signature);
-    console.log("Signature attendue:", expectedSignature);
-
-    return signature === expectedSignature;
-}
+const BOXTAL_WEBHOOK_TOKEN = process.env.BOXTAL_WEBHOOK_TOKEN || "";
 
 export async function POST(req: NextRequest) {
     console.log("🔔 Test webhook POST reçu");
 
-    // Récupérer tous les headers
-    const headers: Record<string, string> = {};
-    req.headers.forEach((value, key) => {
-        headers[key] = value;
-    });
-    console.log("Headers reçus:", headers);
+    // Vérifier le token dans l'URL
+    const { searchParams } = new URL(req.url);
+    const token = searchParams.get('token');
 
-    // Récupérer le body en tant que texte pour la vérification de signature
-    const bodyText = await req.text();
-    console.log("Body brut:", bodyText);
-
-    // Vérifier la signature
-    const signature = req.headers.get('x-bxt-signature') || '';
-    if (BOXTAL_WEBHOOK_SECRET && signature) {
-        const isValid = verifySignature(bodyText, signature, BOXTAL_WEBHOOK_SECRET);
-        if (!isValid) {
-            console.error("❌ Signature invalide");
-            return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-        }
-        console.log("✅ Signature valide");
+    if (!token || token !== BOXTAL_WEBHOOK_TOKEN) {
+        console.error("❌ Token invalide ou manquant");
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    console.log("✅ Token validé");
+
+    // Récupérer le body
+    const bodyText = await req.text();
 
     // Parser le body
     let body;
