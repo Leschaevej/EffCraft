@@ -110,27 +110,8 @@ export default function OrderPage() {
             const response = await fetch(`/api/order/user?statuses=${statuses}`);
             if (response.ok) {
                 const data = await response.json();
-                if (orderView === "pending") {
-                    const ordersWithSync = await Promise.all(
-                        data.orders.map(async (order: Order) => {
-                            if (order.boxtalStatus) {
-                                try {
-                                    const syncResponse = await fetch(`/api/shipping?action=sync-status&orderId=${order._id}`);
-                                    if (syncResponse.ok) {
-                                        const syncData = await syncResponse.json();
-                                        return { ...order, status: syncData.status, boxtalStatus: syncData.boxtalStatus };
-                                    }
-                                } catch (error) {
-                                    console.error("Erreur sync:", error);
-                                }
-                            }
-                            return order;
-                        })
-                    );
-                    setOrders(ordersWithSync);
-                } else {
-                    setOrders(data.orders);
-                }
+                // Les statuts sont maintenant mis à jour en temps réel via webhook
+                setOrders(data.orders);
             }
         } catch (error) {
             console.error("Erreur chargement commandes:", error);
@@ -265,6 +246,23 @@ export default function OrderPage() {
                                                             )}
                                                         </>
                                                     )}
+                                                    <div className="actions">
+                                                        <button className="invoice">Facture</button>
+                                                        {orderView === "pending" && (
+                                                            <>
+                                                                {["paid", "preparing"].includes(order.status) && (
+                                                                    <button className="cancel">
+                                                                        Annulation
+                                                                    </button>
+                                                                )}
+                                                                {["ready", "in_transit", "out_for_delivery", "delivered"].includes(order.status) && (
+                                                                    <button className="return">
+                                                                        Retour
+                                                                    </button>
+                                                                )}
+                                                            </>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 <div className="products">
                                                     {order.products.map((product) => (
@@ -277,20 +275,6 @@ export default function OrderPage() {
                                                     ))}
                                                 </div>
                                             </div>
-                                            {orderView === "pending" && (
-                                                <div className="actions">
-                                                    {["paid", "preparing"].includes(order.status) && (
-                                                        <button className="cancel">
-                                                            Demander une annulation
-                                                        </button>
-                                                    )}
-                                                    {["ready", "in_transit", "out_for_delivery", "delivered"].includes(order.status) && (
-                                                        <button className="return">
-                                                            Demander un retour
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            )}
                                         </div>
                                     )}
                                 </div>

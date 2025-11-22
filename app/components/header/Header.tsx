@@ -303,14 +303,14 @@ export default function Header() {
                             <p>Bonjour, {session.user.name}</p>
                             {session.user.role === "admin" ? (
                                 <button className="backoffice" onClick={() => {
-                                    closeAllMenus();
+                                    closeMenusOnly();
                                     router.push("/backoffice");
                                 }}>
                                     Backoffice
                                 </button>
                             ) : (
                                 <button className="commande" onClick={() => {
-                                    closeAllMenus();
+                                    closeMenusOnly();
                                     router.push("/order");
                                 }}>
                                     Commande

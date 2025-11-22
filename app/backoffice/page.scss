@@ -292,8 +292,9 @@
                         }
                         .actions {
                             display: flex;
-                            gap: 30px;
-                            justify-content: center;
+                            flex-direction: column;
+                            gap: 20px;
+                            align-items: flex-start;
                             button {
                                 padding: 15px 30px;
                                 border: none;
@@ -302,6 +303,14 @@
                                 cursor: pointer;
                                 transition: color 0.3s ease, background-color 0.3s ease;
                                 white-space: nowrap;
+                                &.invoice {
+                                    background-color: var(--mainColor);
+                                    color: var(--secondTextColor);
+                                    &:hover {
+                                        background-color: var(--secondColor);
+                                        color: var(--mainTextColor);
+                                    }
+                                }
                                 &.print {
                                     background-color: var(--mainColor);
                                     color: var(--secondTextColor);
@@ -311,20 +320,91 @@
                                     }
                                 }
                                 &.cancel {
-                                    background-color: #e74c3c;
-                                    color: white;
+                                    background-color: var(--errorColor);
+                                    color: var(--secondTextColor);
                                     &:hover {
-                                        background-color: #c0392b;
+                                        background-color: var(--secondErrorColor);
+                                        color: var(--mainTextColor);
                                     }
                                 }
                                 &.return {
-                                    background-color: #f39c12;
-                                    color: white;
+                                    background-color: var(--errorColor);
+                                    color: var(--secondTextColor);
                                     &:hover {
-                                        background-color: #e67e22;
+                                        background-color: var(--secondErrorColor);
+                                        color: var(--mainTextColor);
+                                    }
+                                }
+                                &.refund {
+                                    background-color: var(--errorColor);
+                                    color: var(--secondTextColor);
+                                    &:hover {
+                                        background-color: var(--secondErrorColor);
+                                        color: var(--mainTextColor);
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+        .modal-content {
+            background-color: var(--secondBackgroundColor);
+            padding: 50px;
+            border-radius: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+            max-width: 600px;
+            text-align: center;
+            h3 {
+                font-size: 36px;
+                color: var(--mainColor);
+                font-weight: 600;
+            }
+            p {
+                font-size: 20px;
+                color: var(--mainTextColor);
+            }
+            .modal-buttons {
+                display: flex;
+                gap: 20px;
+                justify-content: center;
+                button {
+                    padding: 15px 40px;
+                    border: none;
+                    border-radius: 25px;
+                    font-size: 20px;
+                    cursor: pointer;
+                    transition: background-color 0.3s ease, color 0.3s ease;
+                    font-weight: 600;
+                    &.btn-cancel {
+                        background-color: var(--errorColor);
+                        color: var(--secondTextColor);
+                        &:hover {
+                            background-color: var(--secondErrorColor);
+                            color: var(--mainTextColor);
+                        }
+                    }
+                    &.btn-confirm {
+                        background-color: var(--mainColor);
+                        color: var(--secondTextColor);
+                        &:hover {
+                            background-color: var(--secondColor);
+                            color: var(--mainTextColor);
                         }
                     }
                 }

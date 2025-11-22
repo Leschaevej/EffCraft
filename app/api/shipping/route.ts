@@ -140,7 +140,6 @@ async function syncBoxtalStatus(searchParams: URLSearchParams) {
             );
         }
         const shipmentData = await response.json();
-        const boxtalStatus = shipmentData.content?.status;
         const trackingResponse = await fetch(
             `${apiUrl}/shipping/v3.1/shipping-order/${order.boxtalShipmentId}/tracking`,
             {
@@ -152,7 +151,7 @@ async function syncBoxtalStatus(searchParams: URLSearchParams) {
             }
         );
         let ourStatus = order.status;
-        const updateData: any = { boxtalStatus };
+        const updateData: any = {};
         if (trackingResponse.ok) {
             const trackingData = await trackingResponse.json();
             const trackingStatus = trackingData.content?.[0]?.status;
@@ -168,7 +167,7 @@ async function syncBoxtalStatus(searchParams: URLSearchParams) {
             } else if (trackingStatus === "IN_TRANSIT") {
                 ourStatus = "in_transit";
                 updateData.status = "in_transit";
-            } else if (boxtalStatus === "PENDING" && order.status === "preparing") {
+            } else if (shipmentData.content?.status === "PENDING" && order.status === "preparing") {
                 ourStatus = "ready";
                 updateData.status = "ready";
                 if (!order.readyAt) {
@@ -212,7 +211,6 @@ async function syncBoxtalStatus(searchParams: URLSearchParams) {
                 shippingData: "",
                 billingData: "",
                 boxtalShipmentId: "",
-                boxtalStatus: "",
                 trackingNumber: ""
             };
         }
@@ -222,7 +220,6 @@ async function syncBoxtalStatus(searchParams: URLSearchParams) {
         );
         return NextResponse.json({
             success: true,
-            boxtalStatus,
             status: ourStatus
         });
     } catch (error: any) {
@@ -476,8 +473,7 @@ async function createShipment(req: NextRequest) {
                 {
                     $set: {
                         boxtalShipmentId: shipmentResult.content.id,
-                        boxtalStatus: shipmentResult.content.status || "PENDING",
-                        trackingNumber: shipmentResult.content.shipmentId,
+                        trackingNumber: shipmentResult.content.shipmentId
                     }
                 }
             );
@@ -561,7 +557,6 @@ async function getShippingLabel(req: NextRequest) {
             );
         }
         const documentsData = await labelResponse.json();
-        console.log("Documents Boxtal:", JSON.stringify(documentsData, null, 2));
         const labelDocument = documentsData.content?.find((doc: any) => doc.type === "LABEL");
         if (!labelDocument?.url) {
             return NextResponse.json(
@@ -672,7 +667,6 @@ async function getReturnLabel(req: NextRequest) {
             );
         }
         const documentsData = await labelResponse.json();
-        console.log("Documents Boxtal pour retour:", JSON.stringify(documentsData, null, 2));
         const returnDocument = documentsData.content?.find((doc: any) =>
             doc.type === "RETURN_LABEL" || doc.type === "RETURN"
         );

@@ -201,31 +201,39 @@
                         }
                         .actions {
                             display: flex;
-                            gap: 30px;
-                            justify-content: center;
+                            flex-direction: column;
+                            gap: 20px;
+                            align-items: flex-start;
                             button {
                                 padding: 15px 30px;
-                                background-color: var(--mainColor);
-                                color: var(--secondTextColor);
                                 border: none;
                                 border-radius: 25px;
                                 font-size: 24px;
                                 cursor: pointer;
                                 transition: color 0.3s ease, background-color 0.3s ease;
-                                &:hover {
-                                    background-color: var(--secondColor);
-                                    color: var(--mainTextColor);
+                                white-space: nowrap;
+                                &.invoice {
+                                    background-color: var(--mainColor);
+                                    color: var(--secondTextColor);
+                                    &:hover {
+                                        background-color: var(--secondColor);
+                                        color: var(--mainTextColor);
+                                    }
                                 }
                                 &.cancel {
-                                    background-color: #ff6b6b;
+                                    background-color: var(--errorColor);
+                                    color: var(--secondTextColor);
                                     &:hover {
-                                        background-color: #ff5252;
+                                        background-color: var(--secondErrorColor);
+                                        color: var(--mainTextColor);
                                     }
                                 }
                                 &.return {
-                                    background-color: #ffa500;
+                                    background-color: var(--errorColor);
+                                    color: var(--secondTextColor);
                                     &:hover {
-                                        background-color: #ff8c00;
+                                        background-color: var(--secondErrorColor);
+                                        color: var(--mainTextColor);
                                     }
                                 }
                             }
@@ -357,31 +365,39 @@
                         }
                         .actions {
                             display: flex;
-                            gap: 30px;
-                            justify-content: center;
+                            flex-direction: column;
+                            gap: 20px;
+                            align-items: flex-start;
                             button {
                                 padding: 15px 30px;
-                                background-color: var(--mainColor);
-                                color: var(--secondTextColor);
                                 border: none;
                                 border-radius: 25px;
                                 font-size: 24px;
                                 cursor: pointer;
                                 transition: color 0.3s ease, background-color 0.3s ease;
-                                &:hover {
-                                    background-color: var(--secondColor);
-                                    color: var(--mainTextColor);
+                                white-space: nowrap;
+                                &.invoice {
+                                    background-color: var(--mainColor);
+                                    color: var(--secondTextColor);
+                                    &:hover {
+                                        background-color: var(--secondColor);
+                                        color: var(--mainTextColor);
+                                    }
                                 }
                                 &.cancel {
-                                    background-color: #ff6b6b;
+                                    background-color: var(--errorColor);
+                                    color: var(--secondTextColor);
                                     &:hover {
-                                        background-color: #ff5252;
+                                        background-color: var(--secondErrorColor);
+                                        color: var(--mainTextColor);
                                     }
                                 }
                                 &.return {
-                                    background-color: #ffa500;
+                                    background-color: var(--errorColor);
+                                    color: var(--secondTextColor);
                                     &:hover {
-                                        background-color: #ff8c00;
+                                        background-color: var(--secondErrorColor);
+                                        color: var(--mainTextColor);
                                     }
                                 }
                             }

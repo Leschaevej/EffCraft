@@ -70,6 +70,9 @@ export default function Backoffice() {
     const [loading, setLoading] = useState(false);
     const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
     const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
+    const [showCancelModal, setShowCancelModal] = useState(false);
+    const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
+    const [cancelModalMessage, setCancelModalMessage] = useState<string | null>(null);
     useEffect(() => {
         if (status === "loading") return;
         if (!session || session.user.role !== "admin") {
@@ -106,23 +109,8 @@ export default function Backoffice() {
             const response = await fetch(`/api/order?status=${status}`);
             if (response.ok) {
                 const data = await response.json();
-                const ordersWithStatus = await Promise.all(
-                    data.orders.map(async (order: Order) => {
-                        if (order.boxtalShipmentId && (order.status === "preparing" || orderView === "history")) {
-                            try {
-                                const syncResponse = await fetch(`/api/shipping?action=sync-status&orderId=${order._id}`);
-                                if (syncResponse.ok) {
-                                    const syncData = await syncResponse.json();
-                                    return { ...order, status: syncData.status, boxtalStatus: syncData.boxtalStatus };
-                                }
-                            } catch (error) {
-                                console.error("Erreur sync statut:", error);
-                            }
-                        }
-                        return order;
-                    })
-                );
-                setOrders(ordersWithStatus);
+                // Les statuts sont maintenant mis à jour en temps réel via webhook
+                setOrders(data.orders);
             }
         } catch (error) {
         } finally {
@@ -146,6 +134,15 @@ export default function Backoffice() {
                     alert("Erreur lors de la création de l'expédition: " + (error.error || "Erreur inconnue"));
                     return;
                 }
+                const createResult = await createResponse.json();
+
+                // Mettre à jour l'ordre local avec le boxtalShipmentId
+                setOrders(prev => prev.map(o =>
+                    o._id === order._id
+                        ? { ...o, boxtalShipmentId: createResult.shipmentId, boxtalStatus: "PENDING" }
+                        : o
+                ));
+
                 await new Promise(resolve => setTimeout(resolve, 2000));
             }
             const response = await fetch("/api/shipping?action=label", {
@@ -179,25 +176,45 @@ export default function Backoffice() {
         }
     };
     const handleCancelOrder = async (order: Order) => {
-        if (!confirm(`Êtes-vous sûr de vouloir annuler la commande de ${order.userEmail} ?`)) {
-            return;
-        }
+        setOrderToCancel(order);
+        setShowCancelModal(true);
+    };
+    const confirmCancelOrder = async () => {
+        if (!orderToCancel) return;
+
+        setCancelModalMessage("Remboursement en cours de traitement...");
+
         try {
             const response = await fetch("/api/order", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ orderId: order._id, action: "cancel" }),
+                body: JSON.stringify({ orderId: orderToCancel._id, action: "cancel" }),
             });
             if (response.ok) {
-                alert("Commande annulée avec succès");
+                setCancelModalMessage("La commande a bien été remboursée");
                 fetchOrders();
+                setTimeout(() => {
+                    setShowCancelModal(false);
+                    setOrderToCancel(null);
+                    setCancelModalMessage(null);
+                }, 5000);
             } else {
                 const error = await response.json();
-                alert("Erreur lors de l'annulation: " + (error.error || "Erreur inconnue"));
+                setCancelModalMessage("Problème de remboursement : " + (error.error || "Erreur inconnue"));
+                setTimeout(() => {
+                    setShowCancelModal(false);
+                    setOrderToCancel(null);
+                    setCancelModalMessage(null);
+                }, 5000);
             }
         } catch (error) {
             console.error("Erreur annulation:", error);
-            alert("Erreur lors de l'annulation: " + error);
+            setCancelModalMessage("Problème de remboursement : Erreur réseau");
+            setTimeout(() => {
+                setShowCancelModal(false);
+                setOrderToCancel(null);
+                setCancelModalMessage(null);
+            }, 5000);
         }
     };
     const handleReturnOrder = async (order: Order) => {
@@ -379,7 +396,7 @@ export default function Backoffice() {
                                             </div>
                                         </div>
                                         <div className="buttons">
-                                            {orderView === "pending" ? (
+                                            {orderView === "pending" && (
                                                 <button
                                                     className="print"
                                                     onClick={() => handlePrintLabel(order)}
@@ -387,8 +404,6 @@ export default function Backoffice() {
                                                 >
                                                     {printingOrderId === order._id ? "Traitement..." : "Bordereau"}
                                                 </button>
-                                            ) : (
-                                                <button className="invoice">Facture</button>
                                             )}
                                             <button onClick={() => setExpandedOrderId(expandedOrderId === order._id ? null : order._id)}>
                                                 {expandedOrderId === order._id ? "Fermer" : "Details"}
@@ -435,10 +450,37 @@ export default function Backoffice() {
                                                             )}
                                                         </>
                                                     )}
+                                                    <div className="actions">
+                                                        <button className="invoice">Facture</button>
+                                                        {["paid", "preparing"].includes(order.status) && (
+                                                            <button
+                                                                className="cancel"
+                                                                onClick={() => handleCancelOrder(order)}
+                                                            >
+                                                                Annuler
+                                                            </button>
+                                                        )}
+                                                        {["ready", "in_transit", "out_for_delivery", "delivered"].includes(order.status) && (
+                                                            <button
+                                                                className="return"
+                                                                onClick={() => handleReturnOrder(order)}
+                                                            >
+                                                                Retour
+                                                            </button>
+                                                        )}
+                                                        {order.status === "return_requested" && (
+                                                            <button
+                                                                className="refund"
+                                                                onClick={() => handleRefundReturn(order)}
+                                                            >
+                                                                Rembourser
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 <div className="products">
-                                                    {order.products.map((product) => (
-                                                        <div key={product._id} className="product">
+                                                    {order.products.map((product, index) => (
+                                                        <div key={product._id || `${order._id}-product-${index}`} className="product">
                                                             {product.images && product.images.length > 0 && (
                                                                 <img src={product.images[0]} alt={product.name} />
                                                             )}
@@ -446,32 +488,6 @@ export default function Backoffice() {
                                                         </div>
                                                     ))}
                                                 </div>
-                                            </div>
-                                            <div className="actions">
-                                                {["paid", "preparing"].includes(order.status) && (
-                                                    <button
-                                                        className="cancel"
-                                                        onClick={() => handleCancelOrder(order)}
-                                                    >
-                                                        Annuler commande
-                                                    </button>
-                                                )}
-                                                {["ready", "in_transit", "out_for_delivery", "delivered"].includes(order.status) && (
-                                                    <button
-                                                        className="return"
-                                                        onClick={() => handleReturnOrder(order)}
-                                                    >
-                                                        Générer bon de retour
-                                                    </button>
-                                                )}
-                                                {order.status === "return_requested" && (
-                                                    <button
-                                                        className="refund"
-                                                        onClick={() => handleRefundReturn(order)}
-                                                    >
-                                                        Rembourser
-                                                    </button>
-                                                )}
                                             </div>
                                         </div>
                                     )}
@@ -481,6 +497,46 @@ export default function Backoffice() {
                     )}
                 </div>
                 </section>
+            )}
+            {showCancelModal && (
+                <div className="modal-overlay" onClick={() => {
+                    if (!cancelModalMessage) {
+                        setShowCancelModal(false);
+                        setOrderToCancel(null);
+                        setCancelModalMessage(null);
+                    }
+                }}>
+                    <div className="modal-content" onClick={(e) => {
+                        if (!cancelModalMessage) {
+                            e.stopPropagation();
+                        }
+                    }}>
+                        {cancelModalMessage ? (
+                            <>
+                                <h3>
+                                    {cancelModalMessage.includes("en cours")
+                                        ? "Veuillez patienter"
+                                        : cancelModalMessage.includes("bien été")
+                                        ? "Succès"
+                                        : "Erreur"}
+                                </h3>
+                                <p>{cancelModalMessage}</p>
+                            </>
+                        ) : (
+                            <>
+                                <h3>Annulation et remboursement</h3>
+                                <p>Cette action va annuler la commande et rembourser automatiquement le client. Voulez-vous continuer ?</p>
+                                <div className="modal-buttons">
+                                    <button className="btn-confirm" onClick={confirmCancelOrder}>Oui</button>
+                                    <button className="btn-cancel" onClick={() => {
+                                        setShowCancelModal(false);
+                                        setOrderToCancel(null);
+                                    }}>Non</button>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
             )}
         </main>
     );

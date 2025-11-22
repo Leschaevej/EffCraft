@@ -91,35 +91,23 @@ export async function PATCH(req: NextRequest) {
                                     }
                                 }
                             );
-                            if (deleteResponse.ok) {
-                                console.log("✅ Expédition Boxtal annulée:", order.boxtalShipmentId);
-                            } else {
+                            if (!deleteResponse.ok) {
                                 const errorText = await deleteResponse.text();
-                                console.warn("⚠️ Impossible d'annuler l'expédition Boxtal:", errorText);
+                                console.error("Impossible d'annuler l'expédition Boxtal:", errorText);
                             }
                         }
                     } catch (boxtalError) {
-                        console.error("❌ Erreur lors de l'annulation Boxtal:", boxtalError);
+                        console.error("Erreur lors de l'annulation Boxtal:", boxtalError);
                     }
                 }
                 try {
                     if (order.paymentIntentId) {
-                        console.log("🔄 Tentative de remboursement pour Payment Intent:", order.paymentIntentId);
-                        const refund = await stripe.refunds.create({
+                        await stripe.refunds.create({
                             payment_intent: order.paymentIntentId,
                         });
-                        console.log("✅ Remboursement créé avec succès:", {
-                            refundId: refund.id,
-                            amount: refund.amount,
-                            currency: refund.currency,
-                            status: refund.status,
-                            paymentIntent: order.paymentIntentId
-                        });
-                    } else {
-                        console.warn("⚠️ Aucun Payment Intent ID trouvé pour cette commande");
                     }
                 } catch (stripeError: any) {
-                    console.error("❌ Erreur remboursement Stripe:", stripeError);
+                    console.error("Erreur remboursement Stripe:", stripeError);
                     return NextResponse.json(
                         { error: "Erreur lors du remboursement: " + stripeError.message },
                         { status: 500 }
@@ -213,18 +201,12 @@ export async function PATCH(req: NextRequest) {
                 }
                 try {
                     if (refundOrder.paymentIntentId) {
-                        console.log("🔄 Remboursement retour pour Payment Intent:", refundOrder.paymentIntentId);
-                        const refund = await stripe.refunds.create({
+                        await stripe.refunds.create({
                             payment_intent: refundOrder.paymentIntentId,
-                        });
-                        console.log("✅ Remboursement retour créé:", {
-                            refundId: refund.id,
-                            amount: refund.amount,
-                            status: refund.status
                         });
                     }
                 } catch (stripeError: any) {
-                    console.error("❌ Erreur remboursement retour:", stripeError);
+                    console.error("Erreur remboursement retour:", stripeError);
                     return NextResponse.json(
                         { error: "Erreur lors du remboursement: " + stripeError.message },
                         { status: 500 }
