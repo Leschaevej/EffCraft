@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { nothingYouCouldDo } from "../../font";
 import "./page.scss";
 
-export default function PaymentSuccess() {
+function PaymentSuccessContent() {
     const searchParams = useSearchParams();
     const [paymentStatus, setPaymentStatus] = useState<'loading' | 'success' | 'error'>('loading');
     const [isProcessing, setIsProcessing] = useState(false);
@@ -98,5 +98,22 @@ export default function PaymentSuccess() {
                 )}
             </div>
         </main>
+    );
+}
+
+export default function PaymentSuccess() {
+    return (
+        <Suspense fallback={
+            <main className="success">
+                <div className="conteneur">
+                    <h2 className={nothingYouCouldDo.className}>
+                        Chargement...
+                    </h2>
+                    <p className="message">Veuillez patienter...</p>
+                </div>
+            </main>
+        }>
+            <PaymentSuccessContent />
+        </Suspense>
     );
 }
