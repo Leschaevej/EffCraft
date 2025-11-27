@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import useSWR from 'swr';
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -10,21 +10,32 @@ export function useProducts() {
     dedupingInterval: 60000, // Ne pas refaire la même requête pendant 60 secondes
   });
 
+  // Utiliser une ref pour avoir toujours la dernière version de mutate
+  const mutateRef = useRef(mutate);
+  mutateRef.current = mutate;
+
   // Écouter les événements temps réel
   useEffect(() => {
     const handleRealtimeUpdate = (e: Event) => {
       const customEvent = e as CustomEvent;
       const { type } = customEvent.detail;
 
+      console.log('[useProducts] Événement reçu:', type);
+
       if (type === "product_created" || type === "product_deleted") {
+        console.log('[useProducts] Forçage de la revalidation...');
         // Force la revalidation pour récupérer les nouveaux produits
-        mutate(undefined, { revalidate: true });
+        mutateRef.current(undefined, { revalidate: true });
       }
     };
 
+    console.log('[useProducts] Hook monté, écoute des événements cart-update');
     window.addEventListener("cart-update", handleRealtimeUpdate);
-    return () => window.removeEventListener("cart-update", handleRealtimeUpdate);
-  }, [mutate]);
+    return () => {
+      console.log('[useProducts] Hook démonté');
+      window.removeEventListener("cart-update", handleRealtimeUpdate);
+    };
+  }, []); // Pas de dépendances pour éviter les re-souscriptions
 
   return {
     products: data || [],

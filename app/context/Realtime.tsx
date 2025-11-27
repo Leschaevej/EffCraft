@@ -104,6 +104,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         });
 
         channel.bind('product_deleted', (data: { productId: string }) => {
+            console.log('[Pusher] product_deleted reçu:', data);
             setReservedProducts(prev => {
                 const newSet = new Set(prev);
                 newSet.delete(data.productId);
@@ -120,6 +121,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         });
 
         channel.bind('product_created', (data: { productId: string }) => {
+            console.log('[Pusher] product_created reçu:', data);
             window.dispatchEvent(new CustomEvent("cart-update", {
                 detail: { type: "product_created", productId: data.productId }
             }));
