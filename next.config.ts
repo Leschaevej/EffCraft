@@ -8,13 +8,12 @@ const nextConfig: NextConfig = {
     typescript: {
         ignoreBuildErrors: true
     },
-    // Désactive les warnings de préchargement CSS
     onDemandEntries: {
         maxInactiveAge: 25 * 1000,
         pagesBufferLength: 2,
     },
     experimental: {
-        optimizeCss: true,
+        optimizeCss: false,
     }
 };
 export default nextConfig;
