@@ -67,7 +67,7 @@ export async function POST(request: Request) {
         { _id: insertedId },
         { $set: { images: savedImages, cloudinaryFolder: folderName } }
         );
-        notifyClients({
+        await notifyClients({
         type: "product_created",
         data: { productId: productId }
         });

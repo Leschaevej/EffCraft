@@ -87,7 +87,7 @@ export async function DELETE(
         { "cart.productId": productObjectId },
         { $pull: { cart: { productId: productObjectId } } } as any
         );
-        notifyClients({
+        await notifyClients({
         type: "product_deleted",
         data: { productId: id }
         });
