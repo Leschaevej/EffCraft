@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import clientPromise from "../../../lib/mongodb";
 import { ObjectId } from "mongodb";
 import cloudinary from "../../../lib/cloudinary";
-import { notifyClients } from "../../cart/route";
+import { notifyClients } from "../../../lib/pusher-server";
 import crypto from "crypto";
 
 // Fonction pour vérifier la signature HMAC SHA256

@@ -6,7 +6,8 @@ import User from "../../lib/models/User";
 import Product from "../../lib/models/Product";
 import { ObjectId } from "mongodb";
 import { NextRequest } from "next/server";
-import { notifyClients, scheduleNextCleanup } from "../cart/route";
+import { notifyClients } from "../../lib/pusher-server";
+import { scheduleNextCleanup } from "../cart/route";
 
 interface CartItem {
     productId: mongoose.Types.ObjectId;

@@ -4,7 +4,7 @@ import { ObjectId } from "mongodb";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import cloudinary from "../../../lib/cloudinary";
-import { notifyClients } from "../../cart/route";
+import { notifyClients } from "../../../lib/pusher-server";
 
 export async function GET(
     req: Request,

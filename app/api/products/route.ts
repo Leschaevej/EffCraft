@@ -4,7 +4,7 @@ import { v4 as uuidv4 } from "uuid";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]/route";
 import cloudinary from "../../lib/cloudinary";
-import { notifyClients } from "../cart/route";
+import { notifyClients } from "../../lib/pusher-server";
 
 export async function GET() {
     try {

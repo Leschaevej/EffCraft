@@ -4,7 +4,7 @@ import { authOptions } from "../auth/[...nextauth]/route";
 import clientPromise from "../../lib/mongodb";
 import { ObjectId } from "mongodb";
 import cloudinary from "../../lib/cloudinary";
-import { notifyClients } from "../cart/route";
+import { notifyClients } from "../../lib/pusher-server";
 import { stripe } from "../../lib/stripe-server";
 
 export async function GET(req: NextRequest) {
