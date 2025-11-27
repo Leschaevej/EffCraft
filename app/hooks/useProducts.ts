@@ -19,14 +19,17 @@ export function useProducts() {
     const handleRealtimeUpdate = async (e: Event) => {
       const customEvent = e as CustomEvent;
       const { type } = customEvent.detail;
+      console.log('[useProducts] Événement reçu:', type);
 
       if (type === "product_created" || type === "product_deleted") {
+        console.log('[useProducts] Fetch immédiat des produits...');
         // Fetch direct qui bypass complètement le cache et le dedupingInterval
         try {
           const freshData = await fetch('/api/products', {
             cache: 'no-store',
             headers: { 'Cache-Control': 'no-cache' }
           }).then(res => res.json());
+          console.log('[useProducts] Mise à jour SWR avec', freshData.length, 'produits');
           // Met à jour le cache SWR avec les nouvelles données
           mutateRef.current(freshData, false);
         } catch (error) {
