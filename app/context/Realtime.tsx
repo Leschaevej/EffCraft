@@ -65,6 +65,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
             cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
+            // Force Pusher à rester actif même en arrière-plan
+            activityTimeout: 120000, // 2 minutes
+            pongTimeout: 30000,
+            enabledTransports: ['ws', 'wss']
         });
 
         const channel = pusher.subscribe('effcraft-channel');
@@ -104,7 +108,6 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         });
 
         channel.bind('product_deleted', (data: { productId: string }) => {
-            console.log('[Pusher] product_deleted reçu:', data);
             setReservedProducts(prev => {
                 const newSet = new Set(prev);
                 newSet.delete(data.productId);
@@ -121,7 +124,6 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
         });
 
         channel.bind('product_created', (data: { productId: string }) => {
-            console.log('[Pusher] product_created reçu:', data);
             window.dispatchEvent(new CustomEvent("cart-update", {
                 detail: { type: "product_created", productId: data.productId }
             }));
