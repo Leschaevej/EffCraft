@@ -16,16 +16,26 @@ export function useProducts() {
 
   // Écouter les événements temps réel
   useEffect(() => {
-    const handleRealtimeUpdate = (e: Event) => {
+    const handleRealtimeUpdate = async (e: Event) => {
       const customEvent = e as CustomEvent;
       const { type } = customEvent.detail;
 
       console.log('[useProducts] Événement reçu:', type);
 
       if (type === "product_created" || type === "product_deleted") {
-        console.log('[useProducts] Forçage de la revalidation...');
-        // Force la revalidation pour récupérer les nouveaux produits
-        mutateRef.current(undefined, { revalidate: true });
+        console.log('[useProducts] Fetch immédiat des produits...');
+        // Fetch direct qui bypass complètement le cache et le dedupingInterval
+        try {
+          const freshData = await fetch('/api/products', {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache' }
+          }).then(res => res.json());
+          console.log('[useProducts] Nouvelles données reçues:', freshData.length, 'produits');
+          // Met à jour le cache SWR avec les nouvelles données
+          mutateRef.current(freshData, false);
+        } catch (error) {
+          console.error('[useProducts] Erreur lors du fetch:', error);
+        }
       }
     };
 
