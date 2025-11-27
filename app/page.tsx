@@ -44,6 +44,7 @@ export default function Home() {
         const handleRealtimeUpdate = (e: Event) => {
             const customEvent = e as CustomEvent;
             const { type, productId } = customEvent.detail;
+            // Optimisation : mise à jour locale immédiate pour la suppression
             if (type === "product_deleted") {
                 setBijoux(prev => {
                     const updated = prev.filter(b => b._id !== productId);
@@ -53,13 +54,12 @@ export default function Home() {
                     setDisplayedBijoux(productsForCarousel);
                     return updated;
                 });
-            } else if (type === "product_created") {
-                mutate(); // Revalider le cache SWR
             }
+            // product_created est géré automatiquement par useProducts()
         };
         window.addEventListener("cart-update", handleRealtimeUpdate);
         return () => window.removeEventListener("cart-update", handleRealtimeUpdate);
-    }, [filter, mutate]);
+    }, [filter]);
     useEffect(() => {
     async function fetchFavorites() {
         if (status === "authenticated") {

@@ -56,15 +56,25 @@ export async function DELETE(
         if (!product) {
         return NextResponse.json({ error: "Produit non trouvé" }, { status: 404 });
         }
-        if (Array.isArray(product.images)) {
-        const destroyPromises = product.images.map((url: string) => {
-            const match = url.match(/\/effcraft\/products\/.*?\/([^/.]+)\.webp/);
-            const publicId = match ? `effcraft/products/${id}/${match[1]}` : null;
-            if (publicId) {
-            return cloudinary.uploader.destroy(publicId, { resource_type: "image" });
+        // Supprimer les images et le dossier Cloudinary
+        if (product.cloudinaryFolder) {
+            // Si le dossier est sauvegardé, supprimer tout le dossier
+            try {
+                await cloudinary.api.delete_resources_by_prefix(`effcraft/products/${product.cloudinaryFolder}`);
+                await cloudinary.api.delete_folder(`effcraft/products/${product.cloudinaryFolder}`);
+            } catch (error) {
+                console.error("Erreur lors de la suppression du dossier Cloudinary:", error);
             }
-        });
-        await Promise.all(destroyPromises);
+        } else if (Array.isArray(product.images)) {
+            // Fallback pour les anciens produits sans cloudinaryFolder
+            const destroyPromises = product.images.map((url: string) => {
+                const match = url.match(/\/effcraft\/products\/.*?\/([^/.]+)\.webp/);
+                const publicId = match ? `effcraft/products/${id}/${match[1]}` : null;
+                if (publicId) {
+                    return cloudinary.uploader.destroy(publicId, { resource_type: "image" });
+                }
+            });
+            await Promise.all(destroyPromises);
         }
         const result = await db.collection("products").deleteOne({ _id: new ObjectId(id) });
         const usersCollection = db.collection("users");

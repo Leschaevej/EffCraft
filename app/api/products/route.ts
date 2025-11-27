@@ -42,12 +42,21 @@ export async function POST(request: Request) {
         createdAt: new Date(),
         });
         const productId = insertedId.toString();
+        // Créer un slug à partir du nom du produit
+        const slug = data.name
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "") // Enlever les accents
+            .replace(/[^a-z0-9]+/g, "-") // Remplacer les caractères spéciaux par des tirets
+            .replace(/^-+|-+$/g, ""); // Enlever les tirets au début et à la fin
+        const folderName = `${slug}-${productId}`;
+
         const savedImages: string[] = [];
         for (const base64 of data.images) {
         const matches = base64.match(/^data:image\/\w+;base64,(.+)$/);
         if (!matches) continue;
         const uploadResult = await cloudinary.uploader.upload(base64, {
-            folder: `effcraft/products/${productId}`,
+            folder: `effcraft/products/${folderName}`,
             public_id: uuidv4(),
             format: "webp",
             transformation: [{ width: 600, crop: "limit" }],
@@ -56,7 +65,7 @@ export async function POST(request: Request) {
         }
         await db.collection("products").updateOne(
         { _id: insertedId },
-        { $set: { images: savedImages } }
+        { $set: { images: savedImages, cloudinaryFolder: folderName } }
         );
         notifyClients({
         type: "product_created",

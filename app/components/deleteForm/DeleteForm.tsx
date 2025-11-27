@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import Card from "../card/Card";
+import { useProducts } from "../../hooks/useProducts";
 import "./DeleteForm.scss";
 
 interface Product {
@@ -13,26 +14,17 @@ interface Product {
     images: string[];
 }
 export default function DeleteForm() {
+    const { products: swrProducts, isLoading, isError } = useProducts();
     const [products, setProducts] = useState<Product[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
     const [confirmingId, setConfirmingId] = useState<string | null>(null);
     const wrapperRef = useRef<HTMLDivElement | null>(null);
+
+    // Synchroniser les produits SWR avec le state local
     useEffect(() => {
-        fetch("/api/products")
-        .then((res) => {
-            if (!res.ok) throw new Error("Erreur lors du chargement");
-            return res.json();
-        })
-        .then((data) => {
-            setProducts(data || []);
-            setLoading(false);
-        })
-        .catch((err) => {
-            setError(err.message);
-            setLoading(false);
-        });
-    }, []);
+        if (!isLoading) {
+            setProducts(swrProducts);
+        }
+    }, [swrProducts, isLoading]);
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
         if (
@@ -62,8 +54,8 @@ export default function DeleteForm() {
         alert("Impossible de supprimer : " + (err instanceof Error ? err.message : "Erreur"));
         }
     };
-    if (loading) return <p>Chargement des produits...</p>;
-    if (error) return <p>Erreur : {error}</p>;
+    if (isLoading) return <p>Chargement des produits...</p>;
+    if (isError) return <p>Erreur lors du chargement des produits</p>;
     return (
         <div className="deleteForm">
             <div className="grid">
