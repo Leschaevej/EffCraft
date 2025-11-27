@@ -11,7 +11,6 @@ const pusherServer = new Pusher({
 export async function notifyClients(event: { type: string; data: Record<string, unknown> }) {
   try {
     await pusherServer.trigger("effcraft-channel", event.type, event.data);
-    console.log('[Pusher Server] Événement envoyé:', event.type, event.data);
   } catch (error) {
     console.error('[Pusher Server] Erreur envoi:', error);
   }

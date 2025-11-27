@@ -24,7 +24,6 @@ export function useOrders(status: 'pending' | 'history') {
       const { type } = customEvent.detail;
 
       if (type === "order_created" || type === "order_deleted" || type === "order_status_updated") {
-        console.log('[useOrders] Événement reçu:', type);
         await mutateRef.current();
       }
     };
@@ -66,7 +65,6 @@ export function useUserOrders(orderView: 'pending' | 'history') {
       const { type } = customEvent.detail;
 
       if (type === "order_created" || type === "order_deleted" || type === "order_status_updated") {
-        console.log('[useUserOrders] Événement reçu:', type);
         await mutateRef.current();
       }
     };

@@ -18,10 +18,8 @@ export function useProducts() {
     const handleRealtimeUpdate = async (e: Event) => {
       const customEvent = e as CustomEvent;
       const { type } = customEvent.detail;
-      console.log('[useProducts] Événement reçu:', type);
 
       if (type === "product_created" || type === "product_deleted") {
-        console.log('[useProducts] Refetch immédiat !');
         // Force SWR à refetch avec revalidate
         await mutateRef.current();
       }

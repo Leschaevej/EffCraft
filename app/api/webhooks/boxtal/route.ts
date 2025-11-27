@@ -20,10 +20,6 @@ export async function POST(req: NextRequest) {
         const rawBody = await req.text();
         const body = JSON.parse(rawBody);
 
-        console.log("=== WEBHOOK BOXTAL REÇU ===");
-        console.log("Body complet:", JSON.stringify(body, null, 2));
-        console.log("Headers:", Object.fromEntries(req.headers.entries()));
-
         // Vérifier la signature si présente (TEMPORAIREMENT DÉSACTIVÉ POUR TESTS)
         const signature = req.headers.get("x-bxt-signature");
         const webhookSecret = process.env.BOXTAL_TEST_SECRET;
@@ -39,12 +35,10 @@ export async function POST(req: NextRequest) {
                     { status: 401 }
                 );
             }
-            console.log("✓ Signature vérifiée");
         } else {
             console.warn("⚠️ Signature non vérifiée (pas de secret configuré ou pas de signature)");
         }
         */
-        console.warn("⚠️ Vérification de signature DÉSACTIVÉE (mode test)");
 
         // Extraire les données - la structure peut varier selon l'événement
         let shipmentId = body.shipmentId;
@@ -66,11 +60,6 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        console.log("EventType:", eventType);
-        console.log("ShipmentId:", shipmentId);
-        console.log("Status:", status);
-        console.log("TrackingNumber:", trackingNumber);
-
         if (!shipmentId) {
             console.error("shipmentId manquant dans le webhook");
             return NextResponse.json(
@@ -89,13 +78,10 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ success: true, message: "Commande introuvable" });
         }
 
-        console.log(`Commande trouvée: ${order._id}, statut actuel: ${order.status}`);
-
         const updateData: any = {};
 
         // Mapping des statuts Boxtal vers nos statuts internes
         if (status === "PENDING" && order.status === "preparing") {
-            console.log("Passage de preparing à ready");
             updateData.status = "ready";
             updateData.readyAt = new Date();
             if (trackingNumber) {
@@ -131,33 +117,25 @@ export async function POST(req: NextRequest) {
                 updateData.products = cleanedProducts;
             }
         } else if (status === "SHIPPED" || status === "IN_TRANSIT") {
-            console.log("Passage à in_transit");
             updateData.status = "in_transit";
             if (trackingNumber && !order.trackingNumber) {
                 updateData.trackingNumber = trackingNumber;
             }
         } else if (status === "OUT_FOR_DELIVERY") {
-            console.log("Passage à out_for_delivery");
             updateData.status = "out_for_delivery";
         } else if (status === "DELIVERED") {
-            console.log("Passage à delivered");
             updateData.status = "delivered";
             if (!order.deliveredAt) {
                 updateData.deliveredAt = new Date();
             }
         } else if (status === "CANCELLED") {
-            console.log("Passage à cancelled");
             updateData.status = "cancelled";
-        } else {
-            console.warn(`Statut Boxtal non géré: ${status}`);
         }
 
         await ordersCollection.updateOne(
             { _id: new ObjectId(order._id) },
             { $set: updateData }
         );
-
-        console.log(`Commande ${order._id} mise à jour:`, updateData);
 
         await notifyClients({
             type: "order_status_updated",

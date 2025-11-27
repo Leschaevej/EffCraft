@@ -4,8 +4,6 @@ import clientPromise from "../../../lib/mongodb";
 const BOXTAL_WEBHOOK_TOKEN = process.env.BOXTAL_WEBHOOK_TOKEN || "";
 
 export async function POST(req: NextRequest) {
-    console.log("🔔 Test webhook POST reçu");
-
     // Vérifier le token dans l'URL
     const { searchParams } = new URL(req.url);
     const token = searchParams.get('token');
@@ -15,15 +13,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    console.log("✅ Token validé");
-
     // Récupérer et parser le body
     const bodyText = await req.text();
     let webhookData;
 
     try {
         webhookData = JSON.parse(bodyText);
-        console.log("📦 Webhook reçu:", JSON.stringify(webhookData, null, 2));
     } catch (e) {
         console.error("❌ Body non-JSON:", bodyText);
         return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
@@ -37,8 +32,6 @@ export async function POST(req: NextRequest) {
         // Identifier le type d'événement
         const eventType = webhookData.eventType || webhookData.type;
         const shippingOrderId = webhookData.shippingOrderId || webhookData.id;
-
-        console.log(`📋 Event: ${eventType}, ShippingOrderId: ${shippingOrderId}`);
 
         if (!shippingOrderId) {
             console.error("❌ Pas de shippingOrderId dans le webhook");
@@ -58,8 +51,6 @@ export async function POST(req: NextRequest) {
             }, { status: 200 });
         }
 
-        console.log(`✅ Commande trouvée: ${order._id}`);
-
         // Gérer selon le type d'événement
         if (eventType === 'DOCUMENT_CREATED' || webhookData.documents) {
             // Document d'expédition créé
@@ -67,8 +58,6 @@ export async function POST(req: NextRequest) {
             const labelDoc = documents.find((doc: any) => doc.type === 'LABEL');
 
             if (labelDoc && labelDoc.url) {
-                console.log(`📄 URL du bordereau: ${labelDoc.url}`);
-
                 await ordersCollection.updateOne(
                     { _id: order._id },
                     {
@@ -78,8 +67,6 @@ export async function POST(req: NextRequest) {
                         }
                     }
                 );
-
-                console.log(`✅ Bordereau enregistré pour commande ${order._id}`);
             }
         }
 
@@ -88,8 +75,6 @@ export async function POST(req: NextRequest) {
             const tracking = webhookData.tracking || webhookData;
             const trackingStatus = tracking.status;
             const trackingHistory = tracking.history || [];
-
-            console.log(`📍 Nouveau statut de suivi: ${trackingStatus}`);
 
             const updateData: any = {
                 trackingStatus: trackingStatus,
@@ -101,7 +86,6 @@ export async function POST(req: NextRequest) {
             if (trackingStatus === 'DELIVERED') {
                 updateData.status = 'delivered';
                 updateData.deliveredAt = new Date();
-                console.log(`🎉 Commande livrée !`);
             } else if (trackingStatus === 'IN_TRANSIT') {
                 updateData.status = 'shipped';
             } else if (trackingStatus === 'PENDING_PICKUP') {
@@ -112,8 +96,6 @@ export async function POST(req: NextRequest) {
                 { _id: order._id },
                 { $set: updateData }
             );
-
-            console.log(`✅ Statut mis à jour pour commande ${order._id}: ${trackingStatus}`);
         }
 
         return NextResponse.json({
@@ -132,7 +114,6 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-    console.log("🔔 Test webhook GET reçu");
     return NextResponse.json({
         success: true,
         message: "Webhook endpoint ready",
@@ -141,16 +122,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function HEAD(req: NextRequest) {
-    console.log("🔔 Test webhook HEAD reçu");
     return new NextResponse(null, { status: 200 });
 }
 
 export async function PUT(req: NextRequest) {
-    console.log("🔔 Test webhook PUT reçu");
     return NextResponse.json({ success: true }, { status: 200 });
 }
 
 export async function PATCH(req: NextRequest) {
-    console.log("🔔 Test webhook PATCH reçu");
     return NextResponse.json({ success: true }, { status: 200 });
 }
