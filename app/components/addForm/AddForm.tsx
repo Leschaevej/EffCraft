@@ -220,6 +220,7 @@ export default function AddForm({ onProductAdded }: AddFormProps) {
           min="0"
           step="1"
           placeholder="Prix (€)"
+          autoComplete="off"
           className={errors.price ? "error" : ""}
           onChange={handlePriceChange}
         />
@@ -244,6 +245,7 @@ export default function AddForm({ onProductAdded }: AddFormProps) {
           name="description"
           required
           placeholder="Description"
+          autoComplete="off"
           className={errors.description ? "error" : ""}
           onChange={handleDescriptionChange}
         />

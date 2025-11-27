@@ -22,6 +22,7 @@ export default function Contact() {
                 value={name}
                 onChange={e => setName(e.target.value)}
                 placeholder="Nom"
+                autoComplete="name"
                 required
                 />
             </div>
@@ -33,6 +34,7 @@ export default function Contact() {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 placeholder="Email"
+                autoComplete="email"
                 required
                 />
             </div>
@@ -43,6 +45,7 @@ export default function Contact() {
                 value={message}
                 onChange={e => setMessage(e.target.value)}
                 placeholder="Message..."
+                autoComplete="off"
                 required
                 rows={7}
                 />
