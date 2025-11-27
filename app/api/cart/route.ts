@@ -99,12 +99,12 @@ async function handleCleanup(returnResponse: boolean = true) {
                 user.cartExpiresAt = undefined;
                 await user.save();
 
-                userCartProductIds.forEach((productId: any) => {
-                    notifyClients({
+                for (const productId of userCartProductIds) {
+                    await notifyClients({
                         type: "product_available",
                         data: { productId: productId.toString() }
                     });
-                });
+                }
             }
         }
 

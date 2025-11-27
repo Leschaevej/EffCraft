@@ -125,7 +125,7 @@ export async function POST(request: Request) {
             product.reservedBy = user._id as mongoose.Types.ObjectId;
             await product.save();
             await user.save();
-            notifyClients({
+            await notifyClients({
                 type: "product_reserved",
                 data: {
                     productId: productId,
@@ -180,7 +180,7 @@ export async function DELETE(request: Request) {
         if (user.cart.length === 0) {
             user.cartExpiresAt = undefined;
         }
-        notifyClients({
+        await notifyClients({
             type: "product_available",
             data: { productId: productId }
         });
