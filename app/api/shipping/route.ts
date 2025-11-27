@@ -583,7 +583,7 @@ async function getShippingLabel(req: NextRequest) {
                 }
             );
             const { notifyClients } = await import("../cart/route");
-            notifyClients({
+            await notifyClients({
                 type: "order_status_updated",
                 data: {
                     orderId: orderId,

@@ -126,7 +126,7 @@ export async function PATCH(req: NextRequest) {
                             createdAt: new Date(),
                         };
                         const insertResult = await productsCollection.insertOne(restoredProduct);
-                        notifyClients({
+                        await notifyClients({
                             type: "product_created",
                             data: { productId: insertResult.insertedId.toString() }
                         });
@@ -151,7 +151,7 @@ export async function PATCH(req: NextRequest) {
                         }
                     }
                 );
-                notifyClients({
+                await notifyClients({
                     type: "order_status_updated",
                     data: {
                         orderId: orderId,
@@ -180,7 +180,7 @@ export async function PATCH(req: NextRequest) {
                         }
                     }
                 );
-                notifyClients({
+                await notifyClients({
                     type: "order_status_updated",
                     data: {
                         orderId: orderId,
@@ -229,7 +229,7 @@ export async function PATCH(req: NextRequest) {
                         }
                     }
                 );
-                notifyClients({
+                await notifyClients({
                     type: "order_status_updated",
                     data: {
                         orderId: orderId,
@@ -298,7 +298,7 @@ export async function POST(req: NextRequest) {
             _id: { $in: productIds }
         });
         productIds.forEach((productId: ObjectId) => {
-            notifyClients({
+            await notifyClients({
                 type: "product_deleted",
                 data: { productId: productId.toString() }
             });
@@ -331,7 +331,7 @@ export async function POST(req: NextRequest) {
             createdAt: new Date(),
         };
         const result = await ordersCollection.insertOne(order);
-        notifyClients({
+        await notifyClients({
             type: "order_created",
             data: { orderId: result.insertedId.toString() }
         });

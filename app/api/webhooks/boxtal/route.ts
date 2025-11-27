@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
 
         console.log(`Commande ${order._id} mise à jour:`, updateData);
 
-        notifyClients({
+        await notifyClients({
             type: "order_status_updated",
             data: {
                 orderId: order._id.toString(),
