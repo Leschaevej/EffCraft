@@ -7,7 +7,7 @@ export function useProducts() {
   const { data, error, isLoading, mutate } = useSWR('/api/products', fetcher, {
     revalidateOnFocus: false,
     revalidateOnReconnect: false,
-    dedupingInterval: 60000, // Ne pas refaire la même requête pendant 60 secondes
+    dedupingInterval: 0,
   });
 
   // Utiliser une ref pour avoir toujours la dernière version de mutate
@@ -23,18 +23,8 @@ export function useProducts() {
 
       if (type === "product_created" || type === "product_deleted") {
         console.log('[useProducts] Fetch immédiat des produits...');
-        // Fetch direct qui bypass complètement le cache et le dedupingInterval
-        try {
-          const freshData = await fetch('/api/products', {
-            cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache' }
-          }).then(res => res.json());
-          console.log('[useProducts] Mise à jour SWR avec', freshData.length, 'produits');
-          // Met à jour le cache SWR avec les nouvelles données
-          mutateRef.current(freshData, false);
-        } catch (error) {
-          console.error('[useProducts] Erreur lors du fetch:', error);
-        }
+        // Force un revalidate complet
+        mutateRef.current();
       }
     };
 
