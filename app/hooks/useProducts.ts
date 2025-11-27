@@ -47,7 +47,7 @@ export function useProduct(id: string | null) {
     {
       revalidateOnFocus: false,
       revalidateOnReconnect: false,
-      dedupingInterval: 60000,
+      dedupingInterval: 0,
     }
   );
 
