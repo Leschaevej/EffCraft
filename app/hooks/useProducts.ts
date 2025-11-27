@@ -1,98 +1,59 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
+import useSWR from 'swr';
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export function useProducts() {
-  const [products, setProducts] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isError, setIsError] = useState(false);
-  const [updateKey, setUpdateKey] = useState(0);
+  const { data, error, isLoading, mutate } = useSWR('/api/products', fetcher, {
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+    dedupingInterval: 0, // CRITIQUE: 0 pour permettre les refetch immédiats
+  });
 
-  const fetchProducts = useCallback(async () => {
-    try {
-      console.log('[useProducts] Fetching products...');
-      const res = await fetch('/api/products?t=' + Date.now(), {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache' }
-      });
-      const data = await res.json();
-      console.log('[useProducts] Produits récupérés:', data.length);
-      setProducts(data);
-      setIsLoading(false);
-      setIsError(false);
-      setUpdateKey(prev => prev + 1);
-    } catch (error) {
-      console.error('[useProducts] Erreur:', error);
-      setIsError(true);
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Fetch initial
-  useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
+  const mutateRef = useRef(mutate);
+  mutateRef.current = mutate;
 
   // Écouter les événements temps réel
   useEffect(() => {
-    const handleRealtimeUpdate = (e: Event) => {
+    const handleRealtimeUpdate = async (e: Event) => {
       const customEvent = e as CustomEvent;
       const { type } = customEvent.detail;
       console.log('[useProducts] Événement reçu:', type);
 
       if (type === "product_created" || type === "product_deleted") {
         console.log('[useProducts] Refetch immédiat !');
-        fetchProducts();
+        // Force SWR à refetch avec revalidate
+        await mutateRef.current();
       }
     };
 
     window.addEventListener("cart-update", handleRealtimeUpdate);
     return () => window.removeEventListener("cart-update", handleRealtimeUpdate);
-  }, [fetchProducts]);
+  }, []);
 
   return {
-    products,
+    products: data || [],
     isLoading,
-    isError,
-    mutate: fetchProducts,
-    updateKey,
+    isError: error,
+    mutate,
   };
 }
 
 export function useProduct(id: string | null) {
-  const [product, setProduct] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isError, setIsError] = useState(false);
-
-  const fetchProduct = useCallback(async () => {
-    if (!id) {
-      setProduct(null);
-      setIsLoading(false);
-      return;
+  const { data, error, isLoading, mutate } = useSWR(
+    id ? `/api/product/${id}` : null,
+    fetcher,
+    {
+      revalidateOnFocus: true,
+      revalidateOnReconnect: true,
+      dedupingInterval: 0,
     }
-
-    try {
-      const res = await fetch(`/api/product/${id}`, {
-        cache: 'no-store',
-        headers: { 'Cache-Control': 'no-cache' }
-      });
-      const data = await res.json();
-      setProduct(data.product);
-      setIsLoading(false);
-      setIsError(false);
-    } catch (error) {
-      console.error('[useProduct] Erreur:', error);
-      setIsError(true);
-      setIsLoading(false);
-    }
-  }, [id]);
-
-  useEffect(() => {
-    fetchProduct();
-  }, [fetchProduct]);
+  );
 
   return {
-    product,
+    product: data?.product || null,
     isLoading,
-    isError,
-    mutate: fetchProduct,
+    isError: error,
+    mutate,
   };
 }
