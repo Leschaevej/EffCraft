@@ -9,6 +9,7 @@ type RealtimeContextType = {
     availableProducts: Set<string>;
     isProductReserved: (productId: string) => boolean;
     currentUserId: string | null;
+    version: number; // Force re-render
 };
 
 const RealtimeContext = createContext<RealtimeContextType>({
@@ -16,12 +17,14 @@ const RealtimeContext = createContext<RealtimeContextType>({
     availableProducts: new Set(),
     isProductReserved: () => false,
     currentUserId: null,
+    version: 0,
 });
 
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     const [reservedProducts, setReservedProducts] = useState<Set<string>>(new Set());
     const [availableProducts, setAvailableProducts] = useState<Set<string>>(new Set());
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [version, setVersion] = useState(0);
     const { data: session } = useSession();
 
     useEffect(() => {
@@ -77,6 +80,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
                 newSet.delete(data.productId);
                 return newSet;
             });
+            setVersion(v => v + 1); // Force re-render
             window.dispatchEvent(new CustomEvent("cart-update", {
                 detail: { type: "product_reserved", productId: data.productId }
             }));
@@ -93,6 +97,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
                 newSet.add(data.productId);
                 return newSet;
             });
+            setVersion(v => v + 1); // Force re-render
             window.dispatchEvent(new CustomEvent("cart-update", {
                 detail: { type: "product_available", productId: data.productId }
             }));
@@ -150,7 +155,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     }, [reservedProducts]);
 
     return (
-        <RealtimeContext.Provider value={{ reservedProducts, availableProducts, isProductReserved, currentUserId }}>
+        <RealtimeContext.Provider value={{ reservedProducts, availableProducts, isProductReserved, currentUserId, version }}>
             {children}
         </RealtimeContext.Provider>
     );
