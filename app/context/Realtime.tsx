@@ -65,10 +65,11 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY!, {
             cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER!,
-            // Force Pusher à rester actif même en arrière-plan
-            activityTimeout: 120000, // 2 minutes
-            pongTimeout: 30000,
-            enabledTransports: ['ws', 'wss']
+            forceTLS: true,
+            disableStats: true,
+            enabledTransports: ['ws', 'wss'],
+            activityTimeout: 120000,
+            pongTimeout: 30000
         });
 
         const channel = pusher.subscribe('effcraft-channel');

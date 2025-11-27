@@ -1,15 +1,15 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 
 export function useProducts() {
   const [products, setProducts] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isError, setIsError] = useState(false);
-  const shouldRefetchRef = useRef(false);
+  const [updateKey, setUpdateKey] = useState(0);
 
   const fetchProducts = useCallback(async () => {
     try {
       console.log('[useProducts] Fetching products...');
-      const res = await fetch('/api/products', {
+      const res = await fetch('/api/products?t=' + Date.now(), {
         cache: 'no-store',
         headers: { 'Cache-Control': 'no-cache' }
       });
@@ -18,7 +18,7 @@ export function useProducts() {
       setProducts(data);
       setIsLoading(false);
       setIsError(false);
-      shouldRefetchRef.current = false;
+      setUpdateKey(prev => prev + 1);
     } catch (error) {
       console.error('[useProducts] Erreur:', error);
       setIsError(true);
@@ -31,18 +31,6 @@ export function useProducts() {
     fetchProducts();
   }, [fetchProducts]);
 
-  // Polling toutes les secondes pour vérifier si on doit refetch
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (shouldRefetchRef.current) {
-        console.log('[useProducts] Polling détecte un refetch nécessaire !');
-        fetchProducts();
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [fetchProducts]);
-
   // Écouter les événements temps réel
   useEffect(() => {
     const handleRealtimeUpdate = (e: Event) => {
@@ -51,20 +39,21 @@ export function useProducts() {
       console.log('[useProducts] Événement reçu:', type);
 
       if (type === "product_created" || type === "product_deleted") {
-        console.log('[useProducts] Marquage pour refetch !');
-        shouldRefetchRef.current = true;
+        console.log('[useProducts] Refetch immédiat !');
+        fetchProducts();
       }
     };
 
     window.addEventListener("cart-update", handleRealtimeUpdate);
     return () => window.removeEventListener("cart-update", handleRealtimeUpdate);
-  }, []);
+  }, [fetchProducts]);
 
   return {
     products,
     isLoading,
     isError,
     mutate: fetchProducts,
+    updateKey,
   };
 }
 
