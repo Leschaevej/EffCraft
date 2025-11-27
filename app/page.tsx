@@ -12,6 +12,7 @@ import Map from "./components/map/Map";
 import Carousel from "./components/carousel/Carousel";
 import eventData from "./data/event.json";
 import { useSession } from "next-auth/react";
+import { useProducts } from "./hooks/useProducts";
 
 type Category = "all" | "earrings" | "necklace";
 
@@ -19,33 +20,26 @@ export default function Home() {
     const { date, name, time, address, coords } = eventData.event;
     const { lat, lng } = coords;
     const { data: session, status } = useSession();
+    const { products: swrProducts, isLoading: swrLoading, mutate } = useProducts();
     const [filter, setFilter] = useState<Category>("all");
     const [pageIndex, setPageIndex] = useState(0);
     const [isFading, setIsFading] = useState(false);
     const [bijoux, setBijoux] = useState<any[]>([]);
     const [displayedBijoux, setDisplayedBijoux] = useState<any[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
     const [favorites, setFavorites] = useState<string[]>([]);
     const [showDeletedMessage, setShowDeletedMessage] = useState(false);
-    const fetchBijoux = async () => {
-        try {
-            setIsLoading(true);
-            const res = await fetch("/api/products");
-            if (!res.ok) throw new Error("Erreur lors du chargement des bijoux");
-            const data = await res.json();
-            setBijoux(data);
-            const productsForCarousel = filter === "all"
-                ? data.slice(3)
-                : data.filter((b: any) => b.category === filter).slice(3);
-            setDisplayedBijoux(productsForCarousel);
-        } catch (error) {
-        } finally {
-            setIsLoading(false);
-        }
-    };
+
+    // Synchroniser les produits SWR avec le state local
     useEffect(() => {
-        fetchBijoux();
-    }, []);
+        if (swrProducts.length > 0) {
+            setBijoux(swrProducts);
+            const productsForCarousel = filter === "all"
+                ? swrProducts.slice(3)
+                : swrProducts.filter((b: any) => b.category === filter).slice(3);
+            setDisplayedBijoux(productsForCarousel);
+        }
+    }, [swrProducts, filter]);
+
     useEffect(() => {
         const handleRealtimeUpdate = (e: Event) => {
             const customEvent = e as CustomEvent;
@@ -60,12 +54,12 @@ export default function Home() {
                     return updated;
                 });
             } else if (type === "product_created") {
-                fetchBijoux();
+                mutate(); // Revalider le cache SWR
             }
         };
         window.addEventListener("cart-update", handleRealtimeUpdate);
         return () => window.removeEventListener("cart-update", handleRealtimeUpdate);
-    }, [filter]);
+    }, [filter, mutate]);
     useEffect(() => {
     async function fetchFavorites() {
         if (status === "authenticated") {
@@ -172,7 +166,7 @@ export default function Home() {
                 <div className="conteneur">
                     <h2 className={nothingYouCouldDo.className}>Nouveautés</h2>
                     <div className="cards">
-                    {isLoading
+                    {swrLoading
                         ? Array.from({ length: 3 }, (_, i) => <CardSkeleton key={`skeleton-${i}`} />)
                         : bijoux.slice(0, 3).map((bijou) => (
                             <Card
@@ -190,7 +184,7 @@ export default function Home() {
                     <Filter onFilterChange={handleFilterChange} selectedFilter={filter} />
                     <div className={`carouselContaineur ${isFading ? "fade" : ""}`}>
                         <Carousel itemsPerPage={8} pageIndex={pageIndex} setPageIndex={setPageIndex}>
-                            {isLoading
+                            {swrLoading
                             ? Array.from({ length: 8 }, (_, i) => <CardSkeleton key={i} />)
                             : displayedBijoux.map((bijou) => (
                                 <Card

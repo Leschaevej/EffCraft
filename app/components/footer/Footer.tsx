@@ -47,7 +47,7 @@ export default function Footer() {
                         <img src="/payment/mastercard.webp" alt="Mastercard" />
                         <img src="/payment/cb.webp" alt="CB" />
                         <img src="/payment/visa.webp" alt="Visa" />
-                        <img src="/payment/payPal.webp" alt="PayPal" />
+                        <img src="/payment/paypal.webp" alt="PayPal" />
                     </div>
                 </div>
                 <div className="info">

@@ -8,6 +8,7 @@ import { FaCheck, FaBoxOpen, FaWarehouse, FaTruck, FaTruckMoving, FaHome } from 
 import "./page.scss";
 import AddForm from "../components/addForm/AddForm";
 import DeleteForm from "../components/deleteForm/DeleteForm";
+import { useOrders } from "../hooks/useOrders";
 
 interface Product {
     _id: string;
@@ -66,22 +67,30 @@ export default function Backoffice() {
     const [activeSection, setActiveSection] = useState<"manage" | "orders">("manage");
     const [activeView, setActiveView] = useState<"add" | "delete">("add");
     const [orderView, setOrderView] = useState<"pending" | "history">("pending");
+    const { orders: swrOrders, isLoading: swrLoading, mutate } = useOrders(orderView);
     const [orders, setOrders] = useState<Order[]>([]);
-    const [loading, setLoading] = useState(false);
     const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
     const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
     const [showCancelModal, setShowCancelModal] = useState(false);
     const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
     const [cancelModalMessage, setCancelModalMessage] = useState<string | null>(null);
+
+    // Synchroniser les données SWR avec le state local
+    useEffect(() => {
+        if (swrOrders.length > 0) {
+            setOrders(swrOrders);
+        }
+    }, [swrOrders]);
+
     useEffect(() => {
         if (status === "loading") return;
         if (!session || session.user.role !== "admin") {
         router.replace("/");
         }
     }, [session, status, router]);
+
     useEffect(() => {
         if (activeSection === "orders" && session?.user?.role === "admin") {
-            fetchOrders();
             const handleOrderUpdate = (event: Event) => {
                 const customEvent = event as CustomEvent;
                 if (customEvent.detail?.type === "order_status_updated" && customEvent.detail?.data) {
@@ -93,7 +102,7 @@ export default function Backoffice() {
                     customEvent.detail?.type === "order_created" ||
                     customEvent.detail?.type === "order_deleted"
                 ) {
-                    fetchOrders();
+                    mutate(); // Revalider le cache SWR
                 }
             };
             window.addEventListener("cart-update", handleOrderUpdate);
@@ -101,22 +110,7 @@ export default function Backoffice() {
                 window.removeEventListener("cart-update", handleOrderUpdate);
             };
         }
-    }, [activeSection, orderView, session]);
-    const fetchOrders = async () => {
-        setLoading(true);
-        try {
-            const status = orderView === "pending" ? "pending" : "history";
-            const response = await fetch(`/api/order?status=${status}`);
-            if (response.ok) {
-                const data = await response.json();
-                // Les statuts sont maintenant mis à jour en temps réel via webhook
-                setOrders(data.orders);
-            }
-        } catch (error) {
-        } finally {
-            setLoading(false);
-        }
-    };
+    }, [activeSection, session, mutate]);
     const handlePrintLabel = async (order: Order) => {
         if (printingOrderId) {
             return;
@@ -154,6 +148,13 @@ export default function Backoffice() {
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 window.open(url, '_blank');
+
+                // Mettre à jour le statut localement immédiatement
+                setOrders(prev => prev.map(o =>
+                    o._id === order._id
+                        ? { ...o, status: "preparing" }
+                        : o
+                ));
             } else {
                 const contentType = response.headers.get("content-type");
                 let errorMessage = "Erreur inconnue";
@@ -192,7 +193,7 @@ export default function Backoffice() {
             });
             if (response.ok) {
                 setCancelModalMessage("La commande a bien été remboursée");
-                fetchOrders();
+                mutate();
                 setTimeout(() => {
                     setShowCancelModal(false);
                     setOrderToCancel(null);
@@ -259,7 +260,7 @@ export default function Backoffice() {
             } else {
                 alert("Pas d'expédition Boxtal associée à cette commande");
             }
-            fetchOrders();
+            mutate();
         } catch (error) {
             console.error("Erreur génération bon de retour:", error);
             alert("Erreur: " + error);
@@ -277,7 +278,7 @@ export default function Backoffice() {
             });
             if (response.ok) {
                 alert("Client remboursé avec succès");
-                fetchOrders();
+                mutate();
             } else {
                 const error = await response.json();
                 alert("Erreur lors du remboursement: " + (error.error || "Erreur inconnue"));
@@ -286,6 +287,10 @@ export default function Backoffice() {
             console.error("Erreur remboursement:", error);
             alert("Erreur lors du remboursement: " + error);
         }
+    };
+    const handleReturnOrderWithMutate = async (order: Order) => {
+        await handleReturnOrder(order);
+        mutate();
     };
     const getTrackingStep = (order: Order): number => STATUS_STEPS[order.status] || 1;
     const getStatusIcon = (status: string) => {
@@ -365,7 +370,7 @@ export default function Backoffice() {
                     <h2 className={nothingYouCouldDo.className}>
                         {orderView === "pending" ? "En cours" : "Historique"}
                     </h2>
-                    {loading ? (
+                    {swrLoading ? (
                         <p className="loading">Chargement des commandes...</p>
                     ) : orders.length === 0 ? (
                         <p className="empty">Aucune commande</p>

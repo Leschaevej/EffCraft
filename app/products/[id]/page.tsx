@@ -50,7 +50,10 @@ export default function ProductPage() {
                 fetchProduct(true);
             }, 100);
         }
-    }, [reservedProducts, availableProducts]);
+        if (bijou && availableProducts.has(bijou._id)) {
+            setJustAddedToCart(false);
+        }
+    }, [reservedProducts, availableProducts, bijou]);
     useEffect(() => {
         const handleRealtimeUpdate = (e: Event) => {
             const customEvent = e as CustomEvent;

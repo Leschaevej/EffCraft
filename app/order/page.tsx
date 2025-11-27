@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { nothingYouCouldDo } from "../font";
 import { FaCheck, FaBoxOpen, FaWarehouse, FaTruck, FaTruckMoving, FaHome } from "react-icons/fa";
 import "./page.scss";
+import { useUserOrders } from "../hooks/useOrders";
 
 interface Product {
     _id: string;
@@ -58,21 +59,25 @@ const STATUS_LABELS: { [key: string]: string } = {
 export default function OrderPage() {
     const { data: session, status: authStatus } = useSession();
     const router = useRouter();
-    const [orders, setOrders] = useState<Order[]>([]);
-    const [loading, setLoading] = useState(false);
-    const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
     const [orderView, setOrderView] = useState<"pending" | "history">("pending");
+    const { orders: swrOrders, isLoading: swrLoading, mutate } = useUserOrders(orderView);
+    const [orders, setOrders] = useState<Order[]>([]);
+    const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+
+    // Synchroniser les données SWR avec le state local
+    useEffect(() => {
+        if (swrOrders.length > 0 || !swrLoading) {
+            setOrders(swrOrders);
+        }
+    }, [swrOrders, swrLoading]);
+
     useEffect(() => {
         if (authStatus === "loading") return;
         if (!session) {
             router.replace("/");
         }
     }, [session, authStatus, router]);
-    useEffect(() => {
-        if (session?.user?.email) {
-            fetchOrders();
-        }
-    }, [session, orderView]);
+
     useEffect(() => {
         if (session?.user?.email) {
             const handleOrderUpdate = (event: Event) => {
@@ -92,7 +97,7 @@ export default function OrderPage() {
                         setOrders(prev => prev.filter(order => order._id !== orderId));
                     }
                 } else if (customEvent.detail?.type === "order_deleted") {
-                    fetchOrders();
+                    mutate();
                 }
             };
             window.addEventListener("cart-update", handleOrderUpdate);
@@ -100,25 +105,7 @@ export default function OrderPage() {
                 window.removeEventListener("cart-update", handleOrderUpdate);
             };
         }
-    }, [session, orderView]);
-    const fetchOrders = async () => {
-        setLoading(true);
-        try {
-            const statuses = orderView === "pending"
-                ? "paid,preparing,ready,in_transit,out_for_delivery,return_requested"
-                : "delivered,cancelled,returned";
-            const response = await fetch(`/api/order/user?statuses=${statuses}`);
-            if (response.ok) {
-                const data = await response.json();
-                // Les statuts sont maintenant mis à jour en temps réel via webhook
-                setOrders(data.orders);
-            }
-        } catch (error) {
-            console.error("Erreur chargement commandes:", error);
-        } finally {
-            setLoading(false);
-        }
-    };
+    }, [session, orderView, mutate]);
     const getTrackingStep = (order: Order): number => STATUS_STEPS[order.status] || 1;
     const getStatusIcon = (status: string) => {
         const iconMap: { [key: string]: React.ReactNode } = {
@@ -157,8 +144,8 @@ export default function OrderPage() {
                     <h2 className={nothingYouCouldDo.className}>
                         {orderView === "pending" ? "Commande" : "Historique"}
                     </h2>
-                    {loading ? (
-                        <p className="loading">Chargement...</p>
+                    {swrLoading ? (
+                        <p className="loading">Chargement des commandes...</p>
                     ) : orders.length === 0 ? (
                         <p className="empty">Aucune commande</p>
                     ) : (
