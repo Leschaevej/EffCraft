@@ -297,12 +297,12 @@ export async function POST(req: NextRequest) {
         await productsCollection.deleteMany({
             _id: { $in: productIds }
         });
-        productIds.forEach((productId: ObjectId) => {
+        for (const productId of productIds) {
             await notifyClients({
                 type: "product_deleted",
                 data: { productId: productId.toString() }
             });
-        });
+        }
         await usersCollection.updateMany(
             { favorites: { $in: productIds } },
             { $pull: { favorites: { $in: productIds } } } as any
