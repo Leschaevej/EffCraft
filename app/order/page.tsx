@@ -66,7 +66,7 @@ export default function OrderPage() {
 
     // Synchroniser les données SWR avec le state local
     useEffect(() => {
-        if (swrOrders.length > 0 || !swrLoading) {
+        if (!swrLoading) {
             setOrders(swrOrders);
         }
     }, [swrOrders, swrLoading]);

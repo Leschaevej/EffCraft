@@ -31,14 +31,14 @@ export default function Home() {
 
     // Synchroniser les produits SWR avec le state local
     useEffect(() => {
-        if (swrProducts.length > 0) {
+        if (!swrLoading) {
             setBijoux(swrProducts);
             const productsForCarousel = filter === "all"
                 ? swrProducts.slice(3)
                 : swrProducts.filter((b: any) => b.category === filter).slice(3);
             setDisplayedBijoux(productsForCarousel);
         }
-    }, [swrProducts, filter]);
+    }, [swrProducts, filter, swrLoading]);
 
     useEffect(() => {
         const handleRealtimeUpdate = (e: Event) => {

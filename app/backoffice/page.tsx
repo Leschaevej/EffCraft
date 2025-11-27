@@ -77,9 +77,7 @@ export default function Backoffice() {
 
     // Synchroniser les données SWR avec le state local
     useEffect(() => {
-        if (swrOrders.length > 0) {
-            setOrders(swrOrders);
-        }
+        setOrders(swrOrders);
     }, [swrOrders]);
 
     useEffect(() => {
