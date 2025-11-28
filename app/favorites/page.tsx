@@ -5,6 +5,7 @@ import Card from "../components/card/Card";
 import CardSkeleton from "../components/card/CardSkeleton";
 import { useSession, signIn } from "next-auth/react";
 import { nothingYouCouldDo } from "../font";
+import { useFavorites } from "../hooks/useFavorites";
 import "./page.scss";
 
 type Bijou = {
@@ -17,59 +18,8 @@ type Bijou = {
 };
 export default function Favorites() {
     const { data: session, status } = useSession();
-    const [favorites, setFavorites] = useState<Bijou[] | null>(null);
-    const [removingIds, setRemovingIds] = useState<Set<string>>(new Set());
-    useEffect(() => {
-        if (status !== "authenticated") return;
-        const fetchFavorites = async () => {
-        try {
-            const res = await fetch("/api/user?type=favorites");
-            if (!res.ok) throw new Error("Erreur lors du chargement des favoris");
-            const data = await res.json();
-            setFavorites(data.favorites || []);
-        } catch (err) {
-            setFavorites([]);
-        }
-        };
-        fetchFavorites();
-    }, [status]);
-    useEffect(() => {
-        const handleFavoriteRemoved = (e: Event) => {
-            const customEvent = e as CustomEvent<{ productId: string }>;
-            const productId = customEvent.detail.productId;
-            setRemovingIds(prev => new Set(prev).add(productId));
-            setTimeout(() => {
-                setFavorites(prev => prev ? prev.filter(bijou => bijou._id !== productId) : prev);
-                setRemovingIds(prev => {
-                    const newSet = new Set(prev);
-                    newSet.delete(productId);
-                    return newSet;
-                });
-            }, 3000);
-        };
-        const handleRealtimeUpdate = (e: Event) => {
-            const customEvent = e as CustomEvent;
-            const { type, productId } = customEvent.detail;
-            if (type === "product_deleted") {
-                setRemovingIds(prev => new Set(prev).add(productId));
-                setTimeout(() => {
-                    setFavorites(prev => prev ? prev.filter(bijou => bijou._id !== productId) : prev);
-                    setRemovingIds(prev => {
-                        const newSet = new Set(prev);
-                        newSet.delete(productId);
-                        return newSet;
-                    });
-                }, 3000);
-            }
-        };
-        window.addEventListener("removed", handleFavoriteRemoved);
-        window.addEventListener("cart-update", handleRealtimeUpdate);
-        return () => {
-            window.removeEventListener("removed", handleFavoriteRemoved);
-            window.removeEventListener("cart-update", handleRealtimeUpdate);
-        };
-    }, []);
-    const isLoading = status === "loading" || (status === "authenticated" && favorites === null);
+    const { favorites: swrFavorites, isLoading: swrLoading } = useFavorites();
+
     return (
         <main className={`favorites ${status === "unauthenticated" ? "unloged" : ""}`}>
             <div className="conteneur">
@@ -94,27 +44,20 @@ export default function Favorites() {
                     </>
                 ) : (
                 <>
-                    {isLoading && (
+                    {swrLoading ? (
                     <div className="grid">
-                        {Array.from({ length: 6 }, (_, i) => (
+                        {Array.from({ length: 3 }, (_, i) => (
                         <CardSkeleton key={`skeleton-${i}`} />
                         ))}
                     </div>
-                    )}
-                    {!isLoading && Array.isArray(favorites) && favorites.length > 0 && (
+                    ) : swrFavorites.length > 0 ? (
                     <div className="grid">
-                        {favorites.map((bijou) => (
-                        <div
-                            key={bijou._id}
-                            className={removingIds.has(bijou._id) ? "removing" : ""}
-                        >
-                            <Card bijou={bijou} initialIsFavori={true} />
-                        </div>
+                        {swrFavorites.map((bijou) => (
+                            <Card key={bijou._id} bijou={bijou} initialIsFavori={true} />
                         ))}
                     </div>
-                    )}
-                    {!isLoading && Array.isArray(favorites) && favorites.length === 0 && (
-                    <p>Vous n’avez encore ajouté aucun bijou à vos favoris.</p>
+                    ) : (
+                    <p>Vous n'avez encore ajouté aucun bijou à vos favoris.</p>
                     )}
                 </>
                 )}

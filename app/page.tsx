@@ -166,7 +166,7 @@ export default function Home() {
                 <div className="conteneur">
                     <h2 className={nothingYouCouldDo.className}>Nouveautés</h2>
                     <div className="cards">
-                    {swrLoading
+                    {swrLoading && bijoux.length === 0
                         ? Array.from({ length: 3 }, (_, i) => <CardSkeleton key={`skeleton-${i}`} />)
                         : bijoux.slice(0, 3).map((bijou) => (
                             <Card
@@ -184,7 +184,7 @@ export default function Home() {
                     <Filter onFilterChange={handleFilterChange} selectedFilter={filter} />
                     <div className={`carouselContaineur ${isFading ? "fade" : ""}`}>
                         <Carousel itemsPerPage={8} pageIndex={pageIndex} setPageIndex={setPageIndex}>
-                            {swrLoading
+                            {swrLoading && displayedBijoux.length === 0
                             ? Array.from({ length: 8 }, (_, i) => <CardSkeleton key={i} />)
                             : displayedBijoux.map((bijou) => (
                                 <Card

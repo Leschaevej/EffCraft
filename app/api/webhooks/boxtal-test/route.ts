@@ -117,7 +117,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
         success: true,
         message: "Webhook endpoint ready",
-        hasSecret: !!BOXTAL_WEBHOOK_SECRET
+        hasSecret: !!BOXTAL_WEBHOOK_TOKEN
     }, { status: 200 });
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, notFound, useRouter } from "next/navigation";
 import "./page.scss";
 import Card from "../../components/card/Card";
@@ -25,6 +25,7 @@ export default function ProductPage() {
     const [loading, setLoading] = useState(true);
     const [justAddedToCart, setJustAddedToCart] = useState(false);
     const { reservedProducts, availableProducts, currentUserId } = useRealtime();
+    const lastFetchedState = useRef<string>("");
     const fetchProduct = async (silent = false) => {
         try {
             const res = await fetch(`/api/products/${id}`);
@@ -46,9 +47,13 @@ export default function ProductPage() {
     }, [id]);
     useEffect(() => {
         if (bijou && (reservedProducts.has(bijou._id) || availableProducts.has(bijou._id))) {
-            setTimeout(() => {
-                fetchProduct(true);
-            }, 100);
+            const currentState = `${reservedProducts.has(bijou._id)}-${availableProducts.has(bijou._id)}`;
+            if (currentState !== lastFetchedState.current) {
+                lastFetchedState.current = currentState;
+                setTimeout(() => {
+                    fetchProduct(true);
+                }, 100);
+            }
         }
         if (bijou && availableProducts.has(bijou._id)) {
             setJustAddedToCart(false);
@@ -66,7 +71,23 @@ export default function ProductPage() {
         window.addEventListener("cart-update", handleRealtimeUpdate);
         return () => window.removeEventListener("cart-update", handleRealtimeUpdate);
     }, [id, router]);
-    if (loading) return <p>Chargement...</p>;
+    if (loading) {
+        return (
+            <main className="product">
+                <div className="conteneur">
+                    <div className="card skeleton">
+                        <div className="image-skeleton" />
+                    </div>
+                    <div className="info">
+                        <div className="skeleton-line title" />
+                        <div className="skeleton-line price" />
+                        <div className="skeleton-line description" />
+                        <button className="addCart" disabled>Ajouter au panier</button>
+                    </div>
+                </div>
+            </main>
+        );
+    }
     if (!bijou) return notFound();
     const isReserved = availableProducts.has(bijou._id)
         ? false

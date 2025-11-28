@@ -38,6 +38,17 @@ export default function Cart() {
     const [loadingRelayPoints, setLoadingRelayPoints] = useState(false);
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [loadingPayment, setLoadingPayment] = useState(false);
+    const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [billingAddressSuggestions, setBillingAddressSuggestions] = useState<any[]>([]);
+    const [showBillingSuggestions, setShowBillingSuggestions] = useState(false);
+    const [addressWarning, setAddressWarning] = useState<string | null>(null);
+    const [showAddressConfirmDialog, setShowAddressConfirmDialog] = useState(false);
+    const [addressConfirmed, setAddressConfirmed] = useState(false);
+    const [billingAddressWarning, setBillingAddressWarning] = useState<string | null>(null);
+    const [showBillingAddressConfirmDialog, setShowBillingAddressConfirmDialog] = useState(false);
+    const autocompleteRef = React.useRef<HTMLDivElement>(null);
+    const billingAutocompleteRef = React.useRef<HTMLDivElement>(null);
     const [formData, setFormData] = useState({
         nom: "",
         prenom: "",
@@ -56,6 +67,9 @@ export default function Cart() {
         ville: "",
     });
     const fetchCart = async () => {
+        if (status === "loading") {
+            return;
+        }
         if (status !== "authenticated") {
             setLoading(false);
             return;
@@ -76,8 +90,26 @@ export default function Cart() {
         }
     };
     useEffect(() => {
-        fetchCart();
+        if (status !== "loading") {
+            fetchCart();
+        }
     }, [status]);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (autocompleteRef.current && !autocompleteRef.current.contains(event.target as Node)) {
+                setShowSuggestions(false);
+            }
+            if (billingAutocompleteRef.current && !billingAutocompleteRef.current.contains(event.target as Node)) {
+                setShowBillingSuggestions(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
     useEffect(() => {
         const handleCartUpdate = (event: Event) => {
             const customEvent = event as CustomEvent<{ type: string; productId: string }>;
@@ -116,13 +148,89 @@ export default function Cart() {
     };
     const totalPrix = panier.reduce((acc, bijou) => acc + bijou.price, 0);
     const isLoading = status === "loading" || (status === "authenticated" && loading);
+    const searchAddress = async (query: string) => {
+        if (query.length < 3) {
+            setAddressSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=5`
+            );
+            const data = await response.json();
+            setAddressSuggestions(data.features || []);
+            if (data.features && data.features.length > 0) {
+                setShowSuggestions(true);
+            }
+        } catch (error) {
+            console.error("Erreur recherche adresse:", error);
+        }
+    };
+
+    const selectAddress = (suggestion: any) => {
+        const props = suggestion.properties;
+        setFormData(prev => ({
+            ...prev,
+            rue: props.name || "",
+            codePostal: props.postcode || "",
+            ville: props.city || ""
+        }));
+        setShowSuggestions(false);
+        setAddressSuggestions([]);
+    };
+
+    const searchBillingAddress = async (query: string) => {
+        if (query.length < 3) {
+            setBillingAddressSuggestions([]);
+            setShowBillingSuggestions(false);
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=5`
+            );
+            const data = await response.json();
+            setBillingAddressSuggestions(data.features || []);
+            if (data.features && data.features.length > 0) {
+                setShowBillingSuggestions(true);
+            }
+        } catch (error) {
+            console.error("Erreur recherche adresse facturation:", error);
+        }
+    };
+
+    const selectBillingAddress = (suggestion: any) => {
+        const props = suggestion.properties;
+        setBillingData(prev => ({
+            ...prev,
+            rue: props.name || "",
+            codePostal: props.postcode || "",
+            ville: props.city || ""
+        }));
+        setShowBillingSuggestions(false);
+        setBillingAddressSuggestions([]);
+    };
+
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+
+        // Autocomplétion pour le champ "rue"
+        if (name === "rue") {
+            searchAddress(value);
+        }
     };
     const handleBillingInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setBillingData(prev => ({ ...prev, [name]: value }));
+
+        // Autocomplétion pour le champ "rue" de facturation
+        if (name === "rue") {
+            searchBillingAddress(value);
+        }
     };
     const handleValidateOrder = () => {
         setShowCheckout(true);
@@ -177,39 +285,144 @@ export default function Cart() {
         setSelectedRelayPoint(point);
         setShowRelayMap(false);
     };
-    const fetchShippingRates = async () => {
+
+    const validateAddressBeforeContinue = async () => {
         setLoadingShipping(true);
         try {
-            const response = await fetch("/api/shipping", {
+            const params = new URLSearchParams({
+                action: 'rates',
+                address: formData.rue,
+                zipcode: formData.codePostal,
+                city: formData.ville,
+                country: "FR"
+            });
+            const response = await fetch(`/api/shipping?${params.toString()}`, {
                 method: "GET",
                 headers: { "Content-Type": "application/json" }
             });
             if (!response.ok) {
                 const error = await response.json();
-                setErrorMessage(error.error || "Erreur lors du calcul des frais de port");
-                return;
+                setErrorMessage(error.error || "Erreur lors de la validation de l'adresse");
+                setLoadingShipping(false);
+                return false;
             }
             const data = await response.json();
+
+            // Si l'adresse n'est pas reconnue, afficher la modal de confirmation
+            if (data.addressWarning) {
+                setAddressWarning(data.addressWarning);
+                setShippingOptions(data.options || []); // Sauvegarder les options pour plus tard
+                setShowAddressConfirmDialog(true);
+                setLoadingShipping(false);
+                return false; // Ne pas continuer
+            }
+
+            // Adresse validée, sauvegarder les options
             setShippingOptions(data.options || []);
-        } catch (error) {
-            setErrorMessage("Erreur réseau lors du calcul des frais de port");
-        } finally {
             setLoadingShipping(false);
+            return true; // Continuer
+        } catch (error) {
+            setErrorMessage("Erreur réseau lors de la validation de l'adresse");
+            setLoadingShipping(false);
+            return false;
         }
     };
-    const handleContinueToBilling = async (e: React.FormEvent) => {
-        e.preventDefault();
+
+    const handleConfirmAddress = async () => {
+        setShowAddressConfirmDialog(false);
+        setAddressConfirmed(true);
+        // Passer à la page suivante (facturation ou mode de livraison)
         if (sameAddress) {
             setShowShippingMethod(true);
-            await fetchShippingRates();
         } else {
             setShowBillingForm(true);
         }
     };
+
+    const handleModifyAddress = () => {
+        setShowAddressConfirmDialog(false);
+        setAddressWarning(null);
+        // Rester sur le formulaire de livraison
+    };
+
+    const validateBillingAddressBeforeContinue = async () => {
+        setLoadingShipping(true);
+        try {
+            const params = new URLSearchParams({
+                action: 'rates',
+                address: billingData.rue,
+                zipcode: billingData.codePostal,
+                city: billingData.ville,
+                country: "FR"
+            });
+            const response = await fetch(`/api/shipping?${params.toString()}`, {
+                method: "GET",
+                headers: { "Content-Type": "application/json" }
+            });
+            if (!response.ok) {
+                const error = await response.json();
+                setErrorMessage(error.error || "Erreur lors de la validation de l'adresse de facturation");
+                setLoadingShipping(false);
+                return false;
+            }
+            const data = await response.json();
+
+            // Si l'adresse n'est pas reconnue, afficher la modal de confirmation
+            if (data.addressWarning) {
+                setBillingAddressWarning(data.addressWarning);
+                setShowBillingAddressConfirmDialog(true);
+                setLoadingShipping(false);
+                return false; // Ne pas continuer
+            }
+
+            setLoadingShipping(false);
+            return true; // Continuer
+        } catch (error) {
+            setErrorMessage("Erreur réseau lors de la validation de l'adresse de facturation");
+            setLoadingShipping(false);
+            return false;
+        }
+    };
+
+    const handleConfirmBillingAddress = async () => {
+        setShowBillingAddressConfirmDialog(false);
+        // Passer à la page mode de livraison
+        setShowShippingMethod(true);
+    };
+
+    const handleModifyBillingAddress = () => {
+        setShowBillingAddressConfirmDialog(false);
+        setBillingAddressWarning(null);
+        // Rester sur le formulaire de facturation
+    };
+
+    const handleContinueToBilling = async (e: React.FormEvent) => {
+        e.preventDefault();
+
+        // Valider l'adresse avant de continuer
+        const isValid = await validateAddressBeforeContinue();
+
+        if (isValid) {
+            // L'adresse est validée, on peut continuer
+            if (sameAddress) {
+                setShowShippingMethod(true);
+            } else {
+                setShowBillingForm(true);
+            }
+        }
+        // Sinon, la modal s'affiche automatiquement
+    };
+
     const handleContinueToShipping = async (e: React.FormEvent) => {
         e.preventDefault();
-        setShowShippingMethod(true);
-        await fetchShippingRates();
+
+        // Valider l'adresse de facturation avant de continuer
+        const isValid = await validateBillingAddressBeforeContinue();
+
+        if (isValid) {
+            setShowShippingMethod(true);
+        }
+        // Sinon, la modal s'affiche automatiquement
     };
     const handleContinueFromShipping = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -265,9 +478,6 @@ export default function Cart() {
     const handleFinalSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
     };
-    if (isLoading) {
-        return <p>Chargement du panier...</p>;
-    }
     return (
         <main className={`cart ${status === "unauthenticated" ? "unloged" : ""}`}>
             <div className="conteneur">
@@ -299,8 +509,97 @@ export default function Cart() {
                                 {errorMessage}
                             </div>
                         )}
-                        {panier.length === 0 ? (
-                            <p>Votre panier est vide.</p>
+                        {showAddressConfirmDialog && (
+                            <div className="modal-overlay" onClick={() => setShowAddressConfirmDialog(false)}>
+                                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                                    <h3>Adresse non reconnue</h3>
+                                    <div className="address-display">
+                                        <strong>{formData.rue}</strong><br />
+                                        <strong>{formData.codePostal} {formData.ville}</strong>
+                                    </div>
+                                    <div className="modal-actions">
+                                        <button
+                                            type="button"
+                                            onClick={handleModifyAddress}
+                                            className="modify"
+                                        >
+                                            Modifier l&apos;adresse
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleConfirmAddress}
+                                            className="confirm"
+                                        >
+                                            Confirmer quand même
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {showBillingAddressConfirmDialog && (
+                            <div className="modal-overlay" onClick={() => setShowBillingAddressConfirmDialog(false)}>
+                                <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                                    <h3>Adresse non reconnue</h3>
+                                    <div className="address-display">
+                                        <strong>{billingData.rue}</strong><br />
+                                        <strong>{billingData.codePostal} {billingData.ville}</strong>
+                                    </div>
+                                    <div className="modal-actions">
+                                        <button
+                                            type="button"
+                                            onClick={handleModifyBillingAddress}
+                                            className="modify"
+                                        >
+                                            Modifier l&apos;adresse
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleConfirmBillingAddress}
+                                            className="confirm"
+                                        >
+                                            Confirmer quand même
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {loading ? (
+                            <div className="content">
+                                <ul className="list">
+                                    {Array.from({ length: 1 }, (_, i) => (
+                                        <li key={`skeleton-${i}`} className="item cart-skeleton">
+                                            <div className="image-skeleton" />
+                                            <div className="text-skeleton name" />
+                                            <div className="text-skeleton price" />
+                                            <button className="remove" disabled style={{ opacity: 0.5 }}>
+                                                Supprimer
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                                <div className="total">
+                                    <p>Total : <span className="price-skeleton" /></p>
+                                    <button className="valider" disabled>Valider le panier</button>
+                                </div>
+                            </div>
+                        ) : panier.length === 0 ? (
+                            <div className="content">
+                                <div className="empty-message">
+                                    <p>Votre panier est vide.</p>
+                                </div>
+                                <div className="total">
+                                    <p>Total : <strong>0 €</strong></p>
+                                    <button
+                                        className="valider"
+                                        onClick={() => {
+                                            sessionStorage.setItem("scrollToId", "product");
+                                            window.location.href = "/";
+                                        }}
+                                    >
+                                        Visiter notre collection
+                                    </button>
+                                </div>
+                            </div>
                         ) : showRecap ? (
                         <div className="recap">
                             <div className="wrapper">
@@ -556,6 +855,9 @@ export default function Cart() {
                                 value={formData.nom}
                                 onChange={handleInputChange}
                                 autoComplete="family-name"
+                                pattern="[A-Za-zÀ-ÿ\s\-']+"
+                                minLength={2}
+                                title="Le nom ne doit contenir que des lettres, espaces, tirets et apostrophes"
                                 required
                             />
                             <input
@@ -565,18 +867,36 @@ export default function Cart() {
                                 value={formData.prenom}
                                 onChange={handleInputChange}
                                 autoComplete="given-name"
+                                pattern="[A-Za-zÀ-ÿ\s\-']+"
+                                minLength={2}
+                                title="Le prénom ne doit contenir que des lettres, espaces, tirets et apostrophes"
                                 required
                             />
                         </div>
-                        <input
-                            type="text"
-                            name="rue"
-                            placeholder="Rue"
-                            value={formData.rue}
-                            onChange={handleInputChange}
-                            autoComplete="address-line1"
-                            required
-                        />
+                        <div className="address-autocomplete" ref={autocompleteRef}>
+                            <input
+                                type="text"
+                                name="rue"
+                                placeholder="Rue (commencez à taper pour des suggestions)"
+                                value={formData.rue}
+                                onChange={handleInputChange}
+                                autoComplete="off"
+                                required
+                            />
+                            {showSuggestions && addressSuggestions.length > 0 && (
+                                <ul className="suggestions">
+                                    {addressSuggestions.map((suggestion, index) => (
+                                        <li
+                                            key={index}
+                                            onClick={() => selectAddress(suggestion)}
+                                        >
+                                            <strong>{suggestion.properties.name}</strong>
+                                            <span>{suggestion.properties.postcode} {suggestion.properties.city}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
                         <div className="street">
                             <input
                                 type="text"
@@ -593,6 +913,9 @@ export default function Cart() {
                                 value={formData.codePostal}
                                 onChange={handleInputChange}
                                 autoComplete="postal-code"
+                                pattern="[0-9]{5}"
+                                maxLength={5}
+                                title="Le code postal doit contenir exactement 5 chiffres"
                                 required
                             />
                         </div>
@@ -604,15 +927,21 @@ export default function Cart() {
                                 value={formData.ville}
                                 onChange={handleInputChange}
                                 autoComplete="address-level2"
+                                pattern="[A-Za-zÀ-ÿ\s\-']+"
+                                minLength={2}
+                                title="La ville ne doit contenir que des lettres, espaces, tirets et apostrophes"
                                 required
                             />
                             <input
                                 type="tel"
                                 name="telephone"
-                                placeholder="Téléphone"
+                                placeholder="Téléphone (10 chiffres)"
                                 value={formData.telephone}
                                 onChange={handleInputChange}
                                 autoComplete="tel"
+                                pattern="[0-9]{10}"
+                                maxLength={10}
+                                title="Le téléphone doit contenir exactement 10 chiffres"
                                 required
                             />
                         </div>
@@ -647,6 +976,9 @@ export default function Cart() {
                                 value={billingData.nom}
                                 onChange={handleBillingInputChange}
                                 autoComplete="family-name"
+                                pattern="[A-Za-zÀ-ÿ\s\-']+"
+                                minLength={2}
+                                title="Le nom ne doit contenir que des lettres, espaces, tirets et apostrophes"
                                 required
                             />
                             <input
@@ -656,18 +988,36 @@ export default function Cart() {
                                 value={billingData.prenom}
                                 onChange={handleBillingInputChange}
                                 autoComplete="given-name"
+                                pattern="[A-Za-zÀ-ÿ\s\-']+"
+                                minLength={2}
+                                title="Le prénom ne doit contenir que des lettres, espaces, tirets et apostrophes"
                                 required
                             />
                         </div>
-                        <input
-                            type="text"
-                            name="rue"
-                            placeholder="Rue"
-                            value={billingData.rue}
-                            onChange={handleBillingInputChange}
-                            autoComplete="address-line1"
-                            required
-                        />
+                        <div className="address-autocomplete" ref={billingAutocompleteRef}>
+                            <input
+                                type="text"
+                                name="rue"
+                                placeholder="Rue"
+                                value={billingData.rue}
+                                onChange={handleBillingInputChange}
+                                autoComplete="off"
+                                required
+                            />
+                            {showBillingSuggestions && billingAddressSuggestions.length > 0 && (
+                                <ul className="suggestions">
+                                    {billingAddressSuggestions.map((suggestion, index) => (
+                                        <li
+                                            key={index}
+                                            onClick={() => selectBillingAddress(suggestion)}
+                                        >
+                                            <strong>{suggestion.properties.name}</strong>
+                                            <span>{suggestion.properties.postcode} {suggestion.properties.city}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
                         <div className="street">
                             <input
                                 type="text"
@@ -684,6 +1034,9 @@ export default function Cart() {
                                 value={billingData.codePostal}
                                 onChange={handleBillingInputChange}
                                 autoComplete="postal-code"
+                                pattern="[0-9]{5}"
+                                maxLength={5}
+                                title="Le code postal doit contenir exactement 5 chiffres"
                                 required
                             />
                         </div>
@@ -695,6 +1048,9 @@ export default function Cart() {
                                 value={billingData.ville}
                                 onChange={handleBillingInputChange}
                                 autoComplete="address-level2"
+                                pattern="[A-Za-zÀ-ÿ\s\-']+"
+                                minLength={2}
+                                title="La ville ne doit contenir que des lettres, espaces, tirets et apostrophes"
                                 required
                             />
                         </div>

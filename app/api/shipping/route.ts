@@ -29,67 +29,241 @@ export async function GET(request: NextRequest) {
     if (action === 'sync-status') {
         return syncBoxtalStatus(searchParams);
     }
-    return getShippingPrices();
+    return getShippingPrices(searchParams);
 }
-async function getShippingPrices() {
+async function getShippingPrices(searchParams: URLSearchParams) {
     try {
-        const shippingOptions = [
-            {
-                id: "MONR-CpourToi",
-                name: "Mondial Relay",
-                service: "Livraison en point relais (3 à 4 jours)",
-                price: FIXED_PRICES["MONR-CpourToi"],
-                currency: "EUR",
-                logo: "/delivery/mondialRelay.webp",
-                operator: "MONR",
-                serviceCode: "CpourToi",
-                type: "relay"
-            },
-            {
-                id: "SOGP-RelaisColis",
-                name: "Relais Colis",
-                service: "Livraison en point relais (6 jours)",
-                price: FIXED_PRICES["SOGP-RelaisColis"],
-                currency: "EUR",
-                logo: "/delivery/relayColis.webp",
-                operator: "SOGP",
-                serviceCode: "RelaisColis",
-                type: "relay"
-            },
-            {
-                id: "POFR-ColissimoAccess",
-                name: "Colissimo",
-                service: "Livraison à domicile (2 à 3 jours)",
-                price: FIXED_PRICES["POFR-ColissimoAccess"],
-                currency: "EUR",
-                logo: "/delivery/colissimo.webp",
-                operator: "POFR",
-                serviceCode: "ColissimoAccess",
-                type: "home"
-            },
-            {
-                id: "CHRP-Chrono18",
-                name: "Chronopost",
-                service: "Livraison express à domicile (24h avant 18h)",
-                price: FIXED_PRICES["CHRP-Chrono18"],
-                currency: "EUR",
-                logo: "/delivery/chronopost.webp",
-                operator: "CHRP",
-                serviceCode: "Chrono18",
-                type: "express"
-            }
-        ];
+        const zipcode = searchParams.get('zipcode');
+        const city = searchParams.get('city');
+        const address = searchParams.get('address');
+        const country = searchParams.get('country') || 'FR';
+
+        if (!zipcode || !city) {
+            return NextResponse.json(
+                { error: "Code postal et ville requis" },
+                { status: 400 }
+            );
+        }
+
+        // Valider l'adresse avec l'API du gouvernement français
+        const validationResult = await validateFrenchAddress(address, zipcode, city);
+
+        if (validationResult.status === 'invalid') {
+            return NextResponse.json(
+                { error: "Adresse invalide. Veuillez vérifier votre saisie." },
+                { status: 400 }
+            );
+        }
+
+        // Vérifier la disponibilité des transporteurs selon la zone géographique
+        const availableOptions = getAvailableShippingOptionsForZipcode(zipcode);
+
         return NextResponse.json({
             success: true,
-            options: shippingOptions
+            options: availableOptions,
+            addressWarning: validationResult.status === 'unverified' ? validationResult.message : null
         });
     } catch (error: any) {
         console.error("Erreur calcul prix:", error);
-        return NextResponse.json(
-            { error: "Erreur serveur lors du calcul des frais de port" },
-            { status: 500 }
+        return getFallbackShippingOptions();
+    }
+}
+
+type AddressValidationResult = {
+    status: 'valid' | 'unverified' | 'invalid';
+    message?: string;
+};
+
+async function validateFrenchAddress(address: string | null, zipcode: string, city: string): Promise<AddressValidationResult> {
+    try {
+        // Validation basique du code postal français (5 chiffres)
+        if (!/^\d{5}$/.test(zipcode)) {
+            return { status: 'invalid', message: 'Code postal invalide' };
+        }
+
+        // Si pas d'adresse précise, on valide juste le code postal et la ville
+        const query = address ? `${address} ${zipcode} ${city}` : `${zipcode} ${city}`;
+        const response = await fetch(
+            `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=1`
+        );
+
+        if (!response.ok) {
+            console.warn("Erreur API adresse.data.gouv.fr, validation désactivée");
+            return {
+                status: 'unverified',
+                message: 'Votre adresse n\'a pas pu être vérifiée. Veuillez confirmer qu\'elle est correcte avant de continuer.'
+            };
+        }
+
+        const data = await response.json();
+
+        // Si aucun résultat mais que le format est correct, on accepte avec un warning
+        // (adresses récentes, rurales, non référencées)
+        if (!data.features || data.features.length === 0) {
+            console.warn(`Adresse non trouvée dans l'API: ${query}, mais on accepte avec warning`);
+            return {
+                status: 'unverified',
+                message: 'Votre adresse n\'a pas été trouvée dans notre base. Veuillez vérifier qu\'elle est correcte avant de continuer.'
+            };
+        }
+
+        const result = data.features[0];
+        const resultZipcode = result.properties.postcode;
+
+        // Vérifier que le code postal correspond (tolérance)
+        if (resultZipcode !== zipcode) {
+            // Si le département correspond (2 premiers chiffres), on accepte avec warning
+            if (resultZipcode.substring(0, 2) === zipcode.substring(0, 2)) {
+                console.warn(`Code postal proche: ${zipcode} vs ${resultZipcode}, accepté avec warning`);
+                return {
+                    status: 'unverified',
+                    message: `Le code postal trouvé (${resultZipcode}) diffère légèrement du vôtre (${zipcode}). Veuillez vérifier votre adresse.`
+                };
+            }
+            // Code postal très différent, on demande confirmation
+            console.warn(`Code postal très différent: ${zipcode} vs ${resultZipcode}`);
+            return {
+                status: 'unverified',
+                message: 'Votre adresse n\'a pas été trouvée dans notre base. Veuillez vérifier qu\'elle est correcte avant de continuer.'
+            };
+        }
+
+        // Score de confiance : demander confirmation si pas parfait
+        const score = result.properties.score;
+        if (score > 0.7) {
+            return { status: 'valid' }; // Adresse parfaitement validée
+        } else {
+            // Score pas assez élevé, on demande confirmation
+            return {
+                status: 'unverified',
+                message: 'Votre adresse est similaire à une adresse connue mais pas exactement identique. Veuillez la vérifier.'
+            };
+        }
+
+    } catch (error) {
+        console.error("Erreur validation adresse:", error);
+        // En cas d'erreur, on laisse passer avec un warning
+        return {
+            status: 'unverified',
+            message: 'Impossible de vérifier votre adresse pour le moment. Veuillez confirmer qu\'elle est correcte.'
+        };
+    }
+}
+
+function getAvailableShippingOptionsForZipcode(zipcode: string) {
+    // Définir toutes les options possibles
+    const allOptions = [
+        {
+            id: "MONR-CpourToi",
+            name: "Mondial Relay",
+            service: "Livraison en point relais (3 à 4 jours)",
+            price: FIXED_PRICES["MONR-CpourToi"],
+            currency: "EUR",
+            logo: "/delivery/mondialRelay.webp",
+            operator: "MONR",
+            serviceCode: "CpourToi",
+            type: "relay"
+        },
+        {
+            id: "SOGP-RelaisColis",
+            name: "Relais Colis",
+            service: "Livraison en point relais (6 jours)",
+            price: FIXED_PRICES["SOGP-RelaisColis"],
+            currency: "EUR",
+            logo: "/delivery/relayColis.webp",
+            operator: "SOGP",
+            serviceCode: "RelaisColis",
+            type: "relay"
+        },
+        {
+            id: "POFR-ColissimoAccess",
+            name: "Colissimo",
+            service: "Livraison à domicile (2 à 3 jours)",
+            price: FIXED_PRICES["POFR-ColissimoAccess"],
+            currency: "EUR",
+            logo: "/delivery/colissimo.webp",
+            operator: "POFR",
+            serviceCode: "ColissimoAccess",
+            type: "home"
+        },
+        {
+            id: "CHRP-Chrono18",
+            name: "Chronopost",
+            service: "Livraison express à domicile (24h avant 18h)",
+            price: FIXED_PRICES["CHRP-Chrono18"],
+            currency: "EUR",
+            logo: "/delivery/chronopost.webp",
+            operator: "CHRP",
+            serviceCode: "Chrono18",
+            type: "express"
+        }
+    ];
+
+    const dept = zipcode.substring(0, 2);
+
+    // Départements ruraux/zones difficiles d'accès où Chronopost et Relais Colis sont limités
+    const ruralDepartments = [
+        '04', '05', '09', '15', '19', '23', '48', '65', '66', '2A', '2B',  // Zones montagneuses/isolées
+        '50', '52', '55', '58', '70', '88', '89', // Zones rurales du centre et nord-est
+    ];
+
+    // Chronopost dessert principalement les grandes villes et zones urbaines
+    // On le désactive pour les zones rurales/montagneuses
+    const isRuralArea = ruralDepartments.includes(dept);
+
+    if (isRuralArea) {
+        // Zones rurales : uniquement Mondial Relay et Colissimo (les plus fiables)
+        return allOptions.filter(opt =>
+            opt.id === "MONR-CpourToi" || opt.id === "POFR-ColissimoAccess"
         );
     }
+
+    // Grandes métropoles : toutes les options
+    const majorCitiesZipcodes = [
+        '75', '69', '13', '31', '44', '33', '59', '67', '35', '34', // Paris, Lyon, Marseille, Toulouse, etc.
+        '92', '93', '94', '95', '77', '78', '91' // Île-de-France
+    ];
+
+    if (majorCitiesZipcodes.includes(dept)) {
+        // Toutes les options disponibles
+        return allOptions;
+    }
+
+    // Zones intermédiaires : pas de Chronopost mais le reste oui
+    return allOptions.filter(opt => opt.id !== "CHRP-Chrono18");
+}
+
+function getFallbackShippingOptions() {
+    // Options de secours minimales (les plus fiables)
+    const fallbackOptions = [
+        {
+            id: "MONR-CpourToi",
+            name: "Mondial Relay",
+            service: "Livraison en point relais (3 à 4 jours)",
+            price: FIXED_PRICES["MONR-CpourToi"],
+            currency: "EUR",
+            logo: "/delivery/mondialRelay.webp",
+            operator: "MONR",
+            serviceCode: "CpourToi",
+            type: "relay"
+        },
+        {
+            id: "POFR-ColissimoAccess",
+            name: "Colissimo",
+            service: "Livraison à domicile (2 à 3 jours)",
+            price: FIXED_PRICES["POFR-ColissimoAccess"],
+            currency: "EUR",
+            logo: "/delivery/colissimo.webp",
+            operator: "POFR",
+            serviceCode: "ColissimoAccess",
+            type: "home"
+        }
+    ];
+
+    return NextResponse.json({
+        success: true,
+        options: fallbackOptions
+    });
 }
 async function syncBoxtalStatus(searchParams: URLSearchParams) {
     try {
