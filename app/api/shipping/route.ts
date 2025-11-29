@@ -618,31 +618,34 @@ async function createShipment(req: NextRequest) {
             insured: false
         };
         if (order.shippingData?.relayPoint) {
-            shipmentData.shipment.dropOffPointCode = order.shippingData.relayPoint.id;
+            // Pour Mondial Relay : pickupPointCode = point d'arrivée (client), dropOffPointCode = point de départ (expéditeur)
+            shipmentData.shipment.pickupPointCode = order.shippingData.relayPoint.id;
             const operator = order.shippingMethod?.operator || "MONR";
             console.log("📦 Livraison en point relais détectée, operator:", operator);
-            console.log("📦 Relay point ID:", order.shippingData.relayPoint.id);
+            console.log("📦 Relay point ID (client):", order.shippingData.relayPoint.id);
 
             if (operator === "MONR") {
                 const pickupCode = process.env.MONDIAL_RELAY_PICKUP_CODE;
-                console.log("📦 Mondial Relay pickup code:", pickupCode);
+                console.log("📦 Mondial Relay pickup code (expéditeur):", pickupCode);
                 if (!pickupCode) {
                     console.error("❌ MONDIAL_RELAY_PICKUP_CODE n'est pas défini dans .env");
                 }
-                shipmentData.shipment.pickupPointCode = pickupCode;
+                shipmentData.shipment.dropOffPointCode = pickupCode;
             } else if (operator === "SOGP") {
                 const pickupCode = process.env.RELAIS_COLIS_PICKUP_CODE;
-                console.log("📦 Relais Colis pickup code:", pickupCode);
+                console.log("📦 Relais Colis pickup code (expéditeur):", pickupCode);
                 if (!pickupCode) {
                     console.error("❌ RELAIS_COLIS_PICKUP_CODE n'est pas défini dans .env");
                 }
-                shipmentData.shipment.pickupPointCode = pickupCode;
+                shipmentData.shipment.dropOffPointCode = pickupCode;
             }
-            console.log("📦 Final shipmentData.shipment.pickupPointCode:", shipmentData.shipment.pickupPointCode);
+            console.log("📦 Final pickupPointCode (client):", shipmentData.shipment.pickupPointCode);
+            console.log("📦 Final dropOffPointCode (expéditeur):", shipmentData.shipment.dropOffPointCode);
         } else {
             console.log("📦 Livraison à domicile (pas de relayPoint)");
         }
         const apiUrl = getBoxtalApiUrl();
+        console.log("📦 Données envoyées à Boxtal:", JSON.stringify(shipmentData, null, 2));
         const response = await fetch(`${apiUrl}/shipping/v3.1/shipping-order`, {
             method: "POST",
             headers: {
