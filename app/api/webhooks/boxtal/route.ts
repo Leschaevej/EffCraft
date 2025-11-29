@@ -20,25 +20,34 @@ export async function POST(req: NextRequest) {
         const rawBody = await req.text();
         const body = JSON.parse(rawBody);
 
-        // Vérifier la signature si présente (TEMPORAIREMENT DÉSACTIVÉ POUR TESTS)
+        // Vérifier la signature
         const signature = req.headers.get("x-bxt-signature");
-        const webhookSecret = process.env.BOXTAL_TEST_SECRET;
+        const webhookSecret = process.env.BOXTAL_WEBHOOK_TOKEN;
 
-        // TEMPORAIRE : Signature désactivée pour permettre la création de souscription
-        /*
-        if (signature && webhookSecret) {
-            const isValid = verifySignature(rawBody, signature, webhookSecret);
-            if (!isValid) {
-                console.error("Signature invalide");
-                return NextResponse.json(
-                    { error: "Signature invalide" },
-                    { status: 401 }
-                );
-            }
-        } else {
-            console.warn("⚠️ Signature non vérifiée (pas de secret configuré ou pas de signature)");
+        if (!webhookSecret) {
+            console.error("❌ BOXTAL_WEBHOOK_TOKEN non configuré dans .env");
+            return NextResponse.json(
+                { error: "Configuration manquante" },
+                { status: 500 }
+            );
         }
-        */
+
+        if (!signature) {
+            console.error("❌ Pas de signature dans le webhook");
+            return NextResponse.json(
+                { error: "Signature manquante" },
+                { status: 401 }
+            );
+        }
+
+        const isValid = verifySignature(rawBody, signature, webhookSecret);
+        if (!isValid) {
+            console.error("❌ Signature invalide");
+            return NextResponse.json(
+                { error: "Signature invalide" },
+                { status: 401 }
+            );
+        }
 
         // Extraire les données - la structure peut varier selon l'événement
         let shipmentId = body.shipmentId;
