@@ -56,6 +56,23 @@ const STATUS_LABELS: { [key: string]: string } = {
     return_requested: "Retour demandé",
     returned: "Remboursé"
 };
+
+const getTrackingUrl = (trackingNumber: string, operator?: string): string | null => {
+    if (!trackingNumber || !operator) return null;
+
+    switch (operator) {
+        case "MONR": // Mondial Relay
+            return `https://www.mondialrelay.fr/suivi-de-colis/?numeroExpedition=${trackingNumber}`;
+        case "SOGP": // Relais Colis
+            return `https://www.relaiscolis.com/suivi/?code=${trackingNumber}`;
+        case "COPA": // Colissimo
+            return `https://www.laposte.fr/outils/suivre-vos-envois?code=${trackingNumber}`;
+        case "CHRP": // Chronopost
+            return `https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT=${trackingNumber}`;
+        default:
+            return null;
+    }
+};
 export default function OrderPage() {
     const { data: session, status: authStatus } = useSession();
     const router = useRouter();
@@ -210,7 +227,16 @@ export default function OrderPage() {
                                                             <>
                                                                 <p>Mode de livraison : {order.shippingMethod?.name}</p>
                                                                 <p>
-                                                                    N° de suivi : {order.trackingNumber || "En attente"}
+                                                                    N° de suivi : {order.trackingNumber ? (
+                                                                        (() => {
+                                                                            const trackingUrl = getTrackingUrl(order.trackingNumber, order.shippingMethod?.operator);
+                                                                            return trackingUrl ? (
+                                                                                <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--mainColor)', textDecoration: 'underline' }}>
+                                                                                    {order.trackingNumber}
+                                                                                </a>
+                                                                            ) : order.trackingNumber;
+                                                                        })()
+                                                                    ) : "En attente"}
                                                                 </p>
                                                             </>
                                                         )}
