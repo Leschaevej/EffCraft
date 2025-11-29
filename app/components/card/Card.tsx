@@ -128,6 +128,10 @@ export default function Card({
             window.dispatchEvent(new CustomEvent("removed", {
                 detail: { productId: bijou._id }
             }));
+        } else {
+            window.dispatchEvent(new CustomEvent("favorite-added", {
+                detail: { productId: bijou._id, bijou }
+            }));
         }
         } catch (error) {
         }

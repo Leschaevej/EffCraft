@@ -18,7 +18,65 @@ type Bijou = {
 };
 export default function Favorites() {
     const { data: session, status } = useSession();
-    const { favorites: swrFavorites, isLoading: swrLoading } = useFavorites();
+    const [favorites, setFavorites] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchFavorites = async (showLoading = false) => {
+        if (status === "loading") {
+            return;
+        }
+        if (status !== "authenticated") {
+            setLoading(false);
+            return;
+        }
+        if (showLoading) {
+            setLoading(true);
+        }
+        try {
+            const res = await fetch("/api/user?type=favorites");
+            if (res.ok) {
+                const data = await res.json();
+                setFavorites(data.favorites || []);
+            }
+        } catch (error) {
+            console.error("Erreur lors du chargement des favoris:", error);
+        } finally {
+            if (showLoading) {
+                setLoading(false);
+            }
+        }
+    };
+
+    useEffect(() => {
+        if (status !== "loading") {
+            setLoading(true);
+            fetchFavorites(false).finally(() => setLoading(false));
+        }
+    }, [status]);
+
+    useEffect(() => {
+        const handleRemoved = (e: Event) => {
+            const customEvent = e as CustomEvent;
+            const { productId } = customEvent.detail;
+            // Mise à jour locale immédiate sans squelette
+            setFavorites(prev => prev.filter((f: any) => {
+                const fId = typeof f === 'string' ? f : f._id;
+                return fId !== productId;
+            }));
+        };
+
+        const handleAdded = () => {
+            // Refetch avec squelette car on ne peut pas ajouter à la liste optimistement
+            fetchFavorites(true);
+        };
+
+        window.addEventListener("removed", handleRemoved);
+        window.addEventListener("favorite-added", handleAdded);
+        return () => {
+            window.removeEventListener("removed", handleRemoved);
+            window.removeEventListener("favorite-added", handleAdded);
+        };
+    }, [status]);
 
     return (
         <main className={`favorites ${status === "unauthenticated" ? "unloged" : ""}`}>
@@ -44,20 +102,20 @@ export default function Favorites() {
                     </>
                 ) : (
                 <>
-                    {swrLoading ? (
+                    {loading ? (
                     <div className="grid">
                         {Array.from({ length: 3 }, (_, i) => (
                         <CardSkeleton key={`skeleton-${i}`} />
                         ))}
                     </div>
-                    ) : swrFavorites.length > 0 ? (
-                    <div className="grid">
-                        {swrFavorites.map((bijou) => (
-                            <Card key={bijou._id} bijou={bijou} initialIsFavori={true} />
-                        ))}
-                    </div>
+                    ) : favorites.length > 0 ? (
+                        <div className="grid">
+                            {favorites.map((bijou) => (
+                                <Card key={bijou._id} bijou={bijou} initialIsFavori={true} />
+                            ))}
+                        </div>
                     ) : (
-                    <p>Vous n'avez encore ajouté aucun bijou à vos favoris.</p>
+                        <p>Vous n'avez encore ajouté aucun bijou à vos favoris.</p>
                     )}
                 </>
                 )}

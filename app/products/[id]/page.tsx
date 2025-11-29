@@ -6,6 +6,7 @@ import "./page.scss";
 import Card from "../../components/card/Card";
 import AddToCartButton from "../AddToCart";
 import { useRealtime } from "../../context/Realtime";
+import { useFavorites } from "../../hooks/useFavorites";
 
 type Bijou = {
     _id: string;
@@ -25,6 +26,7 @@ export default function ProductPage() {
     const [loading, setLoading] = useState(true);
     const [justAddedToCart, setJustAddedToCart] = useState(false);
     const { reservedProducts, availableProducts, currentUserId } = useRealtime();
+    const { favorites } = useFavorites();
     const lastFetchedState = useRef<string>("");
     const fetchProduct = async (silent = false) => {
         try {
@@ -107,6 +109,7 @@ export default function ProductPage() {
                     clickable={false}
                     showPrice={false}
                     showName={false}
+                    initialIsFavori={favorites.some((f: any) => (typeof f === 'string' ? f : f._id) === bijou._id)}
                 />
                 <div className="info">
                     <h3>{bijou.name}</h3>

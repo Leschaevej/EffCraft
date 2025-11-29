@@ -63,6 +63,7 @@
                 cursor: pointer;
                 transition: background-color 0.3s ease, color 0.3s ease, opacity 0.3s ease;
                 box-sizing: border-box;
+                width: fit-content;
                 &:hover {
                     color: black;
                     background-color: var(--secondColor)
@@ -92,15 +93,15 @@
                 margin: 0;
                 &.title {
                     height: 60px;
-                    width: 100%;
+                    width: 500px;
                 }
                 &.price {
                     height: 60px;
-                    width: 100%;
+                    width: 105px;
                 }
                 &.description {
                     height: 40px;
-                    width: 100%;
+                    width: 600px;
                 }
             }
             .skeleton-button {

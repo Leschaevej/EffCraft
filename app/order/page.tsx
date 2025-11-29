@@ -216,7 +216,7 @@ export default function OrderPage() {
                                                         )}
                                                     </div>
                                                     {order.shippingData && (
-                                                        <>
+                                                        <div className="shipping-container">
                                                             <div className="info">
                                                                 <h3>Livraison</h3>
                                                                 <p>{order.shippingData.nom || ''} {order.shippingData.prenom || ''}</p>
@@ -231,7 +231,7 @@ export default function OrderPage() {
                                                                     <p>{order.shippingData.relayPoint.zipcode} {order.shippingData.relayPoint.city}</p>
                                                                 </div>
                                                             )}
-                                                        </>
+                                                        </div>
                                                     )}
                                                     <div className="actions">
                                                         <button className="invoice">Facture</button>

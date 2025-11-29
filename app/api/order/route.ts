@@ -353,7 +353,7 @@ export async function POST(req: NextRequest) {
         const ordersCollection = db.collection("orders");
 
         // Nettoyer et sanitizer les données d'adresse avant de les enregistrer
-        const cleanedShippingData = {
+        const cleanedShippingData: any = {
             nom: shippingData.nom.trim(),
             prenom: shippingData.prenom.trim(),
             rue: shippingData.rue.trim(),
@@ -362,6 +362,11 @@ export async function POST(req: NextRequest) {
             ville: shippingData.ville.trim(),
             telephone: shippingData.telephone.trim(),
         };
+
+        // Ajouter le point relais si présent (Mondial Relay, Relais Colis, etc.)
+        if (shippingData.relayPoint) {
+            cleanedShippingData.relayPoint = shippingData.relayPoint;
+        }
 
         const cleanedBillingData = {
             nom: billingData.nom.trim(),

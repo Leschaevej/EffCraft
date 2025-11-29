@@ -13,30 +13,27 @@ export function useFavorites() {
     {
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
-      dedupingInterval: 0, // CRITIQUE: 0 pour permettre les refetch immédiats
+      dedupingInterval: 0,
     }
   );
 
   const mutateRef = useRef(mutate);
   mutateRef.current = mutate;
 
-  // Écouter les événements temps réel
+  // Écouter les événements temps réel pour revalider les données
   useEffect(() => {
-    const handleRealtimeUpdate = async (e: Event) => {
-      const customEvent = e as CustomEvent;
-      const { type } = customEvent.detail;
-
-      if (type === "product_deleted" || type === "favorite_added" || type === "favorite_removed") {
-        // Force SWR à refetch
-        await mutateRef.current();
-      }
+    const handleFavoriteUpdate = async () => {
+      // Simple refetch sans mise à jour optimiste
+      await mutateRef.current();
     };
 
-    window.addEventListener("cart-update", handleRealtimeUpdate);
-    window.addEventListener("removed", handleRealtimeUpdate);
+    window.addEventListener("cart-update", handleFavoriteUpdate);
+    window.addEventListener("removed", handleFavoriteUpdate);
+    window.addEventListener("favorite-added", handleFavoriteUpdate);
     return () => {
-      window.removeEventListener("cart-update", handleRealtimeUpdate);
-      window.removeEventListener("removed", handleRealtimeUpdate);
+      window.removeEventListener("cart-update", handleFavoriteUpdate);
+      window.removeEventListener("removed", handleFavoriteUpdate);
+      window.removeEventListener("favorite-added", handleFavoriteUpdate);
     };
   }, []);
 

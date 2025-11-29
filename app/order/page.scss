@@ -182,16 +182,26 @@
                                     flex-direction: column;
                                     gap: 10px;
                                 }
+                                .shipping-container {
+                                    display: flex;
+                                    flex-direction: row;
+                                    gap: 50px;
+                                    .info {
+                                        flex: 1;
+                                    }
+                                }
                             }
                             .products {
                                 display: grid;
                                 grid-template-columns: repeat(2, 1fr);
                                 gap: 30px;
+                                direction: rtl;
                                 .product {
                                     display: flex;
                                     flex-direction: column;
                                     align-items: center;
                                     gap: 10px;
+                                    direction: ltr;
                                     img {
                                         height: 200px;
                                         border-radius: 10px;
@@ -346,16 +356,26 @@
                                     flex-direction: column;
                                     gap: 10px;
                                 }
+                                .shipping-container {
+                                    display: flex;
+                                    flex-direction: row;
+                                    gap: 50px;
+                                    .info {
+                                        flex: 1;
+                                    }
+                                }
                             }
                             .products {
                                 display: grid;
                                 grid-template-columns: repeat(2, 1fr);
                                 gap: 30px;
+                                direction: rtl;
                                 .product {
                                     display: flex;
                                     flex-direction: column;
                                     align-items: center;
                                     gap: 10px;
+                                    direction: ltr;
                                     img {
                                         height: 200px;
                                         border-radius: 10px;
