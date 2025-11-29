@@ -86,11 +86,12 @@ export async function POST(req: NextRequest) {
         }
 
         if (!shipmentId) {
-            console.error("shipmentId manquant dans le webhook");
-            return NextResponse.json(
-                { error: "shipmentId manquant" },
-                { status: 400 }
-            );
+            console.warn("⚠️ shipmentId manquant dans le webhook (événement de test ?)");
+            // Si c'est un événement de test, on retourne success au lieu d'une erreur
+            return NextResponse.json({
+                success: true,
+                message: "Événement de test reçu"
+            });
         }
 
         const client = await clientPromise;
