@@ -14,6 +14,7 @@ const nextConfig: NextConfig = {
     },
     experimental: {
         optimizeCss: false,
-    }
+    },
+    skipTrailingSlashRedirect: true
 };
 export default nextConfig;

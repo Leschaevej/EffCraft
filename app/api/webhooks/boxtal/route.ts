@@ -14,11 +14,27 @@ function verifySignature(payload: string, signature: string, secret: string): bo
     return computedSignature === signature;
 }
 
+export async function GET(req: NextRequest) {
+    console.log("🔔 Webhook GET appelé à", new Date().toISOString());
+    console.log("🔔 Headers:", Object.fromEntries(req.headers.entries()));
+    return NextResponse.json({
+        message: "Webhook Boxtal - Utilisez POST pour envoyer des événements",
+        timestamp: new Date().toISOString()
+    });
+}
+
 export async function POST(req: NextRequest) {
+    const timestamp = new Date().toISOString();
+    console.log("🔔 ========================================");
+    console.log("🔔 WEBHOOK BOXTAL APPELÉ à", timestamp);
+    console.log("🔔 ========================================");
+
     try {
         // Récupérer le body brut pour la vérification de signature
         const rawBody = await req.text();
+        console.log("🔔 Body reçu:", rawBody);
         const body = JSON.parse(rawBody);
+        console.log("🔔 Body parsé:", JSON.stringify(body, null, 2));
 
         // Vérifier la signature
         const signature = req.headers.get("x-bxt-signature");
