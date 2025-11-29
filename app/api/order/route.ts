@@ -51,7 +51,7 @@ export async function PATCH(req: NextRequest) {
                 { status: 403 }
             );
         }
-        const { orderId, action } = await req.json();
+        const { orderId, action, fullRefund } = await req.json();
         if (!orderId || !action) {
             return NextResponse.json(
                 { error: "Paramètres manquants" },
@@ -171,12 +171,55 @@ export async function PATCH(req: NextRequest) {
                         { status: 404 }
                     );
                 }
+
+                // Calculer le montant du remboursement
+                const FIXED_PRICES: { [key: string]: number } = {
+                    "MONR-CpourToi": 5.90,
+                    "SOGP-RelaisColis": 5.90,
+                    "POFR-ColissimoAccess": 9.90,
+                    "CHRP-Chrono18": 12.90
+                };
+
+                const shippingCode = `${returnRequestOrder.shippingMethod?.operator || "MONR"}-${returnRequestOrder.shippingMethod?.serviceCode || "CpourToi"}`;
+                const shippingCost = FIXED_PRICES[shippingCode] || 5.90;
+
+                let refundAmount;
+                let refundReason;
+
+                if (fullRefund) {
+                    // Produit défectueux : remboursement complet
+                    refundAmount = Math.round(returnRequestOrder.totalPrice * 100); // en centimes
+                    refundReason = "Produit défectueux - Remboursement complet";
+                } else {
+                    // Changement d'avis : remboursement moins frais de retour
+                    refundAmount = Math.round((returnRequestOrder.totalPrice - shippingCost) * 100); // en centimes
+                    refundReason = `Changement d'avis - Remboursement ${(returnRequestOrder.totalPrice - shippingCost).toFixed(2)}€ (frais retour déduits)`;
+                }
+
+                // Effectuer le remboursement Stripe
+                try {
+                    if (returnRequestOrder.paymentIntentId && refundAmount > 0) {
+                        await stripe.refunds.create({
+                            payment_intent: returnRequestOrder.paymentIntentId,
+                            amount: refundAmount,
+                        });
+                    }
+                } catch (stripeError: any) {
+                    console.error("Erreur remboursement retour:", stripeError);
+                    return NextResponse.json(
+                        { error: "Erreur lors du remboursement: " + stripeError.message },
+                        { status: 500 }
+                    );
+                }
+
+                // Mettre à jour la commande
                 await ordersCollection.updateOne(
                     { _id: new ObjectId(orderId) },
                     {
                         $set: {
                             status: "return_requested",
-                            returnRequestedAt: new Date()
+                            returnRequestedAt: new Date(),
+                            refundReason: refundReason
                         }
                     }
                 );

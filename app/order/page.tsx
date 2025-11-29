@@ -239,15 +239,28 @@ export default function OrderPage() {
                                                             <>
                                                                 {["paid", "preparing"].includes(order.status) && (
                                                                     <button className="cancel">
-                                                                        Annulation
+                                                                        Demander annulation
                                                                     </button>
                                                                 )}
                                                                 {["ready", "in_transit", "out_for_delivery", "delivered"].includes(order.status) && (
                                                                     <button className="return">
-                                                                        Retour
+                                                                        Demander un retour
                                                                     </button>
                                                                 )}
                                                             </>
+                                                        )}
+                                                        {orderView === "history" && order.status === "delivered" && order.deliveredAt && (
+                                                            (() => {
+                                                                const deliveredDate = new Date(order.deliveredAt);
+                                                                const now = new Date();
+                                                                const diffTime = now.getTime() - deliveredDate.getTime();
+                                                                const diffDays = diffTime / (1000 * 60 * 60 * 24);
+                                                                return diffDays <= 14 ? (
+                                                                    <button className="return">
+                                                                        Demander un retour
+                                                                    </button>
+                                                                ) : null;
+                                                            })()
                                                         )}
                                                     </div>
                                                 </div>

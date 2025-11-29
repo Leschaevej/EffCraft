@@ -33,6 +33,11 @@ interface Order {
     refundReason?: string;
     cancelledAt?: string;
     returnedAt?: string;
+    cancellationRequested?: boolean;
+    cancellationRequestedAt?: string;
+    returnRequested?: boolean;
+    returnRequestedAt?: string;
+    paymentIntentId?: string;
 }
 const TRACKING_STEPS = [
     { label: "Commande confirmée", icon: <FaCheck /> },
@@ -74,6 +79,8 @@ export default function Backoffice() {
     const [showCancelModal, setShowCancelModal] = useState(false);
     const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
     const [cancelModalMessage, setCancelModalMessage] = useState<string | null>(null);
+    const [showReturnModal, setShowReturnModal] = useState(false);
+    const [orderToReturn, setOrderToReturn] = useState<Order | null>(null);
 
     // Synchroniser les données SWR avec le state local
     useEffect(() => {
@@ -219,14 +226,31 @@ export default function Backoffice() {
         }
     };
     const handleReturnOrder = async (order: Order) => {
-        if (!confirm(`Générer un bon de retour pour cette commande ?`)) {
+        // Si la commande est livrée, ouvrir la modal pour choisir le type de retour
+        if (order.status === "delivered") {
+            setOrderToReturn(order);
+            setShowReturnModal(true);
             return;
         }
+
+        // Pour ready, in_transit, out_for_delivery : remboursement moins frais de retour
+        if (!confirm(`Générer un bon de retour pour cette commande ?\nRemboursement : ${order.totalPrice.toFixed(2)}€ - frais de retour`)) {
+            return;
+        }
+
+        await processReturn(order, false); // false = client paye le retour
+    };
+
+    const processReturn = async (order: Order, fullRefund: boolean) => {
         try {
             const response = await fetch("/api/order", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ orderId: order._id, action: "request-return" }),
+                body: JSON.stringify({
+                    orderId: order._id,
+                    action: "request-return",
+                    fullRefund
+                }),
             });
             if (!response.ok) {
                 const error = await response.json();
@@ -265,6 +289,13 @@ export default function Backoffice() {
             console.error("Erreur génération bon de retour:", error);
             alert("Erreur: " + error);
         }
+    };
+
+    const handleReturnChoice = async (fullRefund: boolean) => {
+        if (!orderToReturn) return;
+        setShowReturnModal(false);
+        await processReturn(orderToReturn, fullRefund);
+        setOrderToReturn(null);
     };
     const handleRefundReturn = async (order: Order) => {
         if (!confirm(`Confirmer le remboursement pour cette commande retournée ?`)) {
@@ -540,6 +571,33 @@ export default function Backoffice() {
                                 </div>
                             </>
                         )}
+                    </div>
+                </div>
+            )}
+            {showReturnModal && orderToReturn && (
+                <div className="modal-overlay" onClick={() => {
+                    setShowReturnModal(false);
+                    setOrderToReturn(null);
+                }}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+                        <h3>Type de retour</h3>
+                        <p>Sélectionnez le motif du retour :</p>
+                        <div className="modal-buttons">
+                            <button
+                                className="btn-confirm"
+                                onClick={() => handleReturnChoice(true)}
+                            >
+                                Produit défectueux<br/>
+                                <small>(Remboursement complet : {orderToReturn.totalPrice.toFixed(2)}€)</small>
+                            </button>
+                            <button
+                                className="btn-cancel"
+                                onClick={() => handleReturnChoice(false)}
+                            >
+                                Changement d'avis<br/>
+                                <small>(Remboursement - frais retour)</small>
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
