@@ -450,10 +450,19 @@ export default function Cart() {
                 products: panier,
                 shippingData: {
                     ...formData,
-                    relayPoint: selectedRelayPoint,
+                    shippingMethod: selectedOption ? {
+                        operator: selectedOption.operator,
+                        serviceCode: selectedOption.serviceCode,
+                        relayPoint: selectedRelayPoint ? {
+                            id: selectedRelayPoint.id,
+                            name: selectedRelayPoint.name,
+                            address: selectedRelayPoint.address,
+                            zipcode: selectedRelayPoint.zipcode,
+                            city: selectedRelayPoint.city,
+                        } : undefined,
+                    } : undefined,
                 },
                 billingData: sameAddress ? formData : billingData,
-                shippingMethod: selectedOption,
                 totalAmount: totalAmount,
             };
             localStorage.setItem('pendingOrder', JSON.stringify(orderData));

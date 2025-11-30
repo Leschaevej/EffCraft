@@ -24,12 +24,12 @@ export async function GET(req: NextRequest) {
         // Simple query: récupérer toutes les commandes avec les statuts demandés
         const query: any = {
             userEmail: session.user.email,
-            status: { $in: statuses }
+            "order.status": { $in: statuses }
         };
 
         const orders = await ordersCollection
             .find(query)
-            .sort({ createdAt: -1 })
+            .sort({ "order.createdAt": -1 })
             .toArray();
 
         return NextResponse.json({ orders });

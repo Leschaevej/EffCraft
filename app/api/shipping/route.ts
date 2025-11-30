@@ -278,7 +278,7 @@ async function syncBoxtalStatus(searchParams: URLSearchParams) {
         const db = client.db("effcraftdatabase");
         const ordersCollection = db.collection("orders");
         const order = await ordersCollection.findOne({ _id: new ObjectId(orderId) });
-        if (!order || !order.boxtalShipmentId) {
+        if (!order || !order.shippingData.boxtalShipmentId) {
             return NextResponse.json(
                 { error: "Commande ou expédition Boxtal introuvable" },
                 { status: 404 }
@@ -296,7 +296,7 @@ async function syncBoxtalStatus(searchParams: URLSearchParams) {
         const authString = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
         const apiUrl = getBoxtalApiUrl();
         const response = await fetch(
-            `${apiUrl}/shipping/v3.1/shipping-order/${order.boxtalShipmentId}`,
+            `${apiUrl}/shipping/v3.1/shipping-order/${order.shippingData.boxtalShipmentId}`,
             {
                 method: "GET",
                 headers: {
@@ -315,7 +315,7 @@ async function syncBoxtalStatus(searchParams: URLSearchParams) {
         }
         const shipmentData = await response.json();
         const trackingResponse = await fetch(
-            `${apiUrl}/shipping/v3.1/shipping-order/${order.boxtalShipmentId}/tracking`,
+            `${apiUrl}/shipping/v3.1/shipping-order/${order.shippingData.boxtalShipmentId}/tracking`,
             {
                 method: "GET",
                 headers: {
@@ -324,31 +324,31 @@ async function syncBoxtalStatus(searchParams: URLSearchParams) {
                 }
             }
         );
-        let ourStatus = order.status;
+        let ourStatus = order.order.status;
         const updateData: any = {};
         if (trackingResponse.ok) {
             const trackingData = await trackingResponse.json();
             const trackingStatus = trackingData.content?.[0]?.status;
             if (trackingStatus === "DELIVERED") {
                 ourStatus = "delivered";
-                updateData.status = "delivered";
-                if (!order.deliveredAt) {
-                    updateData.deliveredAt = new Date();
+                updateData["order.status"] = "delivered";
+                if (!order.order.deliveredAt) {
+                    updateData["order.deliveredAt"] = new Date();
                 }
             } else if (trackingStatus === "OUT_FOR_DELIVERY") {
                 ourStatus = "out_for_delivery";
-                updateData.status = "out_for_delivery";
+                updateData["order.status"] = "out_for_delivery";
             } else if (trackingStatus === "IN_TRANSIT") {
                 ourStatus = "in_transit";
-                updateData.status = "in_transit";
-            } else if (shipmentData.content?.status === "PENDING" && order.status === "preparing") {
+                updateData["order.status"] = "in_transit";
+            } else if (shipmentData.content?.status === "PENDING" && order.order.status === "preparing") {
                 ourStatus = "ready";
-                updateData.status = "ready";
-                if (!order.readyAt) {
-                    updateData.readyAt = new Date();
+                updateData["order.status"] = "ready";
+                if (!order.order.readyAt) {
+                    updateData["order.readyAt"] = new Date();
                 }
             }
-            if (order.status === "preparing" && ourStatus !== "preparing") {
+            if (order.order.status === "preparing" && ourStatus !== "preparing") {
                 if (order.products && order.products.length > 0) {
                     const imagesToDelete: string[] = [];
                     order.products.forEach((p: any) => {
@@ -383,9 +383,7 @@ async function syncBoxtalStatus(searchParams: URLSearchParams) {
         if (ourStatus === "delivered") {
             updateQuery.$unset = {
                 shippingData: "",
-                billingData: "",
-                boxtalShipmentId: "",
-                trackingNumber: ""
+                billingData: ""
             };
         }
         await ordersCollection.updateOne(
@@ -543,7 +541,7 @@ async function createShipment(req: NextRequest) {
         }
         const authString = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
         console.log("📦 Création expédition pour commande:", orderId);
-        console.log("📦 Shipping method:", order.shippingMethod);
+        console.log("📦 Shipping method:", order.shippingData?.shippingMethod);
         console.log("📦 Shipping data:", order.shippingData);
 
         const shipmentData: any = {
@@ -613,16 +611,16 @@ async function createShipment(req: NextRequest) {
                     }
                 }
             },
-            shippingOfferCode: `${order.shippingMethod?.operator || "MONR"}-${order.shippingMethod?.serviceCode || "CpourToi"}`,
+            shippingOfferCode: `${order.shippingData?.shippingMethod?.operator || "MONR"}-${order.shippingData?.shippingMethod?.serviceCode || "CpourToi"}`,
             labelType: "PDF_A4",
             insured: false
         };
-        if (order.shippingData?.relayPoint) {
+        if (order.shippingData?.shippingMethod?.relayPoint) {
             // Pour Mondial Relay : pickupPointCode = point d'arrivée (client), dropOffPointCode = point de départ (expéditeur)
-            shipmentData.shipment.pickupPointCode = order.shippingData.relayPoint.id;
-            const operator = order.shippingMethod?.operator || "MONR";
+            shipmentData.shipment.pickupPointCode = order.shippingData.shippingMethod.relayPoint.id;
+            const operator = order.shippingData?.shippingMethod?.operator || "MONR";
             console.log("📦 Livraison en point relais détectée, operator:", operator);
-            console.log("📦 Relay point ID (client):", order.shippingData.relayPoint.id);
+            console.log("📦 Relay point ID (client):", order.shippingData.shippingMethod.relayPoint.id);
 
             if (operator === "MONR") {
                 const pickupCode = process.env.MONDIAL_RELAY_PICKUP_CODE;
@@ -669,8 +667,7 @@ async function createShipment(req: NextRequest) {
                 { _id: new ObjectId(orderId) },
                 {
                     $set: {
-                        boxtalShipmentId: shipmentResult.content.id,
-                        trackingNumber: shipmentResult.content.shipmentId
+                        "shippingData.boxtalShipmentId": shipmentResult.content.id
                     }
                 }
             );
@@ -718,7 +715,7 @@ async function getShippingLabel(req: NextRequest) {
                 { status: 404 }
             );
         }
-        if (!order.boxtalShipmentId) {
+        if (!order.shippingData?.boxtalShipmentId) {
             return NextResponse.json(
                 { error: "Aucune expédition Boxtal associée à cette commande" },
                 { status: 404 }
@@ -736,7 +733,7 @@ async function getShippingLabel(req: NextRequest) {
         const authString = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
         const apiUrl = getBoxtalApiUrl();
         const labelResponse = await fetch(
-            `${apiUrl}/shipping/v3.1/shipping-order/${order.boxtalShipmentId}/shipping-document`,
+            `${apiUrl}/shipping/v3.1/shipping-order/${order.shippingData.boxtalShipmentId}/shipping-document`,
             {
                 method: "GET",
                 headers: {
@@ -769,13 +766,45 @@ async function getShippingLabel(req: NextRequest) {
             );
         }
         const pdfBuffer = await pdfResponse.arrayBuffer();
-        if (order.status !== "preparing") {
+
+        // Récupérer le tracking number du transporteur
+        if (!order.shippingData.trackingNumber) {
+            const trackingResponse = await fetch(
+                `${apiUrl}/shipping/v3.1/shipping-order/${order.shippingData.boxtalShipmentId}/tracking`,
+                {
+                    method: "GET",
+                    headers: {
+                        "Authorization": `Basic ${authString}`,
+                        "Accept": "application/json"
+                    }
+                }
+            );
+
+            if (trackingResponse.ok) {
+                const trackingData = await trackingResponse.json();
+                console.log("📦 Tracking data:", JSON.stringify(trackingData, null, 2));
+                if (trackingData.content?.[0]?.trackingNumber) {
+                    const trackingNumber = trackingData.content[0].trackingNumber;
+                    console.log("📦 Tracking number récupéré:", trackingNumber);
+                    await ordersCollection.updateOne(
+                        { _id: new ObjectId(orderId) },
+                        {
+                            $set: {
+                                "shippingData.trackingNumber": trackingNumber
+                            }
+                        }
+                    );
+                }
+            }
+        }
+
+        if (order.order.status !== "preparing") {
             await ordersCollection.updateOne(
                 { _id: new ObjectId(orderId) },
                 {
                     $set: {
-                        status: "preparing",
-                        preparingAt: new Date()
+                        "order.status": "preparing",
+                        "order.preparingAt": new Date()
                     }
                 }
             );
@@ -828,7 +857,7 @@ async function getReturnLabel(req: NextRequest) {
                 { status: 404 }
             );
         }
-        if (!order.boxtalShipmentId) {
+        if (!order.shippingData?.boxtalShipmentId) {
             return NextResponse.json(
                 { error: "Aucune expédition Boxtal associée à cette commande" },
                 { status: 404 }
@@ -846,7 +875,7 @@ async function getReturnLabel(req: NextRequest) {
         const authString = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
         const apiUrl = getBoxtalApiUrl();
         const labelResponse = await fetch(
-            `${apiUrl}/shipping/v3.1/shipping-order/${order.boxtalShipmentId}/shipping-document`,
+            `${apiUrl}/shipping/v3.1/shipping-order/${order.shippingData.boxtalShipmentId}/shipping-document`,
             {
                 method: "GET",
                 headers: {

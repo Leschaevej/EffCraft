@@ -39,7 +39,7 @@ function PaymentSuccessContent() {
                                 products: pendingOrder.products,
                                 shippingData: pendingOrder.shippingData,
                                 billingData: pendingOrder.billingData,
-                                shippingMethod: pendingOrder.shippingMethod,
+                                totalAmount: pendingOrder.totalAmount,
                             }),
                         });
                     } else {

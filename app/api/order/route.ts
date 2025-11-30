@@ -23,15 +23,15 @@ export async function GET(req: NextRequest) {
         const ordersCollection = db.collection("orders");
         let query: any;
         if (status === 'history') {
-            query = { status: { $in: ['delivered', 'cancelled', 'returned'] } };
+            query = { "order.status": { $in: ['delivered', 'cancelled', 'returned'] } };
         } else if (status === 'pending') {
-            query = { status: { $in: ['paid', 'preparing', 'ready', 'in_transit', 'out_for_delivery', 'return_requested'] } };
+            query = { "order.status": { $in: ['paid', 'preparing', 'ready', 'in_transit', 'out_for_delivery', 'return_requested'] } };
         } else {
-            query = { status };
+            query = { "order.status": status };
         }
         const orders = await ordersCollection
             .find(query)
-            .sort({ createdAt: -1 })
+            .sort({ "order.createdAt": -1 })
             .toArray();
         return NextResponse.json({ orders });
     } catch (error: any) {
@@ -71,7 +71,7 @@ export async function PATCH(req: NextRequest) {
                         { status: 404 }
                     );
                 }
-                if (order.boxtalShipmentId) {
+                if (order.shippingData?.boxtalShipmentId) {
                     try {
                         const isProduction = process.env.BOXTAL_ENV === "production";
                         const apiKey = isProduction ? process.env.BOXTAL_V3_PROD_KEY : process.env.BOXTAL_V3_TEST_KEY;
@@ -82,7 +82,7 @@ export async function PATCH(req: NextRequest) {
                                 ? "https://api.boxtal.com"
                                 : "https://api.boxtal.build";
                             const deleteResponse = await fetch(
-                                `${apiUrl}/shipping/v3.1/shipping-order/${order.boxtalShipmentId}`,
+                                `${apiUrl}/shipping/v3.1/shipping-order/${order.shippingData.boxtalShipmentId}`,
                                 {
                                     method: "DELETE",
                                     headers: {
@@ -101,9 +101,9 @@ export async function PATCH(req: NextRequest) {
                     }
                 }
                 try {
-                    if (order.paymentIntentId) {
+                    if (order.order?.paymentIntentId) {
                         await stripe.refunds.create({
-                            payment_intent: order.paymentIntentId,
+                            payment_intent: order.order.paymentIntentId,
                         });
                     }
                 } catch (stripeError: any) {
@@ -136,18 +136,13 @@ export async function PATCH(req: NextRequest) {
                     { _id: new ObjectId(orderId) },
                     {
                         $set: {
-                            status: "cancelled",
-                            cancelledAt: new Date(),
-                            refundReason: "annulation de la commande"
+                            "order.status": "cancelled",
+                            "order.cancelledAt": new Date(),
+                            "order.refundReason": "annulation de la commande"
                         },
                         $unset: {
                             shippingData: "",
-                            billingData: "",
-                            shippingMethod: "",
-                            boxtalShipmentId: "",
-                            boxtalStatus: "",
-                            trackingNumber: "",
-                            preparingAt: ""
+                            billingData: ""
                         }
                     }
                 );
@@ -180,7 +175,7 @@ export async function PATCH(req: NextRequest) {
                     "CHRP-Chrono18": 12.90
                 };
 
-                const shippingCode = `${returnRequestOrder.shippingMethod?.operator || "MONR"}-${returnRequestOrder.shippingMethod?.serviceCode || "CpourToi"}`;
+                const shippingCode = `${returnRequestOrder.shippingData?.shippingMethod?.operator || "MONR"}-${returnRequestOrder.shippingData?.shippingMethod?.serviceCode || "CpourToi"}`;
                 const shippingCost = FIXED_PRICES[shippingCode] || 5.90;
 
                 let refundAmount;
@@ -188,19 +183,19 @@ export async function PATCH(req: NextRequest) {
 
                 if (fullRefund) {
                     // Produit défectueux : remboursement complet
-                    refundAmount = Math.round(returnRequestOrder.totalPrice * 100); // en centimes
+                    refundAmount = Math.round(returnRequestOrder.order.totalPrice * 100); // en centimes
                     refundReason = "Produit défectueux - Remboursement complet";
                 } else {
                     // Changement d'avis : remboursement moins frais de retour
-                    refundAmount = Math.round((returnRequestOrder.totalPrice - shippingCost) * 100); // en centimes
-                    refundReason = `Changement d'avis - Remboursement ${(returnRequestOrder.totalPrice - shippingCost).toFixed(2)}€ (frais retour déduits)`;
+                    refundAmount = Math.round((returnRequestOrder.order.totalPrice - shippingCost) * 100); // en centimes
+                    refundReason = `Changement d'avis - Remboursement ${(returnRequestOrder.order.totalPrice - shippingCost).toFixed(2)}€ (frais retour déduits)`;
                 }
 
                 // Effectuer le remboursement Stripe
                 try {
-                    if (returnRequestOrder.paymentIntentId && refundAmount > 0) {
+                    if (returnRequestOrder.order?.paymentIntentId && refundAmount > 0) {
                         await stripe.refunds.create({
-                            payment_intent: returnRequestOrder.paymentIntentId,
+                            payment_intent: returnRequestOrder.order.paymentIntentId,
                             amount: refundAmount,
                         });
                     }
@@ -217,9 +212,9 @@ export async function PATCH(req: NextRequest) {
                     { _id: new ObjectId(orderId) },
                     {
                         $set: {
-                            status: "return_requested",
-                            returnRequestedAt: new Date(),
-                            refundReason: refundReason
+                            "order.status": "return_requested",
+                            "order.returnRequestedAt": new Date(),
+                            "order.refundReason": refundReason
                         }
                     }
                 );
@@ -232,7 +227,7 @@ export async function PATCH(req: NextRequest) {
                 });
                 return NextResponse.json({
                     success: true,
-                    boxtalShipmentId: returnRequestOrder.boxtalShipmentId
+                    boxtalShipmentId: returnRequestOrder.shippingData?.boxtalShipmentId
                 });
             case "refund-return":
                 const refundOrder = await ordersCollection.findOne({ _id: new ObjectId(orderId) });
@@ -243,9 +238,9 @@ export async function PATCH(req: NextRequest) {
                     );
                 }
                 try {
-                    if (refundOrder.paymentIntentId) {
+                    if (refundOrder.order?.paymentIntentId) {
                         await stripe.refunds.create({
-                            payment_intent: refundOrder.paymentIntentId,
+                            payment_intent: refundOrder.order.paymentIntentId,
                         });
                     }
                 } catch (stripeError: any) {
@@ -259,16 +254,13 @@ export async function PATCH(req: NextRequest) {
                     { _id: new ObjectId(orderId) },
                     {
                         $set: {
-                            status: "returned",
-                            returnedAt: new Date(),
-                            refundReason: "retour du colis"
+                            "order.status": "returned",
+                            "order.returnedAt": new Date(),
+                            "order.refundReason": "retour du colis"
                         },
                         $unset: {
                             shippingData: "",
-                            billingData: "",
-                            boxtalShipmentId: "",
-                            boxtalStatus: "",
-                            trackingNumber: ""
+                            billingData: ""
                         }
                     }
                 );
@@ -306,7 +298,7 @@ export async function POST(req: NextRequest) {
                 { status: 401 }
             );
         }
-        const { paymentIntentId, shippingData, billingData, shippingMethod, products } = await req.json();
+        const { paymentIntentId, shippingData, billingData, products, totalAmount } = await req.json();
         if (!paymentIntentId) {
             return NextResponse.json(
                 { error: "Payment Intent manquant" },
@@ -367,8 +359,7 @@ export async function POST(req: NextRequest) {
             category: p.category,
             images: p.images || [],
         }));
-        const productsTotalPrice = products.reduce((acc: number, product: any) => acc + product.price, 0);
-        const totalPrice = productsTotalPrice + (shippingMethod.price || 0);
+        const totalPrice = totalAmount;
         await productsCollection.deleteMany({
             _id: { $in: productIds }
         });
@@ -395,41 +386,17 @@ export async function POST(req: NextRequest) {
         );
         const ordersCollection = db.collection("orders");
 
-        // Nettoyer et sanitizer les données d'adresse avant de les enregistrer
-        const cleanedShippingData: any = {
-            nom: shippingData.nom.trim(),
-            prenom: shippingData.prenom.trim(),
-            rue: shippingData.rue.trim(),
-            complement: shippingData.complement ? shippingData.complement.trim() : "",
-            codePostal: shippingData.codePostal.trim(),
-            ville: shippingData.ville.trim(),
-            telephone: shippingData.telephone.trim(),
-        };
-
-        // Ajouter le point relais si présent (Mondial Relay, Relais Colis, etc.)
-        if (shippingData.relayPoint) {
-            cleanedShippingData.relayPoint = shippingData.relayPoint;
-        }
-
-        const cleanedBillingData = {
-            nom: billingData.nom.trim(),
-            prenom: billingData.prenom.trim(),
-            rue: billingData.rue.trim(),
-            complement: billingData.complement ? billingData.complement.trim() : "",
-            codePostal: billingData.codePostal.trim(),
-            ville: billingData.ville.trim(),
-        };
-
         const order = {
             userEmail: session.user.email,
             products: productsForOrder,
-            totalPrice: totalPrice,
-            shippingData: cleanedShippingData,
-            billingData: cleanedBillingData,
-            shippingMethod: shippingMethod,
-            paymentIntentId: paymentIntentId,
-            status: "paid",
-            createdAt: new Date(),
+            shippingData: shippingData,
+            billingData: billingData,
+            order: {
+                totalPrice: totalPrice,
+                paymentIntentId: paymentIntentId,
+                status: "paid",
+                createdAt: new Date(),
+            }
         };
         const result = await ordersCollection.insertOne(order);
         await notifyClients({

@@ -17,17 +17,23 @@ interface Product {
 interface Order {
     _id: string;
     products: Product[];
-    totalPrice: number;
-    shippingData: any;
-    shippingMethod: any;
-    createdAt: string;
-    status: string;
-    boxtalStatus?: string;
-    trackingNumber?: string;
-    deliveredAt?: string;
-    refundReason?: string;
-    cancelledAt?: string;
-    returnedAt?: string;
+    shippingData: {
+        trackingNumber?: string;
+        boxtalShipmentId?: string;
+        shippingMethod?: any;
+        [key: string]: any;
+    };
+    order: {
+        totalPrice: number;
+        status: string;
+        createdAt: Date;
+        deliveredAt?: Date;
+        refundReason?: string;
+        cancelledAt?: Date;
+        returnedAt?: Date;
+        preparingAt?: Date;
+        readyAt?: Date;
+    };
 }
 const TRACKING_STEPS = [
     { label: "Commande confirmée", icon: <FaCheck /> },
@@ -123,7 +129,7 @@ export default function OrderPage() {
             };
         }
     }, [session, orderView, mutate]);
-    const getTrackingStep = (order: Order): number => STATUS_STEPS[order.status] || 1;
+    const getTrackingStep = (order: Order): number => STATUS_STEPS[order.order.status] || 1;
     const getStatusIcon = (status: string) => {
         const iconMap: { [key: string]: React.ReactNode } = {
             paid: <FaCheck />,
@@ -176,13 +182,13 @@ export default function OrderPage() {
                                                     <img src={order.products[0].images[0]} alt={order.products[0].name} />
                                                 )}
                                             </div>
-                                            <p>{new Date(order.createdAt).toLocaleDateString()}</p>
-                                            <p className="total">{order.totalPrice.toFixed(2)}€</p>
+                                            <p>{new Date(order.order.createdAt).toLocaleDateString()}</p>
+                                            <p className="total">{order.order.totalPrice.toFixed(2)}€</p>
                                             <div className="status">
                                                 <div className="icon">
-                                                    {getStatusIcon(order.status)}
+                                                    {getStatusIcon(order.order.status)}
                                                 </div>
-                                                <p className="label">{STATUS_LABELS[order.status] || order.status}</p>
+                                                <p className="label">{STATUS_LABELS[order.order.status] || order.order.status}</p>
                                             </div>
                                         </div>
                                         <button onClick={() => setExpandedOrderId(expandedOrderId === order._id ? null : order._id)}>
@@ -215,26 +221,26 @@ export default function OrderPage() {
                                                 <div className="infos">
                                                     <div className="info">
                                                         <h3>Informations de commande</h3>
-                                                        <p>Date de commande : {new Date(order.createdAt).toLocaleDateString()}</p>
-                                                        <p>Total : {order.totalPrice.toFixed(2)}€</p>
-                                                        {order.refundReason && (
+                                                        <p>Date de commande : {new Date(order.order.createdAt).toLocaleDateString()}</p>
+                                                        <p>Total : {order.order.totalPrice.toFixed(2)}€</p>
+                                                        {order.order.refundReason && (
                                                             <>
-                                                                <p>Motif de remboursement : {order.refundReason}</p>
-                                                                <p>Date de remboursement : {new Date(order.cancelledAt || order.returnedAt || order.createdAt).toLocaleDateString()}</p>
+                                                                <p>Motif de remboursement : {order.order.refundReason}</p>
+                                                                <p>Date de remboursement : {new Date(order.order.cancelledAt || order.order.returnedAt || order.order.createdAt).toLocaleDateString()}</p>
                                                             </>
                                                         )}
-                                                        {!order.refundReason && (
+                                                        {!order.order.refundReason && (
                                                             <>
-                                                                <p>Mode de livraison : {order.shippingMethod?.name}</p>
+                                                                <p>Mode de livraison : {order.shippingData.shippingMethod?.name}</p>
                                                                 <p>
-                                                                    N° de suivi : {order.trackingNumber ? (
+                                                                    N° de suivi : {order.shippingData.trackingNumber ? (
                                                                         (() => {
-                                                                            const trackingUrl = getTrackingUrl(order.trackingNumber, order.shippingMethod?.operator);
+                                                                            const trackingUrl = getTrackingUrl(order.shippingData.trackingNumber, order.shippingData.shippingMethod?.operator);
                                                                             return trackingUrl ? (
                                                                                 <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--mainColor)', textDecoration: 'underline' }}>
-                                                                                    {order.trackingNumber}
+                                                                                    {order.shippingData.trackingNumber}
                                                                                 </a>
-                                                                            ) : order.trackingNumber;
+                                                                            ) : order.shippingData.trackingNumber;
                                                                         })()
                                                                     ) : "En attente"}
                                                                 </p>
@@ -249,12 +255,12 @@ export default function OrderPage() {
                                                                 <p>{order.shippingData.rue || ''}</p>
                                                                 <p>{order.shippingData.codePostal || ''} {order.shippingData.ville || ''}</p>
                                                             </div>
-                                                            {order.shippingData.relayPoint && (
+                                                            {order.shippingData.shippingMethod?.relayPoint && (
                                                                 <div className="info">
                                                                     <h3>Point relais</h3>
-                                                                    <p>{order.shippingData.relayPoint.name} </p>
-                                                                    <p>{order.shippingData.relayPoint.address}</p>
-                                                                    <p>{order.shippingData.relayPoint.zipcode} {order.shippingData.relayPoint.city}</p>
+                                                                    <p>{order.shippingData.shippingMethod.relayPoint.name} </p>
+                                                                    <p>{order.shippingData.shippingMethod.relayPoint.address}</p>
+                                                                    <p>{order.shippingData.shippingMethod.relayPoint.zipcode} {order.shippingData.shippingMethod.relayPoint.city}</p>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -263,21 +269,21 @@ export default function OrderPage() {
                                                         <button className="invoice">Facture</button>
                                                         {orderView === "pending" && (
                                                             <>
-                                                                {["paid", "preparing"].includes(order.status) && (
+                                                                {["paid", "preparing"].includes(order.order.status) && (
                                                                     <button className="cancel">
                                                                         Demander annulation
                                                                     </button>
                                                                 )}
-                                                                {["ready", "in_transit", "out_for_delivery", "delivered"].includes(order.status) && (
+                                                                {["ready", "in_transit", "out_for_delivery", "delivered"].includes(order.order.status) && (
                                                                     <button className="return">
                                                                         Demander un retour
                                                                     </button>
                                                                 )}
                                                             </>
                                                         )}
-                                                        {orderView === "history" && order.status === "delivered" && order.deliveredAt && (
+                                                        {orderView === "history" && order.order.status === "delivered" && order.order.deliveredAt && (
                                                             (() => {
-                                                                const deliveredDate = new Date(order.deliveredAt);
+                                                                const deliveredDate = new Date(order.order.deliveredAt);
                                                                 const now = new Date();
                                                                 const diffTime = now.getTime() - deliveredDate.getTime();
                                                                 const diffDays = diffTime / (1000 * 60 * 60 * 24);

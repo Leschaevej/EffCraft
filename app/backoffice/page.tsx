@@ -18,26 +18,33 @@ interface Product {
 }
 interface Order {
     _id: string;
-    products: Product[];
-    totalPrice: number;
-    shippingData: any;
-    billingData: any;
-    shippingMethod: any;
-    createdAt: string;
     userEmail: string;
-    status: string;
-    boxtalStatus?: string;
-    boxtalShipmentId?: string;
-    trackingNumber?: string;
-    deliveredAt?: string;
-    refundReason?: string;
-    cancelledAt?: string;
-    returnedAt?: string;
-    cancellationRequested?: boolean;
-    cancellationRequestedAt?: string;
-    returnRequested?: boolean;
-    returnRequestedAt?: string;
-    paymentIntentId?: string;
+    products: Product[];
+    shippingData: {
+        trackingNumber?: string;
+        boxtalShipmentId?: string;
+        boxtalStatus?: string;
+        shippingMethod?: any;
+        relayPoint?: any;
+        [key: string]: any;
+    };
+    billingData: any;
+    order: {
+        totalPrice: number;
+        status: string;
+        createdAt: Date;
+        deliveredAt?: Date;
+        refundReason?: string;
+        cancelledAt?: Date;
+        returnedAt?: Date;
+        preparingAt?: Date;
+        readyAt?: Date;
+        cancellationRequested?: boolean;
+        cancellationRequestedAt?: Date;
+        returnRequested?: boolean;
+        returnRequestedAt?: Date;
+        paymentIntentId?: string;
+    };
 }
 const TRACKING_STEPS = [
     { label: "Commande confirmée", icon: <FaCheck /> },
@@ -141,7 +148,7 @@ export default function Backoffice() {
         }
         try {
             setPrintingOrderId(order._id);
-            if (!order.boxtalShipmentId) {
+            if (!order.shippingData.boxtalShipmentId) {
                 const createResponse = await fetch("/api/shipping", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -157,7 +164,14 @@ export default function Backoffice() {
                 // Mettre à jour l'ordre local avec le boxtalShipmentId
                 setOrders(prev => prev.map(o =>
                     o._id === order._id
-                        ? { ...o, boxtalShipmentId: createResult.shipmentId, boxtalStatus: "PENDING" }
+                        ? {
+                            ...o,
+                            shippingData: {
+                                ...o.shippingData,
+                                boxtalShipmentId: createResult.shipmentId,
+                                boxtalStatus: "PENDING"
+                            }
+                        }
                         : o
                 ));
 
@@ -176,7 +190,7 @@ export default function Backoffice() {
                 // Mettre à jour le statut localement immédiatement
                 setOrders(prev => prev.map(o =>
                     o._id === order._id
-                        ? { ...o, status: "preparing" }
+                        ? { ...o, order: { ...o.order, status: "preparing" } }
                         : o
                 ));
             } else {
@@ -244,14 +258,14 @@ export default function Backoffice() {
     };
     const handleReturnOrder = async (order: Order) => {
         // Si la commande est livrée, ouvrir la modal pour choisir le type de retour
-        if (order.status === "delivered") {
+        if (order.order.status === "delivered") {
             setOrderToReturn(order);
             setShowReturnModal(true);
             return;
         }
 
         // Pour ready, in_transit, out_for_delivery : remboursement moins frais de retour
-        if (!confirm(`Générer un bon de retour pour cette commande ?\nRemboursement : ${order.totalPrice.toFixed(2)}€ - frais de retour`)) {
+        if (!confirm(`Générer un bon de retour pour cette commande ?\nRemboursement : ${order.order.totalPrice.toFixed(2)}€ - frais de retour`)) {
             return;
         }
 
@@ -275,7 +289,7 @@ export default function Backoffice() {
                 return;
             }
             const returnData = await response.json();
-            if (returnData.boxtalShipmentId || order.boxtalShipmentId) {
+            if (returnData.boxtalShipmentId || order.shippingData.boxtalShipmentId) {
                 const labelResponse = await fetch("/api/shipping?action=return-label", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -340,7 +354,7 @@ export default function Backoffice() {
         await handleReturnOrder(order);
         mutate();
     };
-    const getTrackingStep = (order: Order): number => STATUS_STEPS[order.status] || 1;
+    const getTrackingStep = (order: Order): number => STATUS_STEPS[order.order.status] || 1;
     const getStatusIcon = (status: string) => {
         const iconMap: { [key: string]: React.ReactNode } = {
             paid: <FaCheck />,
@@ -439,13 +453,13 @@ export default function Backoffice() {
                                                     <p>{order.shippingData.prenom || ''}</p>
                                                 </div>
                                             )}
-                                            <p>{new Date(order.createdAt).toLocaleDateString()}</p>
-                                            <p className="total">{order.totalPrice.toFixed(2)}€</p>
+                                            <p>{new Date(order.order.createdAt).toLocaleDateString()}</p>
+                                            <p className="total">{order.order.totalPrice.toFixed(2)}€</p>
                                             <div className="status">
                                                 <div className="icon">
-                                                    {getStatusIcon(order.status)}
+                                                    {getStatusIcon(order.order.status)}
                                                 </div>
-                                                <p className="label">{STATUS_LABELS[order.status] || order.status}</p>
+                                                <p className="label">{STATUS_LABELS[order.order.status] || order.order.status}</p>
                                             </div>
                                         </div>
                                         <div className="buttons">
@@ -470,26 +484,26 @@ export default function Backoffice() {
                                                     <div className="info">
                                                         <h3>Informations de commande</h3>
                                                         <p>Email : {order.userEmail}</p>
-                                                        <p>Date de commande : {new Date(order.createdAt).toLocaleDateString()} à {new Date(order.createdAt).toLocaleTimeString()}</p>
-                                                        <p>Total : {order.totalPrice.toFixed(2)}€</p>
-                                                        {order.refundReason && (
+                                                        <p>Date de commande : {new Date(order.order.createdAt).toLocaleDateString()} à {new Date(order.order.createdAt).toLocaleTimeString()}</p>
+                                                        <p>Total : {order.order.totalPrice.toFixed(2)}€</p>
+                                                        {order.order.refundReason && (
                                                             <>
-                                                                <p>Motif de remboursement : {order.refundReason}</p>
-                                                                <p>Date de remboursement : {new Date(order.cancelledAt || order.returnedAt || order.createdAt).toLocaleDateString()} à {new Date(order.cancelledAt || order.returnedAt || order.createdAt).toLocaleTimeString()}</p>
+                                                                <p>Motif de remboursement : {order.order.refundReason}</p>
+                                                                <p>Date de remboursement : {new Date(order.order.cancelledAt || order.order.returnedAt || order.order.createdAt).toLocaleDateString()} à {new Date(order.order.cancelledAt || order.order.returnedAt || order.order.createdAt).toLocaleTimeString()}</p>
                                                             </>
                                                         )}
-                                                        {!order.refundReason && (
+                                                        {!order.order.refundReason && (
                                                             <>
-                                                                <p>Mode de livraison : {order.shippingMethod?.name}</p>
+                                                                <p>Mode de livraison : {order.shippingData.shippingMethod?.name}</p>
                                                                 <p>
-                                                                    N° de suivi : {order.trackingNumber ? (
+                                                                    N° de suivi : {order.shippingData.trackingNumber ? (
                                                                         (() => {
-                                                                            const trackingUrl = getTrackingUrl(order.trackingNumber, order.shippingMethod?.operator);
+                                                                            const trackingUrl = getTrackingUrl(order.shippingData.trackingNumber, order.shippingData.shippingMethod?.operator);
                                                                             return trackingUrl ? (
                                                                                 <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--mainColor)', textDecoration: 'underline' }}>
-                                                                                    {order.trackingNumber}
+                                                                                    {order.shippingData.trackingNumber}
                                                                                 </a>
-                                                                            ) : order.trackingNumber;
+                                                                            ) : order.shippingData.trackingNumber;
                                                                         })()
                                                                     ) : "En attente"}
                                                                 </p>
@@ -504,19 +518,19 @@ export default function Backoffice() {
                                                                 <p>{order.shippingData.rue || ''}</p>
                                                                 <p>{order.shippingData.codePostal || ''} {order.shippingData.ville || ''}</p>
                                                             </div>
-                                                            {order.shippingData.relayPoint && (
+                                                            {order.shippingData.shippingMethod?.relayPoint && (
                                                                 <div className="info">
                                                                     <h3>Point relais</h3>
-                                                                    <p>{order.shippingData.relayPoint.name} </p>
-                                                                    <p>{order.shippingData.relayPoint.address}</p>
-                                                                    <p>{order.shippingData.relayPoint.zipcode} {order.shippingData.relayPoint.city}</p>
+                                                                    <p>{order.shippingData.shippingMethod.relayPoint.name} </p>
+                                                                    <p>{order.shippingData.shippingMethod.relayPoint.address}</p>
+                                                                    <p>{order.shippingData.shippingMethod.relayPoint.zipcode} {order.shippingData.shippingMethod.relayPoint.city}</p>
                                                                 </div>
                                                             )}
                                                         </div>
                                                     )}
                                                     <div className="actions">
                                                         <button className="invoice">Facture</button>
-                                                        {["paid", "preparing"].includes(order.status) && (
+                                                        {["paid", "preparing"].includes(order.order.status) && (
                                                             <button
                                                                 className="cancel"
                                                                 onClick={() => handleCancelOrder(order)}
@@ -524,7 +538,7 @@ export default function Backoffice() {
                                                                 Annuler
                                                             </button>
                                                         )}
-                                                        {["ready", "in_transit", "out_for_delivery", "delivered"].includes(order.status) && (
+                                                        {["ready", "in_transit", "out_for_delivery", "delivered"].includes(order.order.status) && (
                                                             <button
                                                                 className="return"
                                                                 onClick={() => handleReturnOrder(order)}
@@ -532,7 +546,7 @@ export default function Backoffice() {
                                                                 Retour
                                                             </button>
                                                         )}
-                                                        {order.status === "return_requested" && (
+                                                        {order.order.status === "return_requested" && (
                                                             <button
                                                                 className="refund"
                                                                 onClick={() => handleRefundReturn(order)}
@@ -616,7 +630,7 @@ export default function Backoffice() {
                                 onClick={() => handleReturnChoice(true)}
                             >
                                 Produit défectueux<br/>
-                                <small>(Remboursement complet : {orderToReturn.totalPrice.toFixed(2)}€)</small>
+                                <small>(Remboursement complet : {orderToReturn.order.totalPrice.toFixed(2)}€)</small>
                             </button>
                             <button
                                 className="btn-cancel"
