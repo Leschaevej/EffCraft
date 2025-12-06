@@ -54,13 +54,26 @@ const STATUS_STEPS: { [key: string]: number } = {
 const STATUS_LABELS: { [key: string]: string } = {
     paid: "Commande confirmée",
     preparing: "En préparation",
-    ready: "Prêt à être récupéré",
+    ready: "Remis au transporteur",
     in_transit: "En transit",
     out_for_delivery: "En cours de livraison",
     delivered: "Livré",
     cancelled: "Remboursé",
     return_requested: "Retour demandé",
     returned: "Remboursé"
+};
+
+const getShippingMethodName = (operator?: string, serviceCode?: string): string => {
+    if (!operator) return "Non défini";
+
+    const names: { [key: string]: string } = {
+        "MONR": "Mondial Relay",
+        "SOGP": "Relais Colis",
+        "POFR": "Colissimo",
+        "CHRP": "Chronopost"
+    };
+
+    return names[operator] || operator;
 };
 
 const getTrackingUrl = (trackingNumber: string, operator?: string): string | null => {
@@ -71,7 +84,7 @@ const getTrackingUrl = (trackingNumber: string, operator?: string): string | nul
             return `https://www.mondialrelay.fr/suivi-de-colis/?numeroExpedition=${trackingNumber}`;
         case "SOGP": // Relais Colis
             return `https://www.relaiscolis.com/suivi/?code=${trackingNumber}`;
-        case "COPA": // Colissimo
+        case "POFR": // Colissimo
             return `https://www.laposte.fr/outils/suivre-vos-envois?code=${trackingNumber}`;
         case "CHRP": // Chronopost
             return `https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT=${trackingNumber}`;
@@ -231,7 +244,7 @@ export default function OrderPage() {
                                                         )}
                                                         {!order.order.refundReason && (
                                                             <>
-                                                                <p>Mode de livraison : {order.shippingData.shippingMethod?.name}</p>
+                                                                <p>Mode de livraison : {getShippingMethodName(order.shippingData.shippingMethod?.operator, order.shippingData.shippingMethod?.serviceCode)}</p>
                                                                 <p>
                                                                     N° de suivi : {order.shippingData.trackingNumber ? (
                                                                         (() => {
@@ -274,7 +287,7 @@ export default function OrderPage() {
                                                                         Demander annulation
                                                                     </button>
                                                                 )}
-                                                                {["ready", "in_transit", "out_for_delivery", "delivered"].includes(order.order.status) && (
+                                                                {order.order.status === "delivered" && (
                                                                     <button className="return">
                                                                         Demander un retour
                                                                     </button>
@@ -297,8 +310,8 @@ export default function OrderPage() {
                                                     </div>
                                                 </div>
                                                 <div className="products">
-                                                    {order.products.map((product) => (
-                                                        <div key={product._id} className="product">
+                                                    {order.products.map((product, index) => (
+                                                        <div key={product._id || `${order._id}-product-${index}`} className="product">
                                                             {product.images && product.images.length > 0 && (
                                                                 <img src={product.images[0]} alt={product.name} />
                                                             )}

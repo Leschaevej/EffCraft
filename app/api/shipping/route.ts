@@ -874,6 +874,8 @@ async function getReturnLabel(req: NextRequest) {
         }
         const authString = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
         const apiUrl = getBoxtalApiUrl();
+
+        // D'abord, vérifier si un bordereau de retour existe déjà
         const labelResponse = await fetch(
             `${apiUrl}/shipping/v3.1/shipping-order/${order.shippingData.boxtalShipmentId}/shipping-document`,
             {
@@ -884,23 +886,154 @@ async function getReturnLabel(req: NextRequest) {
                 }
             }
         );
-        if (!labelResponse.ok) {
-            const errorText = await labelResponse.text();
-            console.error("Erreur récupération documents Boxtal:", errorText);
-            return NextResponse.json(
-                { error: "Impossible de récupérer les documents", details: errorText },
-                { status: labelResponse.status }
+
+        let returnDocument;
+
+        if (labelResponse.ok) {
+            const documentsData = await labelResponse.json();
+            returnDocument = documentsData.content?.find((doc: any) =>
+                doc.type === "RETURN_LABEL" || doc.type === "RETURN"
             );
         }
-        const documentsData = await labelResponse.json();
-        const returnDocument = documentsData.content?.find((doc: any) =>
-            doc.type === "RETURN_LABEL" || doc.type === "RETURN"
-        );
+
+        // Si pas de bordereau de retour, le créer
         if (!returnDocument?.url) {
-            return NextResponse.json(
-                { error: "Aucun bordereau de retour disponible pour cette commande" },
-                { status: 404 }
+            console.log("📦 Création d'un bordereau de retour pour:", order.shippingData.boxtalShipmentId);
+
+            // Créer une nouvelle expédition de retour (adresses inversées)
+            const returnShipmentData: any = {
+                shipment: {
+                    packages: [{
+                        type: "PARCEL",
+                        weight: PACKAGE_WEIGHT,
+                        length: PACKAGE_LENGTH,
+                        width: PACKAGE_WIDTH,
+                        height: PACKAGE_HEIGHT,
+                        value: {
+                            value: order.products.reduce((sum: number, p: any) => sum + p.price, 0),
+                            currency: "EUR"
+                        },
+                        content: {
+                            id: "content:v1:40150",
+                            description: "Bijoux fantaisie"
+                        }
+                    }],
+                    // FROM = l'adresse du client (qui renvoie)
+                    fromAddress: {
+                        type: "RESIDENTIAL",
+                        contact: {
+                            firstName: order.shippingData?.prenom,
+                            lastName: order.shippingData?.nom,
+                            email: order.userEmail,
+                            phone: order.shippingData?.telephone?.replace(/\+/g, '')
+                        },
+                        location: order.shippingData?.shippingMethod?.relayPoint ? {
+                            // Si c'était un point relais, retour depuis le point relais
+                            street: order.shippingData.shippingMethod.relayPoint.address,
+                            city: order.shippingData.shippingMethod.relayPoint.city,
+                            postalCode: order.shippingData.shippingMethod.relayPoint.zipcode,
+                            countryIsoCode: "FR"
+                        } : {
+                            // Sinon retour depuis l'adresse de livraison
+                            street: order.shippingData?.rue,
+                            city: order.shippingData?.ville,
+                            postalCode: order.shippingData?.codePostal,
+                            countryIsoCode: "FR"
+                        }
+                    },
+                    // TO = l'atelier (adresse de retour)
+                    toAddress: {
+                        type: "BUSINESS",
+                        contact: {
+                            company: process.env.COMPANY_NAME,
+                            firstName: process.env.SHIPPER_FIRST_NAME,
+                            lastName: process.env.SHIPPER_LAST_NAME,
+                            email: process.env.SHIPPER_EMAIL,
+                            phone: process.env.SHIPPER_PHONE
+                        },
+                        location: {
+                            number: process.env.SHIPPER_NUMBER,
+                            street: decodeURIComponent(process.env.SHIPPER_STREET || ""),
+                            city: process.env.SHIPPER_CITY,
+                            postalCode: process.env.SHIPPER_POSTAL_CODE || "13100",
+                            countryIsoCode: process.env.SHIPPER_COUNTRY
+                        }
+                    },
+                    service: {
+                        operator: order.shippingData?.shippingMethod?.operator || "MONR",
+                        code: order.shippingData?.shippingMethod?.serviceCode || "CpourToi"
+                    }
+                },
+                shippingOfferCode: `${order.shippingData?.shippingMethod?.operator || "MONR"}-${order.shippingData?.shippingMethod?.serviceCode || "CpourToi"}`
+            };
+
+            // Créer l'expédition de retour
+            const createReturnResponse = await fetch(
+                `${apiUrl}/shipping/v3.1/shipping-order`,
+                {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Basic ${authString}`,
+                        "Accept": "application/json",
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(returnShipmentData)
+                }
             );
+
+            if (!createReturnResponse.ok) {
+                const errorText = await createReturnResponse.text();
+                console.error("Erreur création expédition retour Boxtal:", errorText);
+                console.error("Payload envoyé:", JSON.stringify(returnShipmentData, null, 2));
+                return NextResponse.json(
+                    { error: "Impossible de créer l'expédition de retour", details: errorText },
+                    { status: createReturnResponse.status }
+                );
+            }
+
+            const returnShipmentResult = await createReturnResponse.json();
+            console.log("📦 Réponse complète Boxtal:", JSON.stringify(returnShipmentResult, null, 2));
+
+            const returnShipmentId = returnShipmentResult.content?.id || returnShipmentResult.id;
+            console.log("📦 Expédition de retour créée, ID:", returnShipmentId);
+
+            // Attendre un peu que Boxtal génère le document
+            await new Promise(resolve => setTimeout(resolve, 3000));
+
+            // Récupérer les documents de l'expédition de retour
+            const newLabelResponse = await fetch(
+                `${apiUrl}/shipping/v3.1/shipping-order/${returnShipmentId}/shipping-document`,
+                {
+                    method: "GET",
+                    headers: {
+                        "Authorization": `Basic ${authString}`,
+                        "Accept": "application/json"
+                    }
+                }
+            );
+
+            if (!newLabelResponse.ok) {
+                const errorText = await newLabelResponse.text();
+                console.error("Erreur récupération documents après création:", errorText);
+                return NextResponse.json(
+                    { error: "Impossible de récupérer le bordereau après création", details: errorText },
+                    { status: newLabelResponse.status }
+                );
+            }
+
+            const newDocumentsData = await newLabelResponse.json();
+            // Pour une expédition de retour, chercher le LABEL principal (pas RETURN_LABEL)
+            returnDocument = newDocumentsData.content?.find((doc: any) =>
+                doc.type === "LABEL" || doc.type === "RETURN_LABEL" || doc.type === "RETURN"
+            );
+
+            if (!returnDocument?.url) {
+                console.log("Documents disponibles:", JSON.stringify(newDocumentsData.content));
+                return NextResponse.json(
+                    { error: "Bordereau de retour créé mais non disponible immédiatement" },
+                    { status: 404 }
+                );
+            }
         }
         const pdfResponse = await fetch(returnDocument.url);
         if (!pdfResponse.ok) {

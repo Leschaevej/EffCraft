@@ -48,31 +48,46 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        if (!signature) {
-            console.error("❌ Pas de signature dans le webhook");
-            return NextResponse.json(
-                { error: "Signature manquante" },
-                { status: 401 }
-            );
-        }
+        // Vérifier si c'est une simulation depuis le backoffice
+        const isSimulation = body.event && body.shipment;
 
-        const isValid = verifySignature(rawBody, signature, webhookSecret);
-        if (!isValid) {
-            console.error("❌ Signature invalide");
-            return NextResponse.json(
-                { error: "Signature invalide" },
-                { status: 401 }
-            );
+        if (!isSimulation) {
+            if (!signature) {
+                console.error("❌ Pas de signature dans le webhook");
+                return NextResponse.json(
+                    { error: "Signature manquante" },
+                    { status: 401 }
+                );
+            }
+
+            const isValid = verifySignature(rawBody, signature, webhookSecret);
+            if (!isValid) {
+                console.error("❌ Signature invalide");
+                return NextResponse.json(
+                    { error: "Signature invalide" },
+                    { status: 401 }
+                );
+            }
+        } else {
+            console.log("🧪 Mode simulation détecté - signature ignorée");
         }
 
         // Extraire les données - la structure peut varier selon l'événement
         let shipmentId = body.shipmentId;
         let status = body.status;
         let trackingNumber = body.trackingNumber;
-        const eventType = body.eventType;
+        let eventType = body.eventType;
 
+        // Si c'est une simulation depuis le backoffice
+        if (isSimulation) {
+            status = body.event; // READY_TO_SHIP, PICKED_UP, etc.
+            shipmentId = body.shipment.id;
+            trackingNumber = body.shipment.trackingNumber;
+            eventType = "TRACKING_CHANGED";
+            console.log("🧪 Données simulation:", { status, shipmentId, trackingNumber });
+        }
         // Si c'est un événement TRACKING_CHANGED, les données peuvent être dans content
-        if (body.content) {
+        else if (body.content) {
             if (Array.isArray(body.content) && body.content.length > 0) {
                 const tracking = body.content[0];
                 status = tracking.status;
@@ -97,7 +112,7 @@ export async function POST(req: NextRequest) {
         const client = await clientPromise;
         const db = client.db("effcraftdatabase");
         const ordersCollection = db.collection("orders");
-        const order = await ordersCollection.findOne({ boxtalShipmentId: shipmentId });
+        const order = await ordersCollection.findOne({ "shippingData.boxtalShipmentId": shipmentId });
 
         if (!order) {
             console.warn(`Commande introuvable pour shipmentId: ${shipmentId}`);
@@ -107,11 +122,17 @@ export async function POST(req: NextRequest) {
         const updateData: any = {};
 
         // Mapping des statuts Boxtal vers nos statuts internes
-        if (status === "PENDING" && order.status === "preparing") {
-            updateData.status = "ready";
-            updateData.readyAt = new Date();
+        if ((status === "PENDING" || status === "READY_TO_SHIP") && order.order.status === "paid") {
+            updateData["order.status"] = "preparing";
+            updateData["order.preparingAt"] = new Date();
             if (trackingNumber) {
-                updateData.trackingNumber = trackingNumber;
+                updateData["shippingData.trackingNumber"] = trackingNumber;
+            }
+        } else if (status === "PICKED_UP" && order.order.status === "preparing") {
+            updateData["order.status"] = "ready";
+            updateData["order.readyAt"] = new Date();
+            if (trackingNumber) {
+                updateData["shippingData.trackingNumber"] = trackingNumber;
             }
             // Nettoyage des images supplémentaires
             if (order.products && order.products.length > 0) {
@@ -143,19 +164,19 @@ export async function POST(req: NextRequest) {
                 updateData.products = cleanedProducts;
             }
         } else if (status === "SHIPPED" || status === "IN_TRANSIT") {
-            updateData.status = "in_transit";
-            if (trackingNumber && !order.trackingNumber) {
-                updateData.trackingNumber = trackingNumber;
+            updateData["order.status"] = "in_transit";
+            if (trackingNumber && !order.shippingData?.trackingNumber) {
+                updateData["shippingData.trackingNumber"] = trackingNumber;
             }
         } else if (status === "OUT_FOR_DELIVERY") {
-            updateData.status = "out_for_delivery";
+            updateData["order.status"] = "out_for_delivery";
         } else if (status === "DELIVERED") {
-            updateData.status = "delivered";
-            if (!order.deliveredAt) {
-                updateData.deliveredAt = new Date();
+            updateData["order.status"] = "delivered";
+            if (!order.order.deliveredAt) {
+                updateData["order.deliveredAt"] = new Date();
             }
         } else if (status === "CANCELLED") {
-            updateData.status = "cancelled";
+            updateData["order.status"] = "cancelled";
         }
 
         await ordersCollection.updateOne(
@@ -167,7 +188,7 @@ export async function POST(req: NextRequest) {
             type: "order_status_updated",
             data: {
                 orderId: order._id.toString(),
-                status: updateData.status || order.status
+                status: updateData["order.status"] || order.order.status
             }
         });
 

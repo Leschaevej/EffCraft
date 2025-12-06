@@ -65,13 +65,26 @@ const STATUS_STEPS: { [key: string]: number } = {
 const STATUS_LABELS: { [key: string]: string } = {
     paid: "Commande confirmée",
     preparing: "En préparation",
-    ready: "Prêt à être récupéré",
+    ready: "Remis au transporteur",
     in_transit: "En transit",
     out_for_delivery: "En cours de livraison",
     delivered: "Livré",
     cancelled: "Remboursé",
     return_requested: "Retour demandé",
     returned: "Remboursé"
+};
+
+const getShippingMethodName = (operator?: string, serviceCode?: string): string => {
+    if (!operator) return "Non défini";
+
+    const names: { [key: string]: string } = {
+        "MONR": "Mondial Relay",
+        "SOGP": "Relais Colis",
+        "POFR": "Colissimo",
+        "CHRP": "Chronopost"
+    };
+
+    return names[operator] || operator;
 };
 
 const getTrackingUrl = (trackingNumber: string, operator?: string): string | null => {
@@ -82,7 +95,7 @@ const getTrackingUrl = (trackingNumber: string, operator?: string): string | nul
             return `https://www.mondialrelay.fr/suivi-de-colis/?numeroExpedition=${trackingNumber}`;
         case "SOGP": // Relais Colis
             return `https://www.relaiscolis.com/suivi/?code=${trackingNumber}`;
-        case "COPA": // Colissimo
+        case "POFR": // Colissimo
             return `https://www.laposte.fr/outils/suivre-vos-envois?code=${trackingNumber}`;
         case "CHRP": // Chronopost
             return `https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT=${trackingNumber}`;
@@ -93,7 +106,7 @@ const getTrackingUrl = (trackingNumber: string, operator?: string): string | nul
 export default function Backoffice() {
     const { data: session, status } = useSession();
     const router = useRouter();
-    const [activeSection, setActiveSection] = useState<"manage" | "orders">("manage");
+    const [activeSection, setActiveSection] = useState<"manage" | "orders" | "invoices" | "events">("manage");
     const [activeView, setActiveView] = useState<"add" | "delete">("add");
     const [orderView, setOrderView] = useState<"pending" | "history">("pending");
     const { orders: swrOrders, isLoading: swrLoading, mutate } = useOrders(orderView);
@@ -257,39 +270,30 @@ export default function Backoffice() {
         }
     };
     const handleReturnOrder = async (order: Order) => {
-        // Si la commande est livrée, ouvrir la modal pour choisir le type de retour
-        if (order.order.status === "delivered") {
-            setOrderToReturn(order);
-            setShowReturnModal(true);
+        // Générer directement le bon de retour sans confirmation (admin paye)
+        if (!confirm(`Générer un bon de retour pour cette commande ?`)) {
             return;
         }
 
-        // Pour ready, in_transit, out_for_delivery : remboursement moins frais de retour
-        if (!confirm(`Générer un bon de retour pour cette commande ?\nRemboursement : ${order.order.totalPrice.toFixed(2)}€ - frais de retour`)) {
-            return;
-        }
-
-        await processReturn(order, false); // false = client paye le retour
-    };
-
-    const processReturn = async (order: Order, fullRefund: boolean) => {
         try {
+            // Mettre à jour le statut à return_requested sans remboursement
             const response = await fetch("/api/order", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     orderId: order._id,
-                    action: "request-return",
-                    fullRefund
+                    action: "request-return-only" // Nouveau: juste marquer le retour, pas de remboursement
                 }),
             });
+
             if (!response.ok) {
                 const error = await response.json();
                 alert("Erreur lors de la demande de retour: " + (error.error || "Erreur inconnue"));
                 return;
             }
-            const returnData = await response.json();
-            if (returnData.boxtalShipmentId || order.shippingData.boxtalShipmentId) {
+
+            // Générer le bon de retour Boxtal
+            if (order.shippingData.boxtalShipmentId) {
                 const labelResponse = await fetch("/api/shipping?action=return-label", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -322,22 +326,28 @@ export default function Backoffice() {
         }
     };
 
+    const handleRefundReturn = async (order: Order) => {
+        // Ouvrir la modal pour choisir le type de remboursement
+        setOrderToReturn(order);
+        setShowReturnModal(true);
+    };
+
     const handleReturnChoice = async (fullRefund: boolean) => {
         if (!orderToReturn) return;
         setShowReturnModal(false);
-        await processReturn(orderToReturn, fullRefund);
-        setOrderToReturn(null);
-    };
-    const handleRefundReturn = async (order: Order) => {
-        if (!confirm(`Confirmer le remboursement pour cette commande retournée ?`)) {
-            return;
-        }
+
+        // Effectuer le remboursement
         try {
             const response = await fetch("/api/order", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ orderId: order._id, action: "refund-return" }),
+                body: JSON.stringify({
+                    orderId: orderToReturn._id,
+                    action: "refund-return",
+                    fullRefund
+                }),
             });
+
             if (response.ok) {
                 alert("Client remboursé avec succès");
                 mutate();
@@ -349,11 +359,65 @@ export default function Backoffice() {
             console.error("Erreur remboursement:", error);
             alert("Erreur lors du remboursement: " + error);
         }
+
+        setOrderToReturn(null);
     };
     const handleReturnOrderWithMutate = async (order: Order) => {
         await handleReturnOrder(order);
         mutate();
     };
+
+    const handleNextStatus = async (order: Order) => {
+        // Mapping des statuts actuels vers les événements Boxtal à simuler
+        const statusToEvent: { [key: string]: string } = {
+            paid: "READY_TO_SHIP",
+            preparing: "PICKED_UP",
+            ready: "IN_TRANSIT",
+            in_transit: "OUT_FOR_DELIVERY",
+            out_for_delivery: "DELIVERED"
+        };
+
+        const nextEvent = statusToEvent[order.order.status];
+        if (!nextEvent) {
+            alert("Pas de statut suivant pour cette commande");
+            return;
+        }
+
+        if (!order.shippingData.boxtalShipmentId) {
+            alert("Pas de boxtalShipmentId pour cette commande");
+            return;
+        }
+
+        try {
+            // Simuler un webhook Boxtal
+            const webhookPayload = {
+                event: nextEvent,
+                shipment: {
+                    id: order.shippingData.boxtalShipmentId,
+                    trackingNumber: order.shippingData.trackingNumber || "SIMULATED123",
+                    status: nextEvent
+                }
+            };
+
+            const response = await fetch("/api/webhooks/boxtal", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(webhookPayload),
+            });
+
+            if (response.ok) {
+                alert(`Statut simulé : ${nextEvent}`);
+                mutate(); // Recharger les données
+            } else {
+                const error = await response.json();
+                alert("Erreur lors de la simulation: " + (error.error || "Erreur inconnue"));
+            }
+        } catch (error) {
+            console.error("Erreur simulation:", error);
+            alert("Erreur lors de la simulation: " + error);
+        }
+    };
+
     const getTrackingStep = (order: Order): number => STATUS_STEPS[order.order.status] || 1;
     const getStatusIcon = (status: string) => {
         const iconMap: { [key: string]: React.ReactNode } = {
@@ -378,13 +442,25 @@ export default function Backoffice() {
                     className={activeSection === "manage" ? "active" : ""}
                     onClick={() => setActiveSection("manage")}
                     >
-                    Gérer Produits
+                    Produits
                 </button>
                 <button
                     className={activeSection === "orders" ? "active" : ""}
                     onClick={() => setActiveSection("orders")}
                     >
                     Commandes
+                </button>
+                <button
+                    className={activeSection === "invoices" ? "active" : ""}
+                    onClick={() => setActiveSection("invoices")}
+                    >
+                    Factures
+                </button>
+                <button
+                    className={activeSection === "events" ? "active" : ""}
+                    onClick={() => setActiveSection("events")}
+                    >
+                    Événements
                 </button>
             </section>
             {activeSection === "manage" && (
@@ -463,7 +539,7 @@ export default function Backoffice() {
                                             </div>
                                         </div>
                                         <div className="buttons">
-                                            {orderView === "pending" && (
+                                            {orderView === "pending" && ["paid", "preparing"].includes(order.order.status) && (
                                                 <button
                                                     className="print"
                                                     onClick={() => handlePrintLabel(order)}
@@ -494,7 +570,7 @@ export default function Backoffice() {
                                                         )}
                                                         {!order.order.refundReason && (
                                                             <>
-                                                                <p>Mode de livraison : {order.shippingData.shippingMethod?.name}</p>
+                                                                <p>Mode de livraison : {getShippingMethodName(order.shippingData.shippingMethod?.operator, order.shippingData.shippingMethod?.serviceCode)}</p>
                                                                 <p>
                                                                     N° de suivi : {order.shippingData.trackingNumber ? (
                                                                         (() => {
@@ -538,7 +614,7 @@ export default function Backoffice() {
                                                                 Annuler
                                                             </button>
                                                         )}
-                                                        {["ready", "in_transit", "out_for_delivery", "delivered"].includes(order.order.status) && (
+                                                        {order.order.status === "delivered" && (
                                                             <button
                                                                 className="return"
                                                                 onClick={() => handleReturnOrder(order)}
@@ -552,6 +628,15 @@ export default function Backoffice() {
                                                                 onClick={() => handleRefundReturn(order)}
                                                             >
                                                                 Rembourser
+                                                            </button>
+                                                        )}
+                                                        {["paid", "preparing", "ready", "in_transit", "out_for_delivery"].includes(order.order.status) && order.shippingData.boxtalShipmentId && (
+                                                            <button
+                                                                className="next"
+                                                                onClick={() => handleNextStatus(order)}
+                                                                style={{ backgroundColor: '#4CAF50', color: 'white' }}
+                                                            >
+                                                                Next ⏭️
                                                             </button>
                                                         )}
                                                     </div>
@@ -574,6 +659,22 @@ export default function Backoffice() {
                         </div>
                     )}
                 </div>
+                </section>
+            )}
+            {activeSection === "invoices" && (
+                <section className="invoices">
+                    <div className="conteneur">
+                        <h2 className={nothingYouCouldDo.className}>Factures</h2>
+                        <p>Section factures en cours de développement...</p>
+                    </div>
+                </section>
+            )}
+            {activeSection === "events" && (
+                <section className="events">
+                    <div className="conteneur">
+                        <h2 className={nothingYouCouldDo.className}>Événements</h2>
+                        <p>Section événements en cours de développement...</p>
+                    </div>
                 </section>
             )}
             {showCancelModal && (

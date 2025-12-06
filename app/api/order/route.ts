@@ -158,52 +158,13 @@ export async function PATCH(req: NextRequest) {
                     message: "Commande annulée, client remboursé et produits remis en ligne"
                 });
 
-            case "request-return":
+            case "request-return-only":
+                // Générer seulement le bon de retour, pas de remboursement (le remboursement sera fait quand le colis est de retour à l'atelier)
                 const returnRequestOrder = await ordersCollection.findOne({ _id: new ObjectId(orderId) });
                 if (!returnRequestOrder) {
                     return NextResponse.json(
                         { error: "Commande introuvable" },
                         { status: 404 }
-                    );
-                }
-
-                // Calculer le montant du remboursement
-                const FIXED_PRICES: { [key: string]: number } = {
-                    "MONR-CpourToi": 5.90,
-                    "SOGP-RelaisColis": 5.90,
-                    "POFR-ColissimoAccess": 9.90,
-                    "CHRP-Chrono18": 12.90
-                };
-
-                const shippingCode = `${returnRequestOrder.shippingData?.shippingMethod?.operator || "MONR"}-${returnRequestOrder.shippingData?.shippingMethod?.serviceCode || "CpourToi"}`;
-                const shippingCost = FIXED_PRICES[shippingCode] || 5.90;
-
-                let refundAmount;
-                let refundReason;
-
-                if (fullRefund) {
-                    // Produit défectueux : remboursement complet
-                    refundAmount = Math.round(returnRequestOrder.order.totalPrice * 100); // en centimes
-                    refundReason = "Produit défectueux - Remboursement complet";
-                } else {
-                    // Changement d'avis : remboursement moins frais de retour
-                    refundAmount = Math.round((returnRequestOrder.order.totalPrice - shippingCost) * 100); // en centimes
-                    refundReason = `Changement d'avis - Remboursement ${(returnRequestOrder.order.totalPrice - shippingCost).toFixed(2)}€ (frais retour déduits)`;
-                }
-
-                // Effectuer le remboursement Stripe
-                try {
-                    if (returnRequestOrder.order?.paymentIntentId && refundAmount > 0) {
-                        await stripe.refunds.create({
-                            payment_intent: returnRequestOrder.order.paymentIntentId,
-                            amount: refundAmount,
-                        });
-                    }
-                } catch (stripeError: any) {
-                    console.error("Erreur remboursement retour:", stripeError);
-                    return NextResponse.json(
-                        { error: "Erreur lors du remboursement: " + stripeError.message },
-                        { status: 500 }
                     );
                 }
 
@@ -214,7 +175,6 @@ export async function PATCH(req: NextRequest) {
                         $set: {
                             "order.status": "return_requested",
                             "order.returnRequestedAt": new Date(),
-                            "order.refundReason": refundReason
                         }
                     }
                 );
@@ -229,6 +189,7 @@ export async function PATCH(req: NextRequest) {
                     success: true,
                     boxtalShipmentId: returnRequestOrder.shippingData?.boxtalShipmentId
                 });
+
             case "refund-return":
                 const refundOrder = await ordersCollection.findOne({ _id: new ObjectId(orderId) });
                 if (!refundOrder) {
@@ -237,10 +198,36 @@ export async function PATCH(req: NextRequest) {
                         { status: 404 }
                     );
                 }
+
+                // Calculer le montant du remboursement
+                const FIXED_PRICES: { [key: string]: number } = {
+                    "MONR-CpourToi": 5.90,
+                    "SOGP-RelaisColis": 5.90,
+                    "POFR-ColissimoAccess": 9.90,
+                    "CHRP-Chrono18": 12.90
+                };
+
+                const shippingCode = `${refundOrder.shippingData?.shippingMethod?.operator || "MONR"}-${refundOrder.shippingData?.shippingMethod?.serviceCode || "CpourToi"}`;
+                const shippingCost = FIXED_PRICES[shippingCode] || 5.90;
+
+                let refundAmount;
+                let refundReason;
+
+                if (fullRefund) {
+                    // Produit défectueux : remboursement complet
+                    refundAmount = Math.round(refundOrder.order.totalPrice * 100); // en centimes
+                    refundReason = "Produit défectueux - Remboursement complet";
+                } else {
+                    // Changement d'avis : remboursement moins frais de retour
+                    refundAmount = Math.round((refundOrder.order.totalPrice - shippingCost) * 100); // en centimes
+                    refundReason = `Changement d'avis - Remboursement ${(refundOrder.order.totalPrice - shippingCost).toFixed(2)}€ (frais retour déduits)`;
+                }
+
                 try {
-                    if (refundOrder.order?.paymentIntentId) {
+                    if (refundOrder.order?.paymentIntentId && refundAmount > 0) {
                         await stripe.refunds.create({
                             payment_intent: refundOrder.order.paymentIntentId,
+                            amount: refundAmount,
                         });
                     }
                 } catch (stripeError: any) {
@@ -256,7 +243,7 @@ export async function PATCH(req: NextRequest) {
                         $set: {
                             "order.status": "returned",
                             "order.returnedAt": new Date(),
-                            "order.refundReason": "retour du colis"
+                            "order.refundReason": refundReason
                         },
                         $unset: {
                             shippingData: "",
