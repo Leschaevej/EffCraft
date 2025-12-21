@@ -31,14 +31,20 @@ export default function Home() {
 
     // Synchroniser les produits SWR avec le state local
     useEffect(() => {
-        if (!swrLoading) {
+        if (!swrLoading && swrProducts && swrProducts.length > 0) {
             setBijoux(swrProducts);
+        }
+    }, [swrProducts, swrLoading]);
+
+    // Mettre à jour displayedBijoux quand bijoux ou filter change
+    useEffect(() => {
+        if (bijoux.length > 0) {
             const productsForCarousel = filter === "all"
-                ? swrProducts.slice(3)
-                : swrProducts.filter((b: any) => b.category === filter).slice(3);
+                ? bijoux.slice(3)
+                : bijoux.filter((b: any) => b.category === filter).slice(3);
             setDisplayedBijoux(productsForCarousel);
         }
-    }, [swrProducts, filter, swrLoading]);
+    }, [bijoux, filter]);
 
     useEffect(() => {
         const handleRealtimeUpdate = (e: Event) => {

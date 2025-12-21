@@ -23,9 +23,9 @@ export async function GET(req: NextRequest) {
         const ordersCollection = db.collection("orders");
         let query: any;
         if (status === 'history') {
-            query = { "order.status": { $in: ['delivered', 'cancelled', 'returned'] } };
+            query = { "order.status": { $in: ['delivered', 'cancelled', 'returned', 'return_delivered'] } };
         } else if (status === 'pending') {
-            query = { "order.status": { $in: ['paid', 'preparing', 'ready', 'in_transit', 'out_for_delivery', 'return_requested'] } };
+            query = { "order.status": { $in: ['paid', 'preparing', 'ready', 'in_transit', 'out_for_delivery', 'return_requested', 'return_preparing', 'return_in_transit', 'return_out_for_delivery'] } };
         } else {
             query = { "order.status": status };
         }
@@ -168,13 +168,14 @@ export async function PATCH(req: NextRequest) {
                     );
                 }
 
-                // Mettre à jour la commande
+                // Mettre à jour la commande et réinitialiser le boxtalStatus pour le retour
                 await ordersCollection.updateOne(
                     { _id: new ObjectId(orderId) },
                     {
                         $set: {
                             "order.status": "return_requested",
                             "order.returnRequestedAt": new Date(),
+                            "shippingData.boxtalStatus": "PENDING"
                         }
                     }
                 );
@@ -214,13 +215,13 @@ export async function PATCH(req: NextRequest) {
                 let refundReason;
 
                 if (fullRefund) {
-                    // Produit défectueux : remboursement complet
-                    refundAmount = Math.round(refundOrder.order.totalPrice * 100); // en centimes
-                    refundReason = "Produit défectueux - Remboursement complet";
-                } else {
-                    // Changement d'avis : remboursement moins frais de retour
+                    // Produit défectueux : remboursement moins frais de retour (1 seul trajet)
                     refundAmount = Math.round((refundOrder.order.totalPrice - shippingCost) * 100); // en centimes
-                    refundReason = `Changement d'avis - Remboursement ${(refundOrder.order.totalPrice - shippingCost).toFixed(2)}€ (frais retour déduits)`;
+                    refundReason = `Produit défectueux - Remboursement ${(refundOrder.order.totalPrice - shippingCost).toFixed(2)}€ (frais retour déduits)`;
+                } else {
+                    // Changement d'avis : remboursement moins frais aller + retour (2 trajets)
+                    refundAmount = Math.round((refundOrder.order.totalPrice - (shippingCost * 2)) * 100); // en centimes
+                    refundReason = `Changement d'avis - Remboursement ${(refundOrder.order.totalPrice - (shippingCost * 2)).toFixed(2)}€ (frais aller et retour déduits)`;
                 }
 
                 try {

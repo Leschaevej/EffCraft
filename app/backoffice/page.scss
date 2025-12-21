@@ -378,29 +378,31 @@
             display: flex;
             flex-direction: column;
             gap: 30px;
-            max-width: 600px;
             text-align: center;
             h3 {
-                font-size: 36px;
+                font-size: 24px;
                 color: var(--mainColor);
                 font-weight: 600;
             }
             p {
-                font-size: 20px;
+                font-size: 24px;
                 color: var(--mainTextColor);
             }
             .modal-buttons {
                 display: flex;
-                gap: 20px;
+                gap: 30px;
                 justify-content: center;
                 button {
                     padding: 15px 40px;
                     border: none;
                     border-radius: 25px;
-                    font-size: 20px;
+                    font-size: 24px;
                     cursor: pointer;
                     transition: background-color 0.3s ease, color 0.3s ease;
                     font-weight: 600;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 10px;
                     &.btn-cancel {
                         background-color: var(--errorColor);
                         color: var(--secondTextColor);

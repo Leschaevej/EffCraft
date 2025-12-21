@@ -47,11 +47,11 @@ interface Order {
     };
 }
 const TRACKING_STEPS = [
-    { label: "Commande confirmée", icon: <FaCheck /> },
-    { label: "En cours de préparation", icon: <FaBoxOpen /> },
+    { label: "Confirmé", icon: <FaCheck /> },
+    { label: "En préparation", icon: <FaBoxOpen /> },
     { label: "Remis au transporteur", icon: <FaWarehouse /> },
     { label: "En transit", icon: <FaTruck /> },
-    { label: "En livraison", icon: <FaTruckMoving /> },
+    { label: "Livraison", icon: <FaTruckMoving /> },
     { label: "Livré", icon: <FaHome /> }
 ];
 const STATUS_STEPS: { [key: string]: number } = {
@@ -60,17 +60,27 @@ const STATUS_STEPS: { [key: string]: number } = {
     ready: 3,
     in_transit: 4,
     out_for_delivery: 5,
-    delivered: 6
+    delivered: 6,
+    // Statuts de retour (5 étapes au lieu de 6)
+    return_requested: 1,
+    return_preparing: 2,
+    return_in_transit: 3,
+    return_out_for_delivery: 4,
+    return_delivered: 5
 };
 const STATUS_LABELS: { [key: string]: string } = {
-    paid: "Commande confirmée",
+    paid: "Confirmé",
     preparing: "En préparation",
     ready: "Remis au transporteur",
     in_transit: "En transit",
-    out_for_delivery: "En cours de livraison",
+    out_for_delivery: "Livraison",
     delivered: "Livré",
     cancelled: "Remboursé",
-    return_requested: "Retour demandé",
+    return_requested: "Retour confirmé",
+    return_preparing: "Remis au transporteur",
+    return_in_transit: "En transit",
+    return_out_for_delivery: "Livraison",
+    return_delivered: "Livré",
     returned: "Remboursé"
 };
 
@@ -368,28 +378,42 @@ export default function Backoffice() {
     };
 
     const handleNextStatus = async (order: Order) => {
-        // Mapping des statuts actuels vers les événements Boxtal à simuler
-        const statusToEvent: { [key: string]: string } = {
-            paid: "READY_TO_SHIP",
-            preparing: "PICKED_UP",
-            ready: "IN_TRANSIT",
-            in_transit: "OUT_FOR_DELIVERY",
-            out_for_delivery: "DELIVERED"
-        };
-
-        const nextEvent = statusToEvent[order.order.status];
-        if (!nextEvent) {
-            alert("Pas de statut suivant pour cette commande");
-            return;
-        }
+        const isReturn = order.order.status.startsWith("return_");
 
         if (!order.shippingData.boxtalShipmentId) {
             alert("Pas de boxtalShipmentId pour cette commande");
             return;
         }
 
+        let nextEvent: string | undefined;
+
+        if (isReturn) {
+            // Pour les retours : on regarde order.status
+            const statusToEvent: { [key: string]: string } = {
+                return_requested: "PICKED_UP",
+                return_preparing: "IN_TRANSIT",
+                return_in_transit: "OUT_FOR_DELIVERY",
+                return_out_for_delivery: "DELIVERED"
+            };
+            nextEvent = statusToEvent[order.order.status];
+        } else {
+            // Pour l'envoi : on regarde order.status
+            const statusToEvent: { [key: string]: string } = {
+                paid: "READY_TO_SHIP",
+                preparing: "PICKED_UP",
+                ready: "IN_TRANSIT",
+                in_transit: "OUT_FOR_DELIVERY",
+                out_for_delivery: "DELIVERED"
+            };
+            nextEvent = statusToEvent[order.order.status];
+        }
+
+        if (!nextEvent) {
+            alert("Pas de statut suivant");
+            return;
+        }
+
         try {
-            // Simuler un webhook Boxtal
             const webhookPayload = {
                 event: nextEvent,
                 shipment: {
@@ -407,18 +431,23 @@ export default function Backoffice() {
 
             if (response.ok) {
                 alert(`Statut simulé : ${nextEvent}`);
-                mutate(); // Recharger les données
+                mutate();
             } else {
                 const error = await response.json();
-                alert("Erreur lors de la simulation: " + (error.error || "Erreur inconnue"));
+                alert("Erreur : " + (error.error || "Erreur inconnue"));
             }
         } catch (error) {
             console.error("Erreur simulation:", error);
-            alert("Erreur lors de la simulation: " + error);
+            alert("Erreur : " + error);
         }
     };
 
-    const getTrackingStep = (order: Order): number => STATUS_STEPS[order.order.status] || 1;
+    const getDisplayStatus = (order: Order): string => {
+        // Le statut est maintenant directement dans order.order.status
+        return order.order.status;
+    };
+
+    const getTrackingStep = (order: Order): number => STATUS_STEPS[getDisplayStatus(order)] || 1;
     const getStatusIcon = (status: string) => {
         const iconMap: { [key: string]: React.ReactNode } = {
             paid: <FaCheck />,
@@ -428,7 +457,13 @@ export default function Backoffice() {
             out_for_delivery: <FaTruckMoving />,
             delivered: <FaHome />,
             cancelled: <FaCheck />,
-            returned: <FaCheck />
+            returned: <FaCheck />,
+            // Icônes pour les retours
+            return_requested: <FaCheck />,
+            return_preparing: <FaWarehouse />,
+            return_in_transit: <FaTruck />,
+            return_out_for_delivery: <FaTruckMoving />,
+            return_delivered: <FaHome />
         };
         return iconMap[status] || <FaCheck />;
     };
@@ -533,9 +568,9 @@ export default function Backoffice() {
                                             <p className="total">{order.order.totalPrice.toFixed(2)}€</p>
                                             <div className="status">
                                                 <div className="icon">
-                                                    {getStatusIcon(order.order.status)}
+                                                    {getStatusIcon(getDisplayStatus(order))}
                                                 </div>
-                                                <p className="label">{STATUS_LABELS[order.order.status] || order.order.status}</p>
+                                                <p className="label">{STATUS_LABELS[getDisplayStatus(order)] || getDisplayStatus(order)}</p>
                                             </div>
                                         </div>
                                         <div className="buttons">
@@ -622,7 +657,7 @@ export default function Backoffice() {
                                                                 Retour
                                                             </button>
                                                         )}
-                                                        {order.order.status === "return_requested" && (
+                                                        {order.order.status === "return_delivered" && (
                                                             <button
                                                                 className="refund"
                                                                 onClick={() => handleRefundReturn(order)}
@@ -630,7 +665,7 @@ export default function Backoffice() {
                                                                 Rembourser
                                                             </button>
                                                         )}
-                                                        {["paid", "preparing", "ready", "in_transit", "out_for_delivery"].includes(order.order.status) && order.shippingData.boxtalShipmentId && (
+                                                        {(["paid", "preparing", "ready", "in_transit", "out_for_delivery", "return_requested", "return_preparing", "return_in_transit", "return_out_for_delivery"].includes(order.order.status)) && order.shippingData.boxtalShipmentId && (
                                                             <button
                                                                 className="next"
                                                                 onClick={() => handleNextStatus(order)}
@@ -723,22 +758,50 @@ export default function Backoffice() {
                     setOrderToReturn(null);
                 }}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <h3>Type de retour</h3>
-                        <p>Sélectionnez le motif du retour :</p>
+                        <h3>Motif du retour</h3>
+                        <p>Sélectionnez le motif :</p>
                         <div className="modal-buttons">
-                            <button
-                                className="btn-confirm"
-                                onClick={() => handleReturnChoice(true)}
-                            >
-                                Produit défectueux<br/>
-                                <small>(Remboursement complet : {orderToReturn.order.totalPrice.toFixed(2)}€)</small>
-                            </button>
                             <button
                                 className="btn-cancel"
                                 onClick={() => handleReturnChoice(false)}
                             >
-                                Changement d'avis<br/>
-                                <small>(Remboursement - frais retour)</small>
+                                {(() => {
+                                    const FIXED_PRICES: { [key: string]: number } = {
+                                        "MONR-CpourToi": 5.90,
+                                        "SOGP-RelaisColis": 5.90,
+                                        "POFR-ColissimoAccess": 9.90,
+                                        "CHRP-Chrono18": 12.90
+                                    };
+                                    const shippingCode = `${orderToReturn.shippingData?.shippingMethod?.operator || "MONR"}-${orderToReturn.shippingData?.shippingMethod?.serviceCode || "CpourToi"}`;
+                                    const shippingCost = FIXED_PRICES[shippingCode] || 5.90;
+                                    return (
+                                        <>
+                                            <span className="button-title">Changement d'avis</span>
+                                            <span className="button-calc">{orderToReturn.order.totalPrice.toFixed(2)} - {(shippingCost * 2).toFixed(2)} = {(orderToReturn.order.totalPrice - (shippingCost * 2)).toFixed(2)}€</span>
+                                        </>
+                                    );
+                                })()}
+                            </button>
+                            <button
+                                className="btn-confirm"
+                                onClick={() => handleReturnChoice(true)}
+                            >
+                                {(() => {
+                                    const FIXED_PRICES: { [key: string]: number } = {
+                                        "MONR-CpourToi": 5.90,
+                                        "SOGP-RelaisColis": 5.90,
+                                        "POFR-ColissimoAccess": 9.90,
+                                        "CHRP-Chrono18": 12.90
+                                    };
+                                    const shippingCode = `${orderToReturn.shippingData?.shippingMethod?.operator || "MONR"}-${orderToReturn.shippingData?.shippingMethod?.serviceCode || "CpourToi"}`;
+                                    const shippingCost = FIXED_PRICES[shippingCode] || 5.90;
+                                    return (
+                                        <>
+                                            <span className="button-title">Produit défectueux</span>
+                                            <span className="button-calc">{orderToReturn.order.totalPrice.toFixed(2)} - {shippingCost.toFixed(2)} = {(orderToReturn.order.totalPrice - shippingCost).toFixed(2)}€</span>
+                                        </>
+                                    );
+                                })()}
                             </button>
                         </div>
                     </div>

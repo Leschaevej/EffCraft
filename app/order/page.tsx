@@ -36,11 +36,18 @@ interface Order {
     };
 }
 const TRACKING_STEPS = [
-    { label: "Commande confirmée", icon: <FaCheck /> },
-    { label: "En cours de préparation", icon: <FaBoxOpen /> },
+    { label: "Confirmé", icon: <FaCheck /> },
+    { label: "En préparation", icon: <FaBoxOpen /> },
     { label: "Remis au transporteur", icon: <FaWarehouse /> },
     { label: "En transit", icon: <FaTruck /> },
-    { label: "En livraison", icon: <FaTruckMoving /> },
+    { label: "Livraison", icon: <FaTruckMoving /> },
+    { label: "Livré", icon: <FaHome /> }
+];
+const RETURN_TRACKING_STEPS = [
+    { label: "Retour confirmé", icon: <FaCheck /> },
+    { label: "Remis au transporteur", icon: <FaWarehouse /> },
+    { label: "En transit", icon: <FaTruck /> },
+    { label: "Livraison", icon: <FaTruckMoving /> },
     { label: "Livré", icon: <FaHome /> }
 ];
 const STATUS_STEPS: { [key: string]: number } = {
@@ -49,17 +56,27 @@ const STATUS_STEPS: { [key: string]: number } = {
     ready: 3,
     in_transit: 4,
     out_for_delivery: 5,
-    delivered: 6
+    delivered: 6,
+    // Statuts de retour (5 étapes au lieu de 6)
+    return_requested: 1,
+    return_preparing: 2,
+    return_in_transit: 3,
+    return_out_for_delivery: 4,
+    return_delivered: 5
 };
 const STATUS_LABELS: { [key: string]: string } = {
-    paid: "Commande confirmée",
+    paid: "Confirmé",
     preparing: "En préparation",
     ready: "Remis au transporteur",
     in_transit: "En transit",
-    out_for_delivery: "En cours de livraison",
+    out_for_delivery: "Livraison",
     delivered: "Livré",
     cancelled: "Remboursé",
-    return_requested: "Retour demandé",
+    return_requested: "Retour confirmé",
+    return_preparing: "Remis au transporteur",
+    return_in_transit: "En transit",
+    return_out_for_delivery: "Livraison",
+    return_delivered: "Livré",
     returned: "Remboursé"
 };
 
@@ -120,8 +137,8 @@ export default function OrderPage() {
                 const customEvent = event as CustomEvent;
                 if (customEvent.detail?.type === "order_status_updated" && customEvent.detail?.data) {
                     const { orderId, status } = customEvent.detail.data;
-                    const pendingStatuses = ["paid", "preparing", "ready", "in_transit", "out_for_delivery", "return_requested"];
-                    const historyStatuses = ["delivered", "cancelled", "returned"];
+                    const pendingStatuses = ["paid", "preparing", "ready", "in_transit", "out_for_delivery", "return_requested", "return_preparing", "return_in_transit", "return_out_for_delivery"];
+                    const historyStatuses = ["delivered", "cancelled", "returned", "return_delivered"];
                     const shouldBeInCurrentView = orderView === "pending"
                         ? pendingStatuses.includes(status)
                         : historyStatuses.includes(status);
@@ -142,7 +159,12 @@ export default function OrderPage() {
             };
         }
     }, [session, orderView, mutate]);
-    const getTrackingStep = (order: Order): number => STATUS_STEPS[order.order.status] || 1;
+    const getDisplayStatus = (order: Order): string => {
+        // Le statut est maintenant directement dans order.order.status
+        return order.order.status;
+    };
+
+    const getTrackingStep = (order: Order): number => STATUS_STEPS[getDisplayStatus(order)] || 1;
     const getStatusIcon = (status: string) => {
         const iconMap: { [key: string]: React.ReactNode } = {
             paid: <FaCheck />,
@@ -152,7 +174,13 @@ export default function OrderPage() {
             out_for_delivery: <FaTruckMoving />,
             delivered: <FaHome />,
             cancelled: <FaCheck />,
-            returned: <FaCheck />
+            returned: <FaCheck />,
+            // Icônes pour les retours
+            return_requested: <FaCheck />,
+            return_preparing: <FaWarehouse />,
+            return_in_transit: <FaTruck />,
+            return_out_for_delivery: <FaTruckMoving />,
+            return_delivered: <FaHome />
         };
         return iconMap[status] || <FaCheck />;
     };
@@ -199,9 +227,9 @@ export default function OrderPage() {
                                             <p className="total">{order.order.totalPrice.toFixed(2)}€</p>
                                             <div className="status">
                                                 <div className="icon">
-                                                    {getStatusIcon(order.order.status)}
+                                                    {getStatusIcon(getDisplayStatus(order))}
                                                 </div>
-                                                <p className="label">{STATUS_LABELS[order.order.status] || order.order.status}</p>
+                                                <p className="label">{STATUS_LABELS[getDisplayStatus(order)] || getDisplayStatus(order)}</p>
                                             </div>
                                         </div>
                                         <button onClick={() => setExpandedOrderId(expandedOrderId === order._id ? null : order._id)}>
@@ -212,22 +240,26 @@ export default function OrderPage() {
                                         <div className="details">
                                             {orderView === "pending" && (
                                                 <div className="tracking">
-                                                    {TRACKING_STEPS.map((step, index) => {
-                                                        const currentStep = getTrackingStep(order);
-                                                        const isActive = index + 1 <= currentStep;
-                                                        const isConnectorActive = index + 1 <= currentStep;
-                                                        return (
-                                                            <React.Fragment key={index}>
-                                                                <div className={`step ${isActive ? "active" : ""}`}>
-                                                                    <div className="icon">{step.icon}</div>
-                                                                    <p className="label">{step.label}</p>
-                                                                </div>
-                                                                {index < TRACKING_STEPS.length - 1 && (
-                                                                    <div className={`connector ${isConnectorActive ? "active" : ""}`}></div>
-                                                                )}
-                                                            </React.Fragment>
-                                                        );
-                                                    })}
+                                                    {(() => {
+                                                        const isReturn = order.order.status.startsWith("return_");
+                                                        const steps = isReturn ? RETURN_TRACKING_STEPS : TRACKING_STEPS;
+                                                        return steps.map((step, index) => {
+                                                            const currentStep = getTrackingStep(order);
+                                                            const isActive = index + 1 <= currentStep;
+                                                            const isConnectorActive = index + 1 <= currentStep;
+                                                            return (
+                                                                <React.Fragment key={index}>
+                                                                    <div className={`step ${isActive ? "active" : ""}`}>
+                                                                        <div className="icon">{step.icon}</div>
+                                                                        <p className="label">{step.label}</p>
+                                                                    </div>
+                                                                    {index < steps.length - 1 && (
+                                                                        <div className={`connector ${isConnectorActive ? "active" : ""}`}></div>
+                                                                    )}
+                                                                </React.Fragment>
+                                                            );
+                                                        });
+                                                    })()}
                                                 </div>
                                             )}
                                             <div className="content">

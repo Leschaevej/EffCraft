@@ -121,8 +121,31 @@ export async function POST(req: NextRequest) {
 
         const updateData: any = {};
 
-        // Mapping des statuts Boxtal vers nos statuts internes
-        if ((status === "PENDING" || status === "READY_TO_SHIP") && order.order.status === "paid") {
+        // Si c'est un retour, on met à jour boxtalStatus au lieu de order.status
+        const isReturn = order.order.status === "return_requested" || order.order.status?.startsWith("return_");
+
+        if (isReturn) {
+            // Pour les retours : on met à jour boxtalStatus ET order.status pour l'affichage
+            updateData["shippingData.boxtalStatus"] = status;
+
+            // Mapping des statuts Boxtal vers des statuts de retour
+            if (status === "PENDING" || status === "READY_TO_SHIP") {
+                updateData["order.status"] = "return_requested";
+            } else if (status === "PICKED_UP") {
+                updateData["order.status"] = "return_preparing";
+            } else if (status === "IN_TRANSIT") {
+                updateData["order.status"] = "return_in_transit";
+            } else if (status === "OUT_FOR_DELIVERY") {
+                updateData["order.status"] = "return_out_for_delivery";
+            } else if (status === "DELIVERED") {
+                updateData["order.status"] = "return_delivered";
+            }
+
+            console.log(`🔄 Retour : mise à jour boxtalStatus à ${status}, order.status à ${updateData["order.status"]}`);
+        } else {
+            // Pour les envois normaux : on met à jour order.status
+            // Mapping des statuts Boxtal vers nos statuts internes
+            if ((status === "PENDING" || status === "READY_TO_SHIP") && order.order.status === "paid") {
             updateData["order.status"] = "preparing";
             updateData["order.preparingAt"] = new Date();
             if (trackingNumber) {
@@ -178,6 +201,7 @@ export async function POST(req: NextRequest) {
         } else if (status === "CANCELLED") {
             updateData["order.status"] = "cancelled";
         }
+        }
 
         await ordersCollection.updateOne(
             { _id: new ObjectId(order._id) },
@@ -188,7 +212,8 @@ export async function POST(req: NextRequest) {
             type: "order_status_updated",
             data: {
                 orderId: order._id.toString(),
-                status: updateData["order.status"] || order.order.status
+                status: updateData["order.status"] || order.order.status,
+                boxtalStatus: updateData["shippingData.boxtalStatus"]
             }
         });
 
