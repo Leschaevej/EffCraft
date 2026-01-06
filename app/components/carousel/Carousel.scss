@@ -4,7 +4,7 @@
     margin: 0 auto;
     .controls {
         position: absolute;
-        top: 44.5%;
+        top: 48%;
         left: 12.5px;
         right: 12.5px;
         display: flex;
@@ -13,18 +13,12 @@
         button {
             background: transparent;
             border: none;
-            pointer-events: none;
             svg {
-                width: 25px;
-                height: 50px;
+                width: 30px;
+                height: 30px;
                 color: var(--mainColor);
-                pointer-events: none;
-                path {
-                pointer-events: auto;
-                cursor: pointer;
                 transition: color 0.3s ease;
-                }
-                &:hover path {
+                &:hover {
                     color: var(--secondColor);
                 }
             }
@@ -41,8 +35,8 @@
             align-items: start;
             flex: 0 0 100%;
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 50px;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 30px;
             padding: 0 50px;
         }
     }

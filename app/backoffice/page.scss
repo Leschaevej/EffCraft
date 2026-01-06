@@ -63,7 +63,7 @@
         }
         .conteneur {
             margin: 0 50px;
-            padding: 50px;
+            padding: 30px 50px 50px 50px;
             background-color: var(--secondBackgroundColor);
             border-radius: 50px;
         }
@@ -102,12 +102,12 @@
         }
         .conteneur {
             margin: 0 50px;
-            padding: 50px;
+            padding: 30px 50px 50px 50px;
             background-color: var(--secondBackgroundColor);
             border-radius: 50px;
             display: flex;
             flex-direction: column;
-            gap: 50px;
+            gap: 30px;
             .loading,
             .empty {
                 text-align: center;
@@ -364,7 +364,7 @@
         padding: 0 0 50px 0;
         .conteneur {
             margin: 0 50px;
-            padding: 50px;
+            padding: 30px 50px 50px 50px;
             background-color: var(--secondBackgroundColor);
             border-radius: 50px;
             display: flex;
@@ -472,13 +472,6 @@
                 .event-item {
                     display: flex;
                     gap: 30px;
-                    padding: 20px;
-                    background-color: var(--backgroundColor);
-                    border-radius: 20px;
-                    transition: transform 0.2s ease;
-                    &:hover {
-                        transform: translateY(-5px);
-                    }
                     .box {
                         padding: 20px;
                         border-radius: 28px;

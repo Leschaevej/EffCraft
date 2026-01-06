@@ -3,9 +3,9 @@
     .conteneur {
         display: flex;
         flex-direction: column;
-        gap: 50px;
+        gap: 30px;
         margin: 0 50px;
-        padding: 50px;
+        padding: 30px 50px 50px 50px;
         background-color: var(--secondBackgroundColor);
         border-radius: 50px;
         .loginFav{
@@ -37,7 +37,7 @@
         }
         .grid{
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 50px;
         }
     }

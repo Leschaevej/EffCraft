@@ -66,20 +66,6 @@ export default function Carousel({
                     onClick={handlePrev}
                     aria-label="Page précédente"
                     className="arrow left"
-                    style={{
-                        background: "transparent",
-                        border: "none",
-                        borderRadius: "50%",
-                        width: "40px",
-                        height: "40px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: "pointer",
-                        padding: 0,
-                        color: "var(--mainColor)",
-                        fontSize: "20px",
-                    }}
                 >
                     <IoChevronBack />
                 </button>
@@ -87,20 +73,6 @@ export default function Carousel({
                     onClick={handleNext}
                     aria-label="Page suivante"
                     className="arrow right"
-                    style={{
-                        background: "transparent",
-                        border: "none",
-                        borderRadius: "50%",
-                        width: "40px",
-                        height: "40px",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        cursor: "pointer",
-                        padding: 0,
-                        color: "var(--mainColor)",
-                        fontSize: "20px",
-                    }}
                 >
                     <IoChevronForward />
                 </button>

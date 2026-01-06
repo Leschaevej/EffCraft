@@ -74,8 +74,8 @@ export default function Home() {
     useEffect(() => {
         if (bijoux.length > 0) {
             const productsForCarousel = filter === "all"
-                ? bijoux.slice(3)
-                : bijoux.filter((b: any) => b.category === filter).slice(3);
+                ? bijoux.slice(4)
+                : bijoux.filter((b: any) => b.category === filter).slice(4);
             setDisplayedBijoux(productsForCarousel);
         }
     }, [bijoux, filter]);
@@ -89,8 +89,8 @@ export default function Home() {
                 setBijoux(prev => {
                     const updated = prev.filter(b => b._id !== productId);
                     const productsForCarousel = filter === "all"
-                        ? updated.slice(3)
-                        : updated.filter((b: any) => b.category === filter).slice(3);
+                        ? updated.slice(4)
+                        : updated.filter((b: any) => b.category === filter).slice(4);
                     setDisplayedBijoux(productsForCarousel);
                     return updated;
                 });
@@ -131,8 +131,8 @@ export default function Home() {
         setFilter(newFilter);
         setPageIndex(0);
         const productsForCarousel = newFilter === "all"
-            ? bijoux.slice(3)
-            : bijoux.filter((b) => b.category === newFilter).slice(3);
+            ? bijoux.slice(4)
+            : bijoux.filter((b) => b.category === newFilter).slice(4);
         setDisplayedBijoux(productsForCarousel);
         setIsFading(false);
         }, 500);
@@ -207,8 +207,8 @@ export default function Home() {
                     <h2 className={nothingYouCouldDo.className}>Nouveautés</h2>
                     <div className="cards">
                     {swrLoading && bijoux.length === 0
-                        ? Array.from({ length: 3 }, (_, i) => <CardSkeleton key={`skeleton-${i}`} />)
-                        : bijoux.slice(0, 3).map((bijou) => (
+                        ? Array.from({ length: 4 }, (_, i) => <CardSkeleton key={`skeleton-${i}`} />)
+                        : bijoux.slice(0, 4).map((bijou) => (
                             <Card
                             key={bijou._id || bijou.id}
                             bijou={bijou}
@@ -223,9 +223,9 @@ export default function Home() {
                     <h2 className={nothingYouCouldDo.className}>Les bijoux</h2>
                     <Filter onFilterChange={handleFilterChange} selectedFilter={filter} />
                     <div className={`carouselContaineur ${isFading ? "fade" : ""}`}>
-                        <Carousel itemsPerPage={8} pageIndex={pageIndex} setPageIndex={setPageIndex}>
+                        <Carousel itemsPerPage={12} pageIndex={pageIndex} setPageIndex={setPageIndex}>
                             {swrLoading && displayedBijoux.length === 0
-                            ? Array.from({ length: 8 }, (_, i) => <CardSkeleton key={i} />)
+                            ? Array.from({ length: 12 }, (_, i) => <CardSkeleton key={i} />)
                             : displayedBijoux.map((bijou) => (
                                 <Card
                                     key={bijou._id || bijou.id}

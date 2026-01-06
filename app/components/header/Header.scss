@@ -3,12 +3,12 @@
     top: 0;
     left: 0;
     width: 100%;
-    height: 100px;
+    height: 80px;
     background-color: var(--secondBackgroundColor);
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0 50px;
+    padding: 0 30px;
     z-index: 1000;
     transition: transform 0.18s ease-in-out, box-shadow 0.3s ease;
     &.hide {
@@ -28,14 +28,39 @@
     .right {
         display: flex;
         align-items: center;
-        gap: 50px;
+        gap: 30px;
+        height: 100%;
     }
     nav {
         display: flex;
-        gap: 50px;
+        gap: 30px;
+        height: 100%;
+        align-items: center;
+        a {
+            height: 100%;
+            display: flex;
+            align-items: center;
+        }
+        .userIconWrapper {
+            position: relative;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            .badge {
+                position: absolute;
+                top: 15%;
+                right: 5%;
+                width: 12px;
+                height: 12px;
+                background-color: var(--errorColor);
+                border-radius: 50%;
+                border: 2px solid var(--secondBackgroundColor);
+            }
+        }
         .icon {
-            height: 50px;
-            width: 50px;
+            height: 100%;
+            width: auto;
+            padding: 20px 0;
             color: var(--mainColor);
             cursor: pointer;
         }
@@ -53,7 +78,7 @@
 .menu,
 .login {
     position: fixed;
-    top: 100px;
+    top: 80px;
     right: 0;
     width: fit-content;
     padding: 30px;
@@ -133,6 +158,8 @@
 .timer {
     display: flex;
     align-items: center;
+    height: fit-content;
+    width: 170px;
     gap: 8px;
     padding: 8px 16px;
     background-color: var(--secondColor);

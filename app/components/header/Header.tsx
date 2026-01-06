@@ -262,7 +262,10 @@ export default function Header() {
                 <div className="right">
                     <CartTimer />
                     <nav>
-                        <FaUser className="icon" onClick={toggleLogin} />
+                        <div className="userIconWrapper">
+                            <FaUser className="icon" onClick={toggleLogin} />
+                            {!session?.user && <span className="badge"></span>}
+                        </div>
                         <Link href="/favorites">
                             <FaHeart className="icon" />
                         </Link>
