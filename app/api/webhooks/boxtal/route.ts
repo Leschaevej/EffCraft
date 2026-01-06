@@ -73,10 +73,10 @@ export async function POST(req: NextRequest) {
         }
 
         // Extraire les données - la structure peut varier selon l'événement
-        let shipmentId = body.shipmentId;
+        let shipmentId = body.shipmentId || body.shippingOrderId;
         let status = body.status;
         let trackingNumber = body.trackingNumber;
-        let eventType = body.eventType;
+        let eventType = body.eventType || body.type;
 
         // Si c'est une simulation depuis le backoffice
         if (isSimulation) {
@@ -85,6 +85,13 @@ export async function POST(req: NextRequest) {
             trackingNumber = body.shipment.trackingNumber;
             eventType = "TRACKING_CHANGED";
             console.log("🧪 Données simulation:", { status, shipmentId, trackingNumber });
+        }
+        // Si c'est un événement TRACKING_CHANGED avec payload.trackings
+        else if (body.payload && body.payload.trackings && Array.isArray(body.payload.trackings) && body.payload.trackings.length > 0) {
+            const tracking = body.payload.trackings[0];
+            status = tracking.status;
+            trackingNumber = tracking.trackingNumber;
+            console.log("📦 TRACKING_CHANGED détecté:", { status, trackingNumber, shipmentId });
         }
         // Si c'est un événement TRACKING_CHANGED, les données peuvent être dans content
         else if (body.content) {
