@@ -102,6 +102,9 @@ export async function POST(req: NextRequest) {
 
         if (!shipmentId) {
             console.warn("⚠️ shipmentId manquant dans le webhook (événement de test ?)");
+            console.warn("📋 Body complet reçu:", JSON.stringify(body, null, 2));
+            console.warn("📋 eventType:", eventType);
+            console.warn("📋 status:", status);
             // Si c'est un événement de test, on retourne success au lieu d'une erreur
             return NextResponse.json({
                 success: true,
