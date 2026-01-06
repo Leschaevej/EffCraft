@@ -2,7 +2,7 @@ import "./Calendar.scss";
 
 interface CalendarProps {
     date: string;
-    time: string;
+    time?: string;
 }
 
 export default function Calendar({ date, time }: CalendarProps) {
@@ -16,7 +16,7 @@ export default function Calendar({ date, time }: CalendarProps) {
                 <div className="month">{month}</div>
                 <div className="day">{day}</div>
             </div>
-            <div className="time">{time}</div>
+            {time && <div className="time">{time}</div>}
         </div>
     );
 }

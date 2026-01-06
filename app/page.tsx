@@ -10,15 +10,24 @@ import Calendar from "./components/calendar/Calendar";
 import Contact from "./components/contact/Contact";
 import Map from "./components/map/Map";
 import Carousel from "./components/carousel/Carousel";
-import eventData from "./data/event.json";
 import { useSession } from "next-auth/react";
 import { useProducts } from "./hooks/useProducts";
 
 type Category = "all" | "earrings" | "necklace";
 
+interface EventData {
+    _id: string;
+    name: string;
+    address: string;
+    date: string;
+    heureDebut: string;
+    heureFin: string;
+    lat?: number;
+    lng?: number;
+}
+
 export default function Home() {
-    const { date, name, time, address, coords } = eventData.event;
-    const { lat, lng } = coords;
+    const [nextEvent, setNextEvent] = useState<EventData | null>(null);
     const { data: session, status } = useSession();
     const { products: swrProducts, isLoading: swrLoading, mutate } = useProducts();
     const [filter, setFilter] = useState<Category>("all");
@@ -28,6 +37,31 @@ export default function Home() {
     const [displayedBijoux, setDisplayedBijoux] = useState<any[]>([]);
     const [favorites, setFavorites] = useState<string[]>([]);
     const [showDeletedMessage, setShowDeletedMessage] = useState(false);
+
+    // Charger le prochain événement depuis l'API
+    useEffect(() => {
+        async function fetchNextEvent() {
+            try {
+                const response = await fetch("/api/events");
+                if (response.ok) {
+                    const events: EventData[] = await response.json();
+                    if (events.length > 0) {
+                        // Trier les événements par date et prendre le plus proche
+                        const sortedEvents = events.sort((a, b) =>
+                            new Date(a.date).getTime() - new Date(b.date).getTime()
+                        );
+                        const upcomingEvent = sortedEvents.find(e =>
+                            new Date(e.date) >= new Date()
+                        ) || sortedEvents[0];
+                        setNextEvent(upcomingEvent);
+                    }
+                }
+            } catch (error) {
+                console.error("Erreur chargement événement:", error);
+            }
+        }
+        fetchNextEvent();
+    }, []);
 
     // Synchroniser les produits SWR avec le state local
     useEffect(() => {
@@ -206,15 +240,29 @@ export default function Home() {
             <section id="event" className="event">
                 <div className="conteneur">
                     <h2 className={nothingYouCouldDo.className}>Événements</h2>
-                    <div className="calendarMap">
-                        <div className="calendar">
-                            <Calendar date={date} time={time} />
+                    {nextEvent ? (
+                        <div className="calendarMap">
+                            <div className="calendar">
+                                <Calendar
+                                    date={nextEvent.date}
+                                    time={`${nextEvent.heureDebut.substring(0, 2)}H-${nextEvent.heureFin.substring(0, 2)}H`}
+                                />
+                            </div>
+                            <div className="mapContaineur">
+                                <Map
+                                    lat={nextEvent.lat || 0}
+                                    lng={nextEvent.lng || 0}
+                                    name={nextEvent.name}
+                                    address={nextEvent.address}
+                                />
+                                <div className="name">{nextEvent.name}</div>
+                            </div>
                         </div>
-                        <div className="mapContaineur">
-                            <Map lat={lat} lng={lng} name={name} address={address} />
-                            <div className="name">{name}</div>
-                        </div>
-                    </div>
+                    ) : (
+                        <p style={{ textAlign: 'center', padding: '30px', fontSize: '20px' }}>
+                            Aucun événement à venir pour le moment
+                        </p>
+                    )}
                 </div>
             </section>
             <section id="contact" className="contact">

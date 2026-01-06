@@ -4,11 +4,12 @@ import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { nothingYouCouldDo } from "../font";
-import { FaCheck, FaBoxOpen, FaWarehouse, FaTruck, FaTruckMoving, FaHome } from "react-icons/fa";
+import { FaCheck, FaBoxOpen, FaWarehouse, FaTruck, FaTruckMoving, FaHome, FaPencilAlt, FaTrash } from "react-icons/fa";
 import "./page.scss";
 import AddForm from "../components/addForm/AddForm";
 import DeleteForm from "../components/deleteForm/DeleteForm";
 import { useOrders } from "../hooks/useOrders";
+import Calendar from "../components/calendar/Calendar";
 
 interface Product {
     _id: string;
@@ -128,6 +129,18 @@ export default function Backoffice() {
     const [cancelModalMessage, setCancelModalMessage] = useState<string | null>(null);
     const [showReturnModal, setShowReturnModal] = useState(false);
     const [orderToReturn, setOrderToReturn] = useState<Order | null>(null);
+    const [showEventForm, setShowEventForm] = useState(false);
+    const [editingEventId, setEditingEventId] = useState<string | null>(null);
+    const [eventForm, setEventForm] = useState({
+        name: "",
+        rue: "",
+        ville: "",
+        codePostal: "",
+        date: "",
+        heureDebut: "",
+        heureFin: ""
+    });
+    const [events, setEvents] = useState<any[]>([]);
 
     // Synchroniser les données SWR avec le state local
     useEffect(() => {
@@ -135,6 +148,68 @@ export default function Backoffice() {
             setOrders(swrOrders);
         }
     }, [swrOrders]);
+
+    // Charger les événements
+    useEffect(() => {
+        if (activeSection === "events") {
+            fetchEvents();
+        }
+    }, [activeSection]);
+
+    const fetchEvents = async () => {
+        try {
+            const response = await fetch("/api/events");
+            if (response.ok) {
+                const data = await response.json();
+                setEvents(data);
+            }
+        } catch (error) {
+            console.error("Erreur chargement événements:", error);
+        }
+    };
+
+    const handleEditEvent = (event: any) => {
+        // Extraire rue, ville, code postal depuis l'adresse complète
+        const addressParts = event.address.split(", ");
+        const rue = addressParts[0] || "";
+        const villeCodePostal = addressParts[1] || "";
+        const [codePostal, ...villeArray] = villeCodePostal.split(" ");
+        const ville = villeArray.join(" ");
+
+        setEventForm({
+            name: event.name,
+            rue: rue,
+            ville: ville,
+            codePostal: codePostal,
+            date: event.date,
+            heureDebut: event.heureDebut,
+            heureFin: event.heureFin
+        });
+        setEditingEventId(event._id);
+        setShowEventForm(true);
+    };
+
+    const handleDeleteEvent = async (eventId: string) => {
+        if (!confirm("Êtes-vous sûr de vouloir supprimer cet événement ?")) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/events?id=${eventId}`, {
+                method: "DELETE",
+            });
+
+            if (response.ok) {
+                alert("Événement supprimé avec succès !");
+                fetchEvents();
+            } else {
+                alert("Erreur lors de la suppression");
+            }
+        } catch (error) {
+            console.error("Erreur suppression événement:", error);
+            alert("Erreur lors de la suppression de l'événement");
+        }
+    };
 
     useEffect(() => {
         if (status === "loading") return;
@@ -708,7 +783,181 @@ export default function Backoffice() {
                 <section className="events">
                     <div className="conteneur">
                         <h2 className={nothingYouCouldDo.className}>Événements</h2>
-                        <p>Section événements en cours de développement...</p>
+                        {!showEventForm && (
+                            <button
+                                className="add-event-btn"
+                                onClick={() => setShowEventForm(true)}
+                            >
+                                Ajouter
+                            </button>
+                        )}
+                        {showEventForm ? (
+                            <div className="event-form">
+                                <div className="form-group">
+                                    <label>Nom de l'événement</label>
+                                    <input
+                                        type="text"
+                                        value={eventForm.name}
+                                        onChange={(e) => setEventForm({ ...eventForm, name: e.target.value })}
+                                        placeholder="Nom de l'événement"
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label>Rue</label>
+                                    <input
+                                        type="text"
+                                        value={eventForm.rue}
+                                        onChange={(e) => setEventForm({ ...eventForm, rue: e.target.value })}
+                                        placeholder="Rue"
+                                    />
+                                </div>
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Code Postal</label>
+                                        <input
+                                            type="text"
+                                            value={eventForm.codePostal}
+                                            onChange={(e) => setEventForm({ ...eventForm, codePostal: e.target.value })}
+                                            placeholder="Code Postal"
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Ville</label>
+                                        <input
+                                            type="text"
+                                            value={eventForm.ville}
+                                            onChange={(e) => setEventForm({ ...eventForm, ville: e.target.value })}
+                                            placeholder="Ville"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="form-row">
+                                    <div className="form-group">
+                                        <label>Date</label>
+                                        <input
+                                            type="date"
+                                            value={eventForm.date}
+                                            onChange={(e) => setEventForm({ ...eventForm, date: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Heure de début</label>
+                                        <input
+                                            type="time"
+                                            value={eventForm.heureDebut}
+                                            onChange={(e) => setEventForm({ ...eventForm, heureDebut: e.target.value })}
+                                        />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Heure de fin</label>
+                                        <input
+                                            type="time"
+                                            value={eventForm.heureFin}
+                                            onChange={(e) => setEventForm({ ...eventForm, heureFin: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="form-actions">
+                                    <button
+                                        className="cancel-btn"
+                                        onClick={() => {
+                                            setShowEventForm(false);
+                                            setEventForm({ name: "", rue: "", ville: "", codePostal: "", date: "", heureDebut: "", heureFin: "" });
+                                            setEditingEventId(null);
+                                        }}
+                                    >
+                                        Annuler
+                                    </button>
+                                    <button
+                                        className="submit-btn"
+                                        onClick={async () => {
+                                            if (!eventForm.name || !eventForm.rue || !eventForm.ville || !eventForm.codePostal || !eventForm.date || !eventForm.heureDebut || !eventForm.heureFin) {
+                                                alert("Veuillez remplir tous les champs");
+                                                return;
+                                            }
+
+                                            try {
+                                                if (editingEventId) {
+                                                    // Mode édition - utiliser PUT
+                                                    const response = await fetch(`/api/events?id=${editingEventId}`, {
+                                                        method: "PUT",
+                                                        headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify(eventForm),
+                                                    });
+
+                                                    if (response.ok) {
+                                                        alert("Événement modifié avec succès !");
+                                                        setShowEventForm(false);
+                                                        setEventForm({ name: "", rue: "", ville: "", codePostal: "", date: "", heureDebut: "", heureFin: "" });
+                                                        setEditingEventId(null);
+                                                        fetchEvents();
+                                                    } else {
+                                                        const error = await response.json();
+                                                        alert("Erreur : " + (error.error || "Erreur inconnue"));
+                                                    }
+                                                } else {
+                                                    // Mode création - utiliser POST
+                                                    const response = await fetch("/api/events", {
+                                                        method: "POST",
+                                                        headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify(eventForm),
+                                                    });
+
+                                                    if (response.ok) {
+                                                        const result = await response.json();
+                                                        alert("Événement ajouté avec succès !");
+                                                        setShowEventForm(false);
+                                                        setEventForm({ name: "", rue: "", ville: "", codePostal: "", date: "", heureDebut: "", heureFin: "" });
+                                                        fetchEvents();
+                                                    } else {
+                                                        const error = await response.json();
+                                                        alert("Erreur : " + (error.error || "Erreur inconnue"));
+                                                    }
+                                                }
+                                            } catch (error) {
+                                                console.error("Erreur événement:", error);
+                                                alert("Erreur lors de l'opération");
+                                            }
+                                        }}
+                                    >
+                                        {editingEventId ? "Modifier" : "Enregistrer"}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="events-list">
+                                {events.length === 0 ? (
+                                    <p className="empty">Aucun événement</p>
+                                ) : (
+                                    events.map((event) => {
+                                        return (
+                                            <div key={event._id} className="event-item">
+                                                <Calendar date={event.date} />
+                                                <div className="event-info">
+                                                    <h3>{event.name}</h3>
+                                                    <p className="address">{event.address}</p>
+                                                    <p className="time">{event.heureDebut} - {event.heureFin}</p>
+                                                </div>
+                                                <div className="event-actions">
+                                                    <button
+                                                        className="edit-btn"
+                                                        onClick={() => handleEditEvent(event)}
+                                                    >
+                                                        <FaPencilAlt />
+                                                    </button>
+                                                    <button
+                                                        className="delete-btn"
+                                                        onClick={() => handleDeleteEvent(event._id)}
+                                                    >
+                                                        <FaTrash />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        )}
                     </div>
                 </section>
             )}

@@ -7,17 +7,17 @@
     border-radius: 50px;
     .calendar {
         background-color: var(--secondBackgroundColor);
-        border-bottom-left-radius: 50px;
-        border-bottom-right-radius: 50px;
+        border-bottom-left-radius: 34px;
+        border-bottom-right-radius: 34px;
         border-top-left-radius: 10px;
         border-top-right-radius: 10px;
         border-top: 10px solid #DB6D6D;
         .month {
-            padding: 20px 0 10px 0;
+            padding: 20px 40px 10px 40px;
             font-size: 48px;
         }
         .day {
-            padding: 0 0 10px 0;
+            padding: 0 40px 10px 40px;
             font-size: 96px;
         }
     }
