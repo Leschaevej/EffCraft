@@ -131,6 +131,10 @@ export async function POST(req: NextRequest) {
 
         const updateData: any = {};
 
+        // Toujours stocker le statut Boxtal brut pour le debug
+        updateData["shippingData.boxtalStatus"] = status;
+        updateData["shippingData.boxtalLastUpdate"] = new Date();
+
         // Si c'est un retour, on met à jour boxtalStatus au lieu de order.status
         const isReturn = order.order.status === "return_requested" || order.order.status?.startsWith("return_");
 
@@ -155,62 +159,86 @@ export async function POST(req: NextRequest) {
         } else {
             // Pour les envois normaux : on met à jour order.status
             // Mapping des statuts Boxtal vers nos statuts internes
-            if ((status === "PENDING" || status === "READY_TO_SHIP") && order.order.status === "paid") {
-            updateData["order.status"] = "preparing";
-            updateData["order.preparingAt"] = new Date();
-            if (trackingNumber) {
-                updateData["shippingData.trackingNumber"] = trackingNumber;
-            }
-        } else if (status === "PICKED_UP" && order.order.status === "preparing") {
-            updateData["order.status"] = "ready";
-            updateData["order.readyAt"] = new Date();
-            if (trackingNumber) {
-                updateData["shippingData.trackingNumber"] = trackingNumber;
-            }
-            // Nettoyage des images supplémentaires
-            if (order.products && order.products.length > 0) {
-                const imagesToDelete: string[] = [];
-                order.products.forEach((p: any) => {
-                    if (p.images && p.images.length > 1) {
-                        imagesToDelete.push(...p.images.slice(1));
-                    }
-                });
-                if (imagesToDelete.length > 0) {
-                    for (const imageUrl of imagesToDelete) {
-                        try {
-                            const match = imageUrl.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
-                            if (match && match[1]) {
-                                const publicId = match[1];
-                                await cloudinary.uploader.destroy(publicId);
+            // IMPORTANT: On ne vérifie plus l'état précédent pour permettre les sauts d'étapes
+
+            console.log(`📦 Statut actuel de la commande: ${order.order.status}, Nouveau statut Boxtal: ${status}`);
+
+            if (status === "PENDING" || status === "READY_TO_SHIP") {
+                // Seulement si pas déjà plus avancé
+                if (["paid"].includes(order.order.status)) {
+                    updateData["order.status"] = "preparing";
+                    updateData["order.preparingAt"] = new Date();
+                }
+                if (trackingNumber) {
+                    updateData["shippingData.trackingNumber"] = trackingNumber;
+                }
+            } else if (status === "PICKED_UP") {
+                // Seulement si pas déjà plus avancé
+                if (["paid", "preparing"].includes(order.order.status)) {
+                    updateData["order.status"] = "ready";
+                    updateData["order.readyAt"] = new Date();
+                }
+                if (trackingNumber) {
+                    updateData["shippingData.trackingNumber"] = trackingNumber;
+                }
+                // Nettoyage des images supplémentaires (seulement si on passe à ready)
+                if (updateData["order.status"] === "ready" && order.products && order.products.length > 0) {
+                    const imagesToDelete: string[] = [];
+                    order.products.forEach((p: any) => {
+                        if (p.images && p.images.length > 1) {
+                            imagesToDelete.push(...p.images.slice(1));
+                        }
+                    });
+                    if (imagesToDelete.length > 0) {
+                        for (const imageUrl of imagesToDelete) {
+                            try {
+                                const match = imageUrl.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
+                                if (match && match[1]) {
+                                    const publicId = match[1];
+                                    await cloudinary.uploader.destroy(publicId);
+                                }
+                            } catch (error) {
+                                console.error("Erreur suppression image Cloudinary:", error);
                             }
-                        } catch (error) {
-                            console.error("Erreur suppression image Cloudinary:", error);
                         }
                     }
-                }
-                const cleanedProducts = order.products.map((p: any) => ({
-                    name: p.name,
-                    price: p.price,
-                    images: p.images && p.images.length > 0 ? [p.images[0]] : []
-                }));
+                    const cleanedProducts = order.products.map((p: any) => ({
+                        name: p.name,
+                        price: p.price,
+                        images: p.images && p.images.length > 0 ? [p.images[0]] : []
+                    }));
 
-                updateData.products = cleanedProducts;
+                    updateData.products = cleanedProducts;
+                }
+            } else if (status === "SHIPPED" || status === "IN_TRANSIT") {
+                // Seulement si pas déjà plus avancé
+                if (["paid", "preparing", "ready"].includes(order.order.status)) {
+                    updateData["order.status"] = "in_transit";
+                }
+                if (trackingNumber && !order.shippingData?.trackingNumber) {
+                    updateData["shippingData.trackingNumber"] = trackingNumber;
+                }
+            } else if (status === "OUT_FOR_DELIVERY") {
+                // Seulement si pas déjà plus avancé
+                if (["paid", "preparing", "ready", "in_transit"].includes(order.order.status)) {
+                    updateData["order.status"] = "out_for_delivery";
+                }
+            } else if (status === "DELIVERED") {
+                // Toujours accepter la livraison
+                if (order.order.status !== "delivered") {
+                    updateData["order.status"] = "delivered";
+                    updateData["order.deliveredAt"] = new Date();
+                }
+            } else if (status === "CANCELLED") {
+                updateData["order.status"] = "cancelled";
             }
-        } else if (status === "SHIPPED" || status === "IN_TRANSIT") {
-            updateData["order.status"] = "in_transit";
-            if (trackingNumber && !order.shippingData?.trackingNumber) {
-                updateData["shippingData.trackingNumber"] = trackingNumber;
+
+            // Log si aucune mise à jour n'a été effectuée
+            if (Object.keys(updateData).length === 0) {
+                console.log(`⚠️ Aucune mise à jour effectuée - statut ${status} ignoré car commande déjà en ${order.order.status}`);
+            } else {
+                console.log(`✅ Mise à jour prévue:`, JSON.stringify(updateData, null, 2));
             }
-        } else if (status === "OUT_FOR_DELIVERY") {
-            updateData["order.status"] = "out_for_delivery";
-        } else if (status === "DELIVERED") {
-            updateData["order.status"] = "delivered";
-            if (!order.order.deliveredAt) {
-                updateData["order.deliveredAt"] = new Date();
-            }
-        } else if (status === "CANCELLED") {
-            updateData["order.status"] = "cancelled";
-        }
         }
 
         await ordersCollection.updateOne(
