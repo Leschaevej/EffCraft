@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { nothingYouCouldDo } from "../font";
-import { FaCheck, FaBoxOpen, FaWarehouse, FaTruck, FaTruckMoving, FaHome } from "react-icons/fa";
+import { FaCheck, FaBoxOpen, FaTruck, FaHome } from "react-icons/fa";
 import "./page.scss";
 import { useUserOrders } from "../hooks/useOrders";
 interface Product {
@@ -37,12 +37,12 @@ interface Order {
 const TRACKING_STEPS = [
     { label: "Confirmé", icon: <FaCheck /> },
     { label: "En préparation", icon: <FaBoxOpen /> },
-    { label: "En transit", icon: <FaTruck /> },
+    { label: "Livraison", icon: <FaTruck /> },
     { label: "Livré", icon: <FaHome /> }
 ];
 const RETURN_TRACKING_STEPS = [
     { label: "Retour confirmé", icon: <FaCheck /> },
-    { label: "En transit", icon: <FaTruck /> },
+    { label: "Livraison", icon: <FaTruck /> },
     { label: "Livré", icon: <FaHome /> }
 ];
 const STATUS_STEPS: { [key: string]: number } = {

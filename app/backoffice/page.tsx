@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { nothingYouCouldDo } from "../font";
-import { FaCheck, FaBoxOpen, FaWarehouse, FaTruck, FaTruckMoving, FaHome, FaPencilAlt, FaTrash } from "react-icons/fa";
+import { FaCheck, FaBoxOpen, FaTruck, FaHome, FaPencilAlt, FaTrash } from "react-icons/fa";
 import "./page.scss";
 import AddForm from "../components/addForm/AddForm";
 import DeleteForm from "../components/deleteForm/DeleteForm";
@@ -46,21 +46,6 @@ interface Order {
         paymentIntentId?: string;
     };
 }
-const TRACKING_STEPS = [
-    { label: "Confirmé", icon: <FaCheck /> },
-    { label: "En préparation", icon: <FaBoxOpen /> },
-    { label: "En transit", icon: <FaTruck /> },
-    { label: "Livré", icon: <FaHome /> }
-];
-const STATUS_STEPS: { [key: string]: number } = {
-    paid: 1,
-    preparing: 2,
-    in_transit: 3,
-    delivered: 4,
-    return_requested: 1,
-    return_in_transit: 2,
-    return_delivered: 3
-};
 const STATUS_LABELS: { [key: string]: string } = {
     paid: "Confirmé",
     preparing: "En préparation",
@@ -405,7 +390,6 @@ export default function Backoffice() {
     const getDisplayStatus = (order: Order): string => {
         return order.order.status;
     };
-    const getTrackingStep = (order: Order): number => STATUS_STEPS[getDisplayStatus(order)] || 1;
     const getStatusIcon = (status: string) => {
         const iconMap: { [key: string]: React.ReactNode } = {
             paid: <FaCheck />,
