@@ -140,31 +140,29 @@ export async function POST(req: NextRequest) {
 
         if (isReturn) {
             // Pour les retours : on met à jour boxtalStatus ET order.status pour l'affichage
-            updateData["shippingData.boxtalStatus"] = status;
-
-            // Mapping des statuts Boxtal vers des statuts de retour
-            if (status === "PENDING" || status === "READY_TO_SHIP") {
+            // Mapping des VRAIS statuts Boxtal vers des statuts de retour
+            if (status === "ANNOUNCED" || status === "PENDING" || status === "READY_TO_SHIP") {
                 updateData["order.status"] = "return_requested";
-            } else if (status === "PICKED_UP") {
+            } else if (status === "AT_PICKUP_LOCATION" || status === "PICKED_UP") {
                 updateData["order.status"] = "return_preparing";
             } else if (status === "IN_TRANSIT") {
                 updateData["order.status"] = "return_in_transit";
             } else if (status === "OUT_FOR_DELIVERY") {
                 updateData["order.status"] = "return_out_for_delivery";
-            } else if (status === "DELIVERED") {
+            } else if (status === "DELIVERED" || status === "AVAILABLE_FOR_WITHDRAWAL") {
                 updateData["order.status"] = "return_delivered";
             }
 
             console.log(`🔄 Retour : mise à jour boxtalStatus à ${status}, order.status à ${updateData["order.status"]}`);
         } else {
             // Pour les envois normaux : on met à jour order.status
-            // Mapping des statuts Boxtal vers nos statuts internes
-            // IMPORTANT: On ne vérifie plus l'état précédent pour permettre les sauts d'étapes
+            // Mapping des VRAIS statuts Boxtal vers nos statuts internes
+            // Statuts Boxtal réels: ANNOUNCED, AT_PICKUP_LOCATION, IN_TRANSIT, OUT_FOR_DELIVERY, DELIVERED, AVAILABLE_FOR_WITHDRAWAL, RETURNED
 
             console.log(`📦 Statut actuel de la commande: ${order.order.status}, Nouveau statut Boxtal: ${status}`);
 
-            if (status === "PENDING" || status === "READY_TO_SHIP") {
-                // Seulement si pas déjà plus avancé
+            // ANNOUNCED = Envoi préparé / annoncé au transporteur
+            if (status === "ANNOUNCED" || status === "PENDING" || status === "READY_TO_SHIP") {
                 if (["paid"].includes(order.order.status)) {
                     updateData["order.status"] = "preparing";
                     updateData["order.preparingAt"] = new Date();
@@ -172,8 +170,9 @@ export async function POST(req: NextRequest) {
                 if (trackingNumber) {
                     updateData["shippingData.trackingNumber"] = trackingNumber;
                 }
-            } else if (status === "PICKED_UP") {
-                // Seulement si pas déjà plus avancé
+            }
+            // AT_PICKUP_LOCATION = En attente de collecte / PICKED_UP = Récupéré par le transporteur
+            else if (status === "AT_PICKUP_LOCATION" || status === "PICKED_UP") {
                 if (["paid", "preparing"].includes(order.order.status)) {
                     updateData["order.status"] = "ready";
                     updateData["order.readyAt"] = new Date();
@@ -210,32 +209,38 @@ export async function POST(req: NextRequest) {
 
                     updateData.products = cleanedProducts;
                 }
-            } else if (status === "SHIPPED" || status === "IN_TRANSIT") {
-                // Seulement si pas déjà plus avancé
+            }
+            // IN_TRANSIT = En transit
+            else if (status === "SHIPPED" || status === "IN_TRANSIT") {
                 if (["paid", "preparing", "ready"].includes(order.order.status)) {
                     updateData["order.status"] = "in_transit";
                 }
                 if (trackingNumber && !order.shippingData?.trackingNumber) {
                     updateData["shippingData.trackingNumber"] = trackingNumber;
                 }
-            } else if (status === "OUT_FOR_DELIVERY") {
-                // Seulement si pas déjà plus avancé
+            }
+            // OUT_FOR_DELIVERY = En cours de livraison
+            else if (status === "OUT_FOR_DELIVERY") {
                 if (["paid", "preparing", "ready", "in_transit"].includes(order.order.status)) {
                     updateData["order.status"] = "out_for_delivery";
                 }
-            } else if (status === "DELIVERED") {
-                // Toujours accepter la livraison
+            }
+            // DELIVERED = Livré / AVAILABLE_FOR_WITHDRAWAL = Disponible en point relais
+            else if (status === "DELIVERED" || status === "AVAILABLE_FOR_WITHDRAWAL") {
                 if (order.order.status !== "delivered") {
                     updateData["order.status"] = "delivered";
                     updateData["order.deliveredAt"] = new Date();
                 }
-            } else if (status === "CANCELLED") {
+            }
+            // RETURNED = Retourné à l'expéditeur / CANCELLED = Annulé
+            else if (status === "CANCELLED" || status === "RETURNED") {
                 updateData["order.status"] = "cancelled";
             }
 
-            // Log si aucune mise à jour n'a été effectuée
-            if (Object.keys(updateData).length === 0) {
-                console.log(`⚠️ Aucune mise à jour effectuée - statut ${status} ignoré car commande déjà en ${order.order.status}`);
+            // Log si aucune mise à jour de statut n'a été effectuée (hors boxtalStatus/boxtalLastUpdate)
+            const hasStatusUpdate = updateData["order.status"] !== undefined;
+            if (!hasStatusUpdate) {
+                console.log(`⚠️ Pas de changement de statut commande - statut Boxtal ${status} reçu, commande déjà en ${order.order.status}`);
             } else {
                 console.log(`✅ Mise à jour prévue:`, JSON.stringify(updateData, null, 2));
             }
