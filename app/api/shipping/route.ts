@@ -44,20 +44,14 @@ async function getShippingPrices(searchParams: URLSearchParams) {
                 { status: 400 }
             );
         }
-
-        // Valider l'adresse avec l'API du gouvernement français
         const validationResult = await validateFrenchAddress(address, zipcode, city);
-
         if (validationResult.status === 'invalid') {
             return NextResponse.json(
                 { error: "Adresse invalide. Veuillez vérifier votre saisie." },
                 { status: 400 }
             );
         }
-
-        // Vérifier la disponibilité des transporteurs selon la zone géographique
         const availableOptions = getAvailableShippingOptionsForZipcode(zipcode);
-
         return NextResponse.json({
             success: true,
             options: availableOptions,
@@ -68,25 +62,19 @@ async function getShippingPrices(searchParams: URLSearchParams) {
         return getFallbackShippingOptions();
     }
 }
-
 type AddressValidationResult = {
     status: 'valid' | 'unverified' | 'invalid';
     message?: string;
 };
-
 async function validateFrenchAddress(address: string | null, zipcode: string, city: string): Promise<AddressValidationResult> {
     try {
-        // Validation basique du code postal français (5 chiffres)
         if (!/^\d{5}$/.test(zipcode)) {
             return { status: 'invalid', message: 'Code postal invalide' };
         }
-
-        // Si pas d'adresse précise, on valide juste le code postal et la ville
         const query = address ? `${address} ${zipcode} ${city}` : `${zipcode} ${city}`;
         const response = await fetch(
             `https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(query)}&limit=1`
         );
-
         if (!response.ok) {
             console.warn("Erreur API adresse.data.gouv.fr, validation désactivée");
             return {
@@ -94,11 +82,7 @@ async function validateFrenchAddress(address: string | null, zipcode: string, ci
                 message: 'Votre adresse n\'a pas pu être vérifiée. Veuillez confirmer qu\'elle est correcte avant de continuer.'
             };
         }
-
         const data = await response.json();
-
-        // Si aucun résultat mais que le format est correct, on accepte avec un warning
-        // (adresses récentes, rurales, non référencées)
         if (!data.features || data.features.length === 0) {
             console.warn(`Adresse non trouvée dans l'API: ${query}, mais on accepte avec warning`);
             return {
@@ -106,13 +90,9 @@ async function validateFrenchAddress(address: string | null, zipcode: string, ci
                 message: 'Votre adresse n\'a pas été trouvée dans notre base. Veuillez vérifier qu\'elle est correcte avant de continuer.'
             };
         }
-
         const result = data.features[0];
         const resultZipcode = result.properties.postcode;
-
-        // Vérifier que le code postal correspond (tolérance)
         if (resultZipcode !== zipcode) {
-            // Si le département correspond (2 premiers chiffres), on accepte avec warning
             if (resultZipcode.substring(0, 2) === zipcode.substring(0, 2)) {
                 console.warn(`Code postal proche: ${zipcode} vs ${resultZipcode}, accepté avec warning`);
                 return {
@@ -120,38 +100,30 @@ async function validateFrenchAddress(address: string | null, zipcode: string, ci
                     message: `Le code postal trouvé (${resultZipcode}) diffère légèrement du vôtre (${zipcode}). Veuillez vérifier votre adresse.`
                 };
             }
-            // Code postal très différent, on demande confirmation
             console.warn(`Code postal très différent: ${zipcode} vs ${resultZipcode}`);
             return {
                 status: 'unverified',
                 message: 'Votre adresse n\'a pas été trouvée dans notre base. Veuillez vérifier qu\'elle est correcte avant de continuer.'
             };
         }
-
-        // Score de confiance : demander confirmation si pas parfait
         const score = result.properties.score;
         if (score > 0.7) {
-            return { status: 'valid' }; // Adresse parfaitement validée
+            return { status: 'valid' };
         } else {
-            // Score pas assez élevé, on demande confirmation
             return {
                 status: 'unverified',
                 message: 'Votre adresse est similaire à une adresse connue mais pas exactement identique. Veuillez la vérifier.'
             };
         }
-
     } catch (error) {
         console.error("Erreur validation adresse:", error);
-        // En cas d'erreur, on laisse passer avec un warning
         return {
             status: 'unverified',
             message: 'Impossible de vérifier votre adresse pour le moment. Veuillez confirmer qu\'elle est correcte.'
         };
     }
 }
-
 function getAvailableShippingOptionsForZipcode(zipcode: string) {
-    // Définir toutes les options possibles
     const allOptions = [
         {
             id: "MONR-CpourToi",
@@ -198,43 +170,27 @@ function getAvailableShippingOptionsForZipcode(zipcode: string) {
             type: "express"
         }
     ];
-
     const dept = zipcode.substring(0, 2);
-
-    // Départements ruraux/zones difficiles d'accès où Chronopost et Relais Colis sont limités
     const ruralDepartments = [
-        '04', '05', '09', '15', '19', '23', '48', '65', '66', '2A', '2B',  // Zones montagneuses/isolées
-        '50', '52', '55', '58', '70', '88', '89', // Zones rurales du centre et nord-est
+        '04', '05', '09', '15', '19', '23', '48', '65', '66', '2A', '2B',
+        '50', '52', '55', '58', '70', '88', '89',
     ];
-
-    // Chronopost dessert principalement les grandes villes et zones urbaines
-    // On le désactive pour les zones rurales/montagneuses
     const isRuralArea = ruralDepartments.includes(dept);
-
     if (isRuralArea) {
-        // Zones rurales : uniquement Mondial Relay et Colissimo (les plus fiables)
         return allOptions.filter(opt =>
             opt.id === "MONR-CpourToi" || opt.id === "POFR-ColissimoAccess"
         );
     }
-
-    // Grandes métropoles : toutes les options
     const majorCitiesZipcodes = [
-        '75', '69', '13', '31', '44', '33', '59', '67', '35', '34', // Paris, Lyon, Marseille, Toulouse, etc.
-        '92', '93', '94', '95', '77', '78', '91' // Île-de-France
+        '75', '69', '13', '31', '44', '33', '59', '67', '35', '34',
+        '92', '93', '94', '95', '77', '78', '91'
     ];
-
     if (majorCitiesZipcodes.includes(dept)) {
-        // Toutes les options disponibles
         return allOptions;
     }
-
-    // Zones intermédiaires : pas de Chronopost mais le reste oui
     return allOptions.filter(opt => opt.id !== "CHRP-Chrono18");
 }
-
 function getFallbackShippingOptions() {
-    // Options de secours minimales (les plus fiables)
     const fallbackOptions = [
         {
             id: "MONR-CpourToi",
@@ -259,7 +215,6 @@ function getFallbackShippingOptions() {
             type: "home"
         }
     ];
-
     return NextResponse.json({
         success: true,
         options: fallbackOptions
@@ -616,12 +571,10 @@ async function createShipment(req: NextRequest) {
             insured: false
         };
         if (order.shippingData?.shippingMethod?.relayPoint) {
-            // Pour Mondial Relay : pickupPointCode = point d'arrivée (client), dropOffPointCode = point de départ (expéditeur)
             shipmentData.shipment.pickupPointCode = order.shippingData.shippingMethod.relayPoint.id;
             const operator = order.shippingData?.shippingMethod?.operator || "MONR";
             console.log("📦 Livraison en point relais détectée, operator:", operator);
             console.log("📦 Relay point ID (client):", order.shippingData.shippingMethod.relayPoint.id);
-
             if (operator === "MONR") {
                 const pickupCode = process.env.MONDIAL_RELAY_PICKUP_CODE;
                 console.log("📦 Mondial Relay pickup code (expéditeur):", pickupCode);
@@ -766,8 +719,6 @@ async function getShippingLabel(req: NextRequest) {
             );
         }
         const pdfBuffer = await pdfResponse.arrayBuffer();
-
-        // Récupérer le tracking number du transporteur
         if (!order.shippingData.trackingNumber) {
             const trackingResponse = await fetch(
                 `${apiUrl}/shipping/v3.1/shipping-order/${order.shippingData.boxtalShipmentId}/tracking`,
@@ -779,7 +730,6 @@ async function getShippingLabel(req: NextRequest) {
                     }
                 }
             );
-
             if (trackingResponse.ok) {
                 const trackingData = await trackingResponse.json();
                 console.log("📦 Tracking data:", JSON.stringify(trackingData, null, 2));
@@ -797,7 +747,6 @@ async function getShippingLabel(req: NextRequest) {
                 }
             }
         }
-
         if (order.order.status !== "preparing") {
             await ordersCollection.updateOne(
                 { _id: new ObjectId(orderId) },
@@ -874,8 +823,6 @@ async function getReturnLabel(req: NextRequest) {
         }
         const authString = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
         const apiUrl = getBoxtalApiUrl();
-
-        // D'abord, vérifier si un bordereau de retour existe déjà
         const labelResponse = await fetch(
             `${apiUrl}/shipping/v3.1/shipping-order/${order.shippingData.boxtalShipmentId}/shipping-document`,
             {
@@ -886,21 +833,15 @@ async function getReturnLabel(req: NextRequest) {
                 }
             }
         );
-
         let returnDocument;
-
         if (labelResponse.ok) {
             const documentsData = await labelResponse.json();
             returnDocument = documentsData.content?.find((doc: any) =>
                 doc.type === "RETURN_LABEL" || doc.type === "RETURN"
             );
         }
-
-        // Si pas de bordereau de retour, le créer
         if (!returnDocument?.url) {
             console.log("📦 Création d'un bordereau de retour pour:", order.shippingData.boxtalShipmentId);
-
-            // Créer une nouvelle expédition de retour (adresses inversées)
             const returnShipmentData: any = {
                 shipment: {
                     packages: [{
@@ -918,7 +859,6 @@ async function getReturnLabel(req: NextRequest) {
                             description: "Bijoux fantaisie"
                         }
                     }],
-                    // FROM = l'adresse du client (qui renvoie)
                     fromAddress: {
                         type: "RESIDENTIAL",
                         contact: {
@@ -928,20 +868,17 @@ async function getReturnLabel(req: NextRequest) {
                             phone: order.shippingData?.telephone?.replace(/\+/g, '')
                         },
                         location: order.shippingData?.shippingMethod?.relayPoint ? {
-                            // Si c'était un point relais, retour depuis le point relais
                             street: order.shippingData.shippingMethod.relayPoint.address,
                             city: order.shippingData.shippingMethod.relayPoint.city,
                             postalCode: order.shippingData.shippingMethod.relayPoint.zipcode,
                             countryIsoCode: "FR"
                         } : {
-                            // Sinon retour depuis l'adresse de livraison
                             street: order.shippingData?.rue,
                             city: order.shippingData?.ville,
                             postalCode: order.shippingData?.codePostal,
                             countryIsoCode: "FR"
                         }
                     },
-                    // TO = l'atelier (adresse de retour)
                     toAddress: {
                         type: "BUSINESS",
                         contact: {
@@ -966,8 +903,6 @@ async function getReturnLabel(req: NextRequest) {
                 },
                 shippingOfferCode: `${order.shippingData?.shippingMethod?.operator || "MONR"}-${order.shippingData?.shippingMethod?.serviceCode || "CpourToi"}`
             };
-
-            // Créer l'expédition de retour
             const createReturnResponse = await fetch(
                 `${apiUrl}/shipping/v3.1/shipping-order`,
                 {
@@ -980,7 +915,6 @@ async function getReturnLabel(req: NextRequest) {
                     body: JSON.stringify(returnShipmentData)
                 }
             );
-
             if (!createReturnResponse.ok) {
                 const errorText = await createReturnResponse.text();
                 console.error("Erreur création expédition retour Boxtal:", errorText);
@@ -990,14 +924,10 @@ async function getReturnLabel(req: NextRequest) {
                     { status: createReturnResponse.status }
                 );
             }
-
             const returnShipmentResult = await createReturnResponse.json();
             console.log("📦 Réponse complète Boxtal:", JSON.stringify(returnShipmentResult, null, 2));
-
             const returnShipmentId = returnShipmentResult.content?.id || returnShipmentResult.id;
             console.log("📦 Expédition de retour créée, ID:", returnShipmentId);
-
-            // Sauvegarder le nouveau shipmentId pour que les webhooks de retour fonctionnent
             if (returnShipmentId) {
                 await ordersCollection.updateOne(
                     { _id: new ObjectId(orderId) },
@@ -1011,11 +941,7 @@ async function getReturnLabel(req: NextRequest) {
                 );
                 console.log("📦 boxtalShipmentId mis à jour pour le retour:", returnShipmentId);
             }
-
-            // Attendre un peu que Boxtal génère le document
             await new Promise(resolve => setTimeout(resolve, 3000));
-
-            // Récupérer les documents de l'expédition de retour
             const newLabelResponse = await fetch(
                 `${apiUrl}/shipping/v3.1/shipping-order/${returnShipmentId}/shipping-document`,
                 {
@@ -1026,7 +952,6 @@ async function getReturnLabel(req: NextRequest) {
                     }
                 }
             );
-
             if (!newLabelResponse.ok) {
                 const errorText = await newLabelResponse.text();
                 console.error("Erreur récupération documents après création:", errorText);
@@ -1035,13 +960,10 @@ async function getReturnLabel(req: NextRequest) {
                     { status: newLabelResponse.status }
                 );
             }
-
             const newDocumentsData = await newLabelResponse.json();
-            // Pour une expédition de retour, chercher le LABEL principal (pas RETURN_LABEL)
             returnDocument = newDocumentsData.content?.find((doc: any) =>
                 doc.type === "LABEL" || doc.type === "RETURN_LABEL" || doc.type === "RETURN"
             );
-
             if (!returnDocument?.url) {
                 console.log("Documents disponibles:", JSON.stringify(newDocumentsData.content));
                 return NextResponse.json(

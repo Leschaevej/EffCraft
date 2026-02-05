@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
         if (status === 'history') {
             query = { "order.status": { $in: ['delivered', 'cancelled', 'returned', 'return_delivered'] } };
         } else if (status === 'pending') {
-            query = { "order.status": { $in: ['paid', 'preparing', 'ready', 'in_transit', 'out_for_delivery', 'return_requested', 'return_preparing', 'return_in_transit', 'return_out_for_delivery'] } };
+            query = { "order.status": { $in: ['paid', 'preparing', 'in_transit', 'return_requested', 'return_in_transit'] } };
         } else {
             query = { "order.status": status };
         }

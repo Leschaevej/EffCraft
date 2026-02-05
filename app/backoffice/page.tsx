@@ -10,7 +10,6 @@ import AddForm from "../components/addForm/AddForm";
 import DeleteForm from "../components/deleteForm/DeleteForm";
 import { useOrders } from "../hooks/useOrders";
 import Calendar from "../components/calendar/Calendar";
-
 interface Product {
     _id: string;
     name: string;
@@ -50,65 +49,49 @@ interface Order {
 const TRACKING_STEPS = [
     { label: "Confirmé", icon: <FaCheck /> },
     { label: "En préparation", icon: <FaBoxOpen /> },
-    { label: "Remis au transporteur", icon: <FaWarehouse /> },
     { label: "En transit", icon: <FaTruck /> },
-    { label: "Livraison", icon: <FaTruckMoving /> },
     { label: "Livré", icon: <FaHome /> }
 ];
 const STATUS_STEPS: { [key: string]: number } = {
     paid: 1,
     preparing: 2,
-    ready: 3,
-    in_transit: 4,
-    out_for_delivery: 5,
-    delivered: 6,
-    // Statuts de retour (5 étapes au lieu de 6)
+    in_transit: 3,
+    delivered: 4,
     return_requested: 1,
-    return_preparing: 2,
-    return_in_transit: 3,
-    return_out_for_delivery: 4,
-    return_delivered: 5
+    return_in_transit: 2,
+    return_delivered: 3
 };
 const STATUS_LABELS: { [key: string]: string } = {
     paid: "Confirmé",
     preparing: "En préparation",
-    ready: "Remis au transporteur",
-    in_transit: "En transit",
-    out_for_delivery: "Livraison",
+    in_transit: "Livraison",
     delivered: "Livré",
     cancelled: "Remboursé",
     return_requested: "Retour confirmé",
-    return_preparing: "Remis au transporteur",
     return_in_transit: "En transit",
-    return_out_for_delivery: "Livraison",
     return_delivered: "Livré",
     returned: "Remboursé"
 };
-
 const getShippingMethodName = (operator?: string, serviceCode?: string): string => {
     if (!operator) return "Non défini";
-
     const names: { [key: string]: string } = {
         "MONR": "Mondial Relay",
         "SOGP": "Relais Colis",
         "POFR": "Colissimo",
         "CHRP": "Chronopost"
     };
-
     return names[operator] || operator;
 };
-
 const getTrackingUrl = (trackingNumber: string, operator?: string): string | null => {
     if (!trackingNumber || !operator) return null;
-
     switch (operator) {
-        case "MONR": // Mondial Relay
+        case "MONR":
             return `https://www.mondialrelay.fr/suivi-de-colis/?numeroExpedition=${trackingNumber}`;
-        case "SOGP": // Relais Colis
+        case "SOGP":
             return `https://www.relaiscolis.com/suivi/?code=${trackingNumber}`;
-        case "POFR": // Colissimo
+        case "POFR":
             return `https://www.laposte.fr/outils/suivre-vos-envois?code=${trackingNumber}`;
-        case "CHRP": // Chronopost
+        case "CHRP":
             return `https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT=${trackingNumber}`;
         default:
             return null;
@@ -141,21 +124,16 @@ export default function Backoffice() {
         heureFin: ""
     });
     const [events, setEvents] = useState<any[]>([]);
-
-    // Synchroniser les données SWR avec le state local
     useEffect(() => {
         if (JSON.stringify(swrOrders) !== JSON.stringify(orders)) {
             setOrders(swrOrders);
         }
     }, [swrOrders]);
-
-    // Charger les événements
     useEffect(() => {
         if (activeSection === "events") {
             fetchEvents();
         }
     }, [activeSection]);
-
     const fetchEvents = async () => {
         try {
             const response = await fetch("/api/events");
@@ -167,15 +145,12 @@ export default function Backoffice() {
             console.error("Erreur chargement événements:", error);
         }
     };
-
     const handleEditEvent = (event: any) => {
-        // Extraire rue, ville, code postal depuis l'adresse complète
         const addressParts = event.address.split(", ");
         const rue = addressParts[0] || "";
         const villeCodePostal = addressParts[1] || "";
         const [codePostal, ...villeArray] = villeCodePostal.split(" ");
         const ville = villeArray.join(" ");
-
         setEventForm({
             name: event.name,
             rue: rue,
@@ -188,12 +163,10 @@ export default function Backoffice() {
         setEditingEventId(event._id);
         setShowEventForm(true);
     };
-
     const handleDeleteEvent = async (eventId: string) => {
         if (!confirm("Êtes-vous sûr de vouloir supprimer cet événement ?")) {
             return;
         }
-
         try {
             const response = await fetch(`/api/events?id=${eventId}`, {
                 method: "DELETE",
@@ -210,14 +183,12 @@ export default function Backoffice() {
             alert("Erreur lors de la suppression de l'événement");
         }
     };
-
     useEffect(() => {
         if (status === "loading") return;
         if (!session || session.user.role !== "admin") {
         router.replace("/");
         }
     }, [session, status, router]);
-
     useEffect(() => {
         if (activeSection === "orders" && session?.user?.role === "admin") {
             const handleOrderUpdate = (event: Event) => {
@@ -231,7 +202,7 @@ export default function Backoffice() {
                     customEvent.detail?.type === "order_created" ||
                     customEvent.detail?.type === "order_deleted"
                 ) {
-                    mutate(); // Revalider le cache SWR
+                    mutate();
                 }
             };
             window.addEventListener("cart-update", handleOrderUpdate);
@@ -258,8 +229,6 @@ export default function Backoffice() {
                     return;
                 }
                 const createResult = await createResponse.json();
-
-                // Mettre à jour l'ordre local avec le boxtalShipmentId
                 setOrders(prev => prev.map(o =>
                     o._id === order._id
                         ? {
@@ -284,8 +253,6 @@ export default function Backoffice() {
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 window.open(url, '_blank');
-
-                // Mettre à jour le statut localement immédiatement
                 setOrders(prev => prev.map(o =>
                     o._id === order._id
                         ? { ...o, order: { ...o.order, status: "preparing" } }
@@ -318,9 +285,7 @@ export default function Backoffice() {
     };
     const confirmCancelOrder = async () => {
         if (!orderToCancel) return;
-
         setCancelModalMessage("Remboursement en cours de traitement...");
-
         try {
             const response = await fetch("/api/order", {
                 method: "PATCH",
@@ -355,36 +320,29 @@ export default function Backoffice() {
         }
     };
     const handleReturnOrder = async (order: Order) => {
-        // Générer directement le bon de retour sans confirmation (admin paye)
         if (!confirm(`Générer un bon de retour pour cette commande ?`)) {
             return;
         }
-
         try {
-            // Mettre à jour le statut à return_requested sans remboursement
             const response = await fetch("/api/order", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     orderId: order._id,
-                    action: "request-return-only" // Nouveau: juste marquer le retour, pas de remboursement
+                    action: "request-return-only"
                 }),
             });
-
             if (!response.ok) {
                 const error = await response.json();
                 alert("Erreur lors de la demande de retour: " + (error.error || "Erreur inconnue"));
                 return;
             }
-
-            // Générer le bon de retour Boxtal
             if (order.shippingData.boxtalShipmentId) {
                 const labelResponse = await fetch("/api/shipping?action=return-label", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ orderId: order._id }),
                 });
-
                 if (labelResponse.ok) {
                     const blob = await labelResponse.blob();
                     const url = window.URL.createObjectURL(blob);
@@ -410,18 +368,13 @@ export default function Backoffice() {
             alert("Erreur: " + error);
         }
     };
-
     const handleRefundReturn = async (order: Order) => {
-        // Ouvrir la modal pour choisir le type de remboursement
         setOrderToReturn(order);
         setShowReturnModal(true);
     };
-
     const handleReturnChoice = async (fullRefund: boolean) => {
         if (!orderToReturn) return;
         setShowReturnModal(false);
-
-        // Effectuer le remboursement
         try {
             const response = await fetch("/api/order", {
                 method: "PATCH",
@@ -432,7 +385,6 @@ export default function Backoffice() {
                     fullRefund
                 }),
             });
-
             if (response.ok) {
                 alert("Client remboursé avec succès");
                 mutate();
@@ -444,100 +396,26 @@ export default function Backoffice() {
             console.error("Erreur remboursement:", error);
             alert("Erreur lors du remboursement: " + error);
         }
-
         setOrderToReturn(null);
     };
     const handleReturnOrderWithMutate = async (order: Order) => {
         await handleReturnOrder(order);
         mutate();
     };
-
-    const handleNextStatus = async (order: Order) => {
-        const isReturn = order.order.status.startsWith("return_");
-
-        if (!order.shippingData.boxtalShipmentId) {
-            alert("Pas de boxtalShipmentId pour cette commande");
-            return;
-        }
-
-        let nextEvent: string | undefined;
-
-        if (isReturn) {
-            // Pour les retours : on regarde order.status
-            const statusToEvent: { [key: string]: string } = {
-                return_requested: "PICKED_UP",
-                return_preparing: "IN_TRANSIT",
-                return_in_transit: "OUT_FOR_DELIVERY",
-                return_out_for_delivery: "DELIVERED"
-            };
-            nextEvent = statusToEvent[order.order.status];
-        } else {
-            // Pour l'envoi : on regarde order.status
-            const statusToEvent: { [key: string]: string } = {
-                paid: "READY_TO_SHIP",
-                preparing: "PICKED_UP",
-                ready: "IN_TRANSIT",
-                in_transit: "OUT_FOR_DELIVERY",
-                out_for_delivery: "DELIVERED"
-            };
-            nextEvent = statusToEvent[order.order.status];
-        }
-
-        if (!nextEvent) {
-            alert("Pas de statut suivant");
-            return;
-        }
-
-        try {
-            const webhookPayload = {
-                event: nextEvent,
-                shipment: {
-                    id: order.shippingData.boxtalShipmentId,
-                    trackingNumber: order.shippingData.trackingNumber || "SIMULATED123",
-                    status: nextEvent
-                }
-            };
-
-            const response = await fetch("/api/webhooks/boxtal", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(webhookPayload),
-            });
-
-            if (response.ok) {
-                alert(`Statut simulé : ${nextEvent}`);
-                mutate();
-            } else {
-                const error = await response.json();
-                alert("Erreur : " + (error.error || "Erreur inconnue"));
-            }
-        } catch (error) {
-            console.error("Erreur simulation:", error);
-            alert("Erreur : " + error);
-        }
-    };
-
     const getDisplayStatus = (order: Order): string => {
-        // Le statut est maintenant directement dans order.order.status
         return order.order.status;
     };
-
     const getTrackingStep = (order: Order): number => STATUS_STEPS[getDisplayStatus(order)] || 1;
     const getStatusIcon = (status: string) => {
         const iconMap: { [key: string]: React.ReactNode } = {
             paid: <FaCheck />,
             preparing: <FaBoxOpen />,
-            ready: <FaWarehouse />,
             in_transit: <FaTruck />,
-            out_for_delivery: <FaTruckMoving />,
             delivered: <FaHome />,
             cancelled: <FaCheck />,
             returned: <FaCheck />,
-            // Icônes pour les retours
             return_requested: <FaCheck />,
-            return_preparing: <FaWarehouse />,
             return_in_transit: <FaTruck />,
-            return_out_for_delivery: <FaTruckMoving />,
             return_delivered: <FaHome />
         };
         return iconMap[status] || <FaCheck />;
@@ -740,15 +618,6 @@ export default function Backoffice() {
                                                                 Rembourser
                                                             </button>
                                                         )}
-                                                        {(["paid", "preparing", "ready", "in_transit", "out_for_delivery", "return_requested", "return_preparing", "return_in_transit", "return_out_for_delivery"].includes(order.order.status)) && order.shippingData.boxtalShipmentId && (
-                                                            <button
-                                                                className="next"
-                                                                onClick={() => handleNextStatus(order)}
-                                                                style={{ backgroundColor: '#4CAF50', color: 'white' }}
-                                                            >
-                                                                Next ⏭️
-                                                            </button>
-                                                        )}
                                                     </div>
                                                 </div>
                                                 <div className="products">
@@ -875,10 +744,8 @@ export default function Backoffice() {
                                                 alert("Veuillez remplir tous les champs");
                                                 return;
                                             }
-
                                             try {
                                                 if (editingEventId) {
-                                                    // Mode édition - utiliser PUT
                                                     const response = await fetch(`/api/events?id=${editingEventId}`, {
                                                         method: "PUT",
                                                         headers: { "Content-Type": "application/json" },
@@ -896,7 +763,6 @@ export default function Backoffice() {
                                                         alert("Erreur : " + (error.error || "Erreur inconnue"));
                                                     }
                                                 } else {
-                                                    // Mode création - utiliser POST
                                                     const response = await fetch("/api/events", {
                                                         method: "POST",
                                                         headers: { "Content-Type": "application/json" },

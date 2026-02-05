@@ -7,7 +7,6 @@ import { nothingYouCouldDo } from "../font";
 import { FaCheck, FaBoxOpen, FaWarehouse, FaTruck, FaTruckMoving, FaHome } from "react-icons/fa";
 import "./page.scss";
 import { useUserOrders } from "../hooks/useOrders";
-
 interface Product {
     _id: string;
     name: string;
@@ -38,72 +37,55 @@ interface Order {
 const TRACKING_STEPS = [
     { label: "Confirmé", icon: <FaCheck /> },
     { label: "En préparation", icon: <FaBoxOpen /> },
-    { label: "Remis au transporteur", icon: <FaWarehouse /> },
     { label: "En transit", icon: <FaTruck /> },
-    { label: "Livraison", icon: <FaTruckMoving /> },
     { label: "Livré", icon: <FaHome /> }
 ];
 const RETURN_TRACKING_STEPS = [
     { label: "Retour confirmé", icon: <FaCheck /> },
-    { label: "Remis au transporteur", icon: <FaWarehouse /> },
     { label: "En transit", icon: <FaTruck /> },
-    { label: "Livraison", icon: <FaTruckMoving /> },
     { label: "Livré", icon: <FaHome /> }
 ];
 const STATUS_STEPS: { [key: string]: number } = {
     paid: 1,
     preparing: 2,
-    ready: 3,
-    in_transit: 4,
-    out_for_delivery: 5,
-    delivered: 6,
-    // Statuts de retour (5 étapes au lieu de 6)
+    in_transit: 3,
+    delivered: 4,
     return_requested: 1,
-    return_preparing: 2,
-    return_in_transit: 3,
-    return_out_for_delivery: 4,
-    return_delivered: 5
+    return_in_transit: 2,
+    return_delivered: 3
 };
 const STATUS_LABELS: { [key: string]: string } = {
     paid: "Confirmé",
     preparing: "En préparation",
-    ready: "Remis au transporteur",
-    in_transit: "En transit",
-    out_for_delivery: "Livraison",
+    in_transit: "Livraison",
     delivered: "Livré",
     cancelled: "Remboursé",
     return_requested: "Retour confirmé",
-    return_preparing: "Remis au transporteur",
     return_in_transit: "En transit",
-    return_out_for_delivery: "Livraison",
     return_delivered: "Livré",
     returned: "Remboursé"
 };
-
 const getShippingMethodName = (operator?: string, serviceCode?: string): string => {
     if (!operator) return "Non défini";
-
     const names: { [key: string]: string } = {
         "MONR": "Mondial Relay",
         "SOGP": "Relais Colis",
         "POFR": "Colissimo",
         "CHRP": "Chronopost"
     };
-
     return names[operator] || operator;
 };
-
 const getTrackingUrl = (trackingNumber: string, operator?: string): string | null => {
     if (!trackingNumber || !operator) return null;
 
     switch (operator) {
-        case "MONR": // Mondial Relay
+        case "MONR":
             return `https://www.mondialrelay.fr/suivi-de-colis/?numeroExpedition=${trackingNumber}`;
-        case "SOGP": // Relais Colis
+        case "SOGP":
             return `https://www.relaiscolis.com/suivi/?code=${trackingNumber}`;
-        case "POFR": // Colissimo
+        case "POFR":
             return `https://www.laposte.fr/outils/suivre-vos-envois?code=${trackingNumber}`;
-        case "CHRP": // Chronopost
+        case "CHRP":
             return `https://www.chronopost.fr/tracking-no-cms/suivi-page?listeNumerosLT=${trackingNumber}`;
         default:
             return null;
@@ -116,28 +98,24 @@ export default function OrderPage() {
     const { orders: swrOrders, isLoading: swrLoading, mutate } = useUserOrders(orderView);
     const [orders, setOrders] = useState<Order[]>([]);
     const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
-
-    // Synchroniser les données SWR avec le state local
     useEffect(() => {
         if (!swrLoading) {
             setOrders(swrOrders);
         }
     }, [swrOrders, swrLoading]);
-
     useEffect(() => {
         if (authStatus === "loading") return;
         if (!session) {
             router.replace("/");
         }
     }, [session, authStatus, router]);
-
     useEffect(() => {
         if (session?.user?.email) {
             const handleOrderUpdate = (event: Event) => {
                 const customEvent = event as CustomEvent;
                 if (customEvent.detail?.type === "order_status_updated" && customEvent.detail?.data) {
                     const { orderId, status } = customEvent.detail.data;
-                    const pendingStatuses = ["paid", "preparing", "ready", "in_transit", "out_for_delivery", "return_requested", "return_preparing", "return_in_transit", "return_out_for_delivery"];
+                    const pendingStatuses = ["paid", "preparing", "in_transit", "return_requested", "return_in_transit"];
                     const historyStatuses = ["delivered", "cancelled", "returned", "return_delivered"];
                     const shouldBeInCurrentView = orderView === "pending"
                         ? pendingStatuses.includes(status)
@@ -160,26 +138,19 @@ export default function OrderPage() {
         }
     }, [session, orderView, mutate]);
     const getDisplayStatus = (order: Order): string => {
-        // Le statut est maintenant directement dans order.order.status
         return order.order.status;
     };
-
     const getTrackingStep = (order: Order): number => STATUS_STEPS[getDisplayStatus(order)] || 1;
     const getStatusIcon = (status: string) => {
         const iconMap: { [key: string]: React.ReactNode } = {
             paid: <FaCheck />,
             preparing: <FaBoxOpen />,
-            ready: <FaWarehouse />,
             in_transit: <FaTruck />,
-            out_for_delivery: <FaTruckMoving />,
             delivered: <FaHome />,
             cancelled: <FaCheck />,
             returned: <FaCheck />,
-            // Icônes pour les retours
             return_requested: <FaCheck />,
-            return_preparing: <FaWarehouse />,
             return_in_transit: <FaTruck />,
-            return_out_for_delivery: <FaTruckMoving />,
             return_delivered: <FaHome />
         };
         return iconMap[status] || <FaCheck />;
