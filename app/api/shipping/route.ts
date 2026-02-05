@@ -997,6 +997,21 @@ async function getReturnLabel(req: NextRequest) {
             const returnShipmentId = returnShipmentResult.content?.id || returnShipmentResult.id;
             console.log("📦 Expédition de retour créée, ID:", returnShipmentId);
 
+            // Sauvegarder le nouveau shipmentId pour que les webhooks de retour fonctionnent
+            if (returnShipmentId) {
+                await ordersCollection.updateOne(
+                    { _id: new ObjectId(orderId) },
+                    {
+                        $set: {
+                            "shippingData.boxtalShipmentId": returnShipmentId,
+                            "shippingData.boxtalReturnShipmentId": returnShipmentId,
+                            "shippingData.originalBoxtalShipmentId": order.shippingData.boxtalShipmentId
+                        }
+                    }
+                );
+                console.log("📦 boxtalShipmentId mis à jour pour le retour:", returnShipmentId);
+            }
+
             // Attendre un peu que Boxtal génère le document
             await new Promise(resolve => setTimeout(resolve, 3000));
 
