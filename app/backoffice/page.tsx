@@ -577,7 +577,7 @@ export default function Backoffice() {
                                                         </div>
                                                     )}
                                                     <div className="actions">
-                                                        <button className="invoice">Facture</button>
+                                                        <button className="invoice" onClick={() => window.open(`/api/invoice?orderId=${order._id}`, '_blank')}>Facture</button>
                                                         {["paid", "preparing"].includes(order.order.status) && (
                                                             <button
                                                                 className="cancel"

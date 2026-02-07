@@ -282,7 +282,7 @@ export default function OrderPage() {
                                                         </div>
                                                     )}
                                                     <div className="actions">
-                                                        <button className="invoice">Facture</button>
+                                                        <button className="invoice" onClick={() => window.open(`/api/invoice?orderId=${order._id}`, '_blank')}>Facture</button>
                                                         {orderView === "pending" && (
                                                             <>
                                                                 {["paid", "preparing"].includes(order.order.status) && (
