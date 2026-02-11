@@ -374,7 +374,7 @@ export async function POST(req: NextRequest) {
             data: { orderId: result.insertedId.toString() }
         });
         try {
-            const { buffer, invoiceNumber } = generateInvoicePdf(
+            const { buffer, invoiceNumber } = await generateInvoicePdf(
                 { ...order, order: { ...order.order, createdAt: order.order.createdAt } },
                 result.insertedId.toString()
             );
