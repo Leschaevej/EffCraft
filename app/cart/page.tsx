@@ -37,6 +37,7 @@ export default function Cart() {
     const [selectedRelayPoint, setSelectedRelayPoint] = useState<RelayPoint | null>(null);
     const [loadingRelayPoints, setLoadingRelayPoints] = useState(false);
     const [clientSecret, setClientSecret] = useState<string | null>(null);
+    const [paymentSuccess, setPaymentSuccess] = useState(false);
     const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [billingAddressSuggestions, setBillingAddressSuggestions] = useState<any[]>([]);
@@ -47,6 +48,7 @@ export default function Cart() {
     const [billingAddressWarning, setBillingAddressWarning] = useState<string | null>(null);
     const [showBillingAddressConfirmDialog, setShowBillingAddressConfirmDialog] = useState(false);
     const autocompleteRef = React.useRef<HTMLDivElement>(null);
+    const pendingOrderRef = React.useRef<any>(null);
     const billingAutocompleteRef = React.useRef<HTMLDivElement>(null);
     const [formData, setFormData] = useState({
         nom: "",
@@ -463,7 +465,7 @@ export default function Cart() {
                 billingData: sameAddress ? formData : billingData,
                 totalAmount: totalAmount,
             };
-            localStorage.setItem('pendingOrder', JSON.stringify(orderData));
+            pendingOrderRef.current = orderData;
             const response = await fetch("/api/payment", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -487,9 +489,18 @@ export default function Cart() {
         <main className={`cart ${status === "unauthenticated" ? "unloged" : ""}`}>
             <div className="conteneur">
                 <h2 className={nothingYouCouldDo.className}>
-                    {!showCheckout ? "Panier" : showRecap ? "Récapitulatif" : showShippingMethod ? "Mode de livraison" : showBillingForm ? "Facturation" : "Livraison"}
+                    {paymentSuccess ? "Commande confirmée" : !showCheckout ? "Panier" : showRecap ? "Récapitulatif" : showShippingMethod ? "Mode de livraison" : showBillingForm ? "Facturation" : "Livraison"}
                 </h2>
-                {status === "unauthenticated" ? (
+                {paymentSuccess ? (
+                    <div className="success">
+                        <h3>Paiement réussi !</h3>
+                        <p>Merci pour votre commande ! Votre paiement a été traité avec succès. Vous allez recevoir un email de confirmation sous peu.</p>
+                        <div className="actions">
+                            <button onClick={() => window.location.href = "/"}>Retour à l'accueil</button>
+                            <button onClick={() => window.location.href = "/order"}>Mes commandes</button>
+                        </div>
+                    </div>
+                ) : status === "unauthenticated" ? (
                     <>
                         <div className="login">
                             <p>Veuillez vous connecter pour voir votre panier !</p>
@@ -733,8 +744,31 @@ export default function Cart() {
                                         <PaymentForm
                                             clientSecret={clientSecret}
                                             userEmail={session?.user?.email || ''}
-                                            onSuccess={() => {
-                                                alert("Paiement réussi !");
+                                            onSuccess={async (paymentIntentId) => {
+                                                try {
+                                                    const orderData = pendingOrderRef.current;
+                                                    if (!orderData) return;
+                                                    const response = await fetch("/api/order", {
+                                                        method: "POST",
+                                                        headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify({
+                                                            paymentIntentId,
+                                                            shippingData: orderData.shippingData,
+                                                            billingData: orderData.billingData,
+                                                            products: orderData.products,
+                                                            totalAmount: orderData.totalAmount,
+                                                        }),
+                                                    });
+                                                    if (!response.ok) {
+                                                        const err = await response.json();
+                                                        setErrorMessage(err.error || "Erreur lors de la création de la commande");
+                                                        return;
+                                                    }
+                                                    setCart([]);
+                                                    setPaymentSuccess(true);
+                                                } catch {
+                                                    setErrorMessage("Erreur réseau lors de la création de la commande");
+                                                }
                                             }}
                                             onError={(error) => {
                                                 setErrorMessage(error);

@@ -7,7 +7,7 @@ import "./PaymentForm.scss";
 type PaymentFormProps = {
     clientSecret: string;
     userEmail?: string;
-    onSuccess?: () => void;
+    onSuccess?: (paymentIntentId: string) => void;
     onError?: (error: string) => void;
 };
 export default function PaymentForm({ clientSecret, userEmail, onSuccess, onError }: PaymentFormProps) {
@@ -24,20 +24,19 @@ export default function PaymentForm({ clientSecret, userEmail, onSuccess, onErro
         setIsProcessing(true);
         setErrorMessage(null);
         try {
-            const { error } = await stripe.confirmPayment({
+            const { error, paymentIntent } = await stripe.confirmPayment({
                 elements,
-                confirmParams: {
-                    return_url: `${window.location.origin}/cart/success`,
-                },
+                redirect: 'if_required',
             });
             if (error) {
                 setErrorMessage(error.message || "Une erreur est survenue");
                 if (onError) {
                     onError(error.message || "Une erreur est survenue");
                 }
-            } else {
+                setIsProcessing(false);
+            } else if (paymentIntent && paymentIntent.status === 'succeeded') {
                 if (onSuccess) {
-                    onSuccess();
+                    onSuccess(paymentIntent.id);
                 }
             }
         } catch (err) {
@@ -45,46 +44,35 @@ export default function PaymentForm({ clientSecret, userEmail, onSuccess, onErro
             if (onError) {
                 onError("Une erreur est survenue lors du paiement");
             }
-        } finally {
             setIsProcessing(false);
         }
     };
     return (
-        <>
-            {!isReady && (
-                <div className="payment-skeleton">
-                    <div className="skeleton-item" />
-                    <div className="skeleton-item" />
-                    <div className="skeleton-item" />
-                    <button className="skeleton-button" disabled>Payer maintenant</button>
-                </div>
-            )}
-            <form onSubmit={handleSubmit} className={`payment ${!isReady ? 'payment-loading' : ''}`}>
-                <PaymentElement
-                    onReady={() => setIsReady(true)}
-                    options={{
-                        layout: {
-                            type: 'accordion',
-                            defaultCollapsed: true,
-                            radios: false,
-                            spacedAccordionItems: true,
+        <form onSubmit={handleSubmit} className="payment">
+            <PaymentElement
+                onReady={() => setIsReady(true)}
+                options={{
+                    layout: {
+                        type: 'accordion',
+                        defaultCollapsed: true,
+                        radios: false,
+                        spacedAccordionItems: true,
+                    },
+                    wallets: {
+                        applePay: 'auto',
+                        googlePay: 'auto',
+                    },
+                    defaultValues: {
+                        billingDetails: {
+                            email: userEmail || '',
                         },
-                        wallets: {
-                            applePay: 'auto',
-                            googlePay: 'auto',
-                        },
-                        defaultValues: {
-                            billingDetails: {
-                                email: userEmail || '',
-                            },
-                        },
-                    }}
-                />
-                {errorMessage && <div className="error">{errorMessage}</div>}
-                <button type="submit" disabled={!stripe || isProcessing} className="button">
-                    {isProcessing ? "Traitement..." : "Payer maintenant"}
-                </button>
-            </form>
-        </>
+                    },
+                }}
+            />
+            {errorMessage && <div className="error">{errorMessage}</div>}
+            <button type="submit" disabled={!stripe || !isReady || isProcessing} className="button">
+                {isProcessing ? "Paiement en cours..." : "Payer maintenant"}
+            </button>
+        </form>
     );
 }
