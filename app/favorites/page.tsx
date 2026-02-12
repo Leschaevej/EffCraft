@@ -115,7 +115,9 @@ export default function Favorites() {
                             ))}
                         </div>
                     ) : (
-                        <p>Vous n'avez encore ajouté aucun bijou à vos favoris.</p>
+                        <div className="empty-message">
+                            <p>Vous n'avez encore ajouté aucun bijou à vos favoris.</p>
+                        </div>
                     )}
                 </>
                 )}

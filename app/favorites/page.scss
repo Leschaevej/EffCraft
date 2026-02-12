@@ -35,6 +35,16 @@
                 }
             }
         }
+        .empty-message {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 187.5px;
+            p {
+                font-size: 24px;
+                color: var(--thirdColor);
+            }
+        }
         .grid{
             display: grid;
             grid-template-columns: repeat(4, 1fr);
