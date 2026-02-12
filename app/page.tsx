@@ -14,7 +14,6 @@ import { useSession } from "next-auth/react";
 import { useProducts } from "./hooks/useProducts";
 
 type Category = "all" | "earrings" | "necklace";
-
 interface EventData {
     _id: string;
     name: string;
@@ -25,7 +24,6 @@ interface EventData {
     lat?: number;
     lng?: number;
 }
-
 export default function Home() {
     const [nextEvent, setNextEvent] = useState<EventData | null>(null);
     const { data: session, status } = useSession();
@@ -37,8 +35,6 @@ export default function Home() {
     const [displayedBijoux, setDisplayedBijoux] = useState<any[]>([]);
     const [favorites, setFavorites] = useState<string[]>([]);
     const [showDeletedMessage, setShowDeletedMessage] = useState(false);
-
-    // Charger le prochain événement depuis l'API
     useEffect(() => {
         async function fetchNextEvent() {
             try {
@@ -46,7 +42,6 @@ export default function Home() {
                 if (response.ok) {
                     const events: EventData[] = await response.json();
                     if (events.length > 0) {
-                        // Trier les événements par date et prendre le plus proche
                         const sortedEvents = events.sort((a, b) =>
                             new Date(a.date).getTime() - new Date(b.date).getTime()
                         );
@@ -62,15 +57,11 @@ export default function Home() {
         }
         fetchNextEvent();
     }, []);
-
-    // Synchroniser les produits SWR avec le state local
     useEffect(() => {
         if (!swrLoading && swrProducts && swrProducts.length > 0) {
             setBijoux(swrProducts);
         }
     }, [swrProducts, swrLoading]);
-
-    // Mettre à jour displayedBijoux quand bijoux ou filter change
     useEffect(() => {
         if (bijoux.length > 0) {
             const productsForCarousel = filter === "all"
@@ -79,12 +70,10 @@ export default function Home() {
             setDisplayedBijoux(productsForCarousel);
         }
     }, [bijoux, filter]);
-
     useEffect(() => {
         const handleRealtimeUpdate = (e: Event) => {
             const customEvent = e as CustomEvent;
             const { type, productId } = customEvent.detail;
-            // Optimisation : mise à jour locale immédiate pour la suppression
             if (type === "product_deleted") {
                 setBijoux(prev => {
                     const updated = prev.filter(b => b._id !== productId);
@@ -95,7 +84,6 @@ export default function Home() {
                     return updated;
                 });
             }
-            // product_created est géré automatiquement par useProducts()
         };
         window.addEventListener("cart-update", handleRealtimeUpdate);
         return () => window.removeEventListener("cart-update", handleRealtimeUpdate);
@@ -182,8 +170,8 @@ export default function Home() {
             </div>
         )}
         <main>
-            <section className="landing">
-                <img src="/acceuil.webp" alt="Boucle d'oreille en bois sculpté" />
+            <section id="hero" className="hero"></section>
+            <section className="about">
                 <div className="intro">
                     <p className="title">Bienvenue dans mon atelier de création artisanale !</p>
                     <p className="contenu">
