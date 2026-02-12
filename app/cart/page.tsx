@@ -37,7 +37,6 @@ export default function Cart() {
     const [selectedRelayPoint, setSelectedRelayPoint] = useState<RelayPoint | null>(null);
     const [loadingRelayPoints, setLoadingRelayPoints] = useState(false);
     const [clientSecret, setClientSecret] = useState<string | null>(null);
-    const [loadingPayment, setLoadingPayment] = useState(false);
     const [addressSuggestions, setAddressSuggestions] = useState<any[]>([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [billingAddressSuggestions, setBillingAddressSuggestions] = useState<any[]>([]);
@@ -441,7 +440,6 @@ export default function Cart() {
         await createPaymentIntent();
     };
     const createPaymentIntent = async () => {
-        setLoadingPayment(true);
         try {
             const selectedOption = shippingOptions.find(opt => opt.id === selectedShippingMethod);
             const shippingPrice = selectedOption?.price || 0;
@@ -480,8 +478,6 @@ export default function Cart() {
             setClientSecret(data.clientSecret);
         } catch (error) {
             setErrorMessage("Erreur réseau lors de la création du paiement");
-        } finally {
-            setLoadingPayment(false);
         }
     };
     const handleFinalSubmit = async (e: React.FormEvent) => {
@@ -685,9 +681,7 @@ export default function Cart() {
                                             : 0)).toFixed(2)} €</strong>
                                     </span>
                                 </div>
-                                {loadingPayment ? (
-                                    <div className="loading">Préparation du paiement...</div>
-                                ) : clientSecret && stripePromise ? (
+                                {clientSecret && stripePromise ? (
                                     <Elements
                                         stripe={stripePromise}
                                         options={{
@@ -725,6 +719,12 @@ export default function Cart() {
                                                     },
                                                     '.Input': {
                                                         color: getComputedStyle(document.documentElement).getPropertyValue('--mainTextColor').trim() || '#24191C',
+                                                    },
+                                                    '.Error': {
+                                                        fontSize: '0px',
+                                                        margin: '0',
+                                                        padding: '0',
+                                                        lineHeight: '0',
                                                     },
                                                 },
                                             },

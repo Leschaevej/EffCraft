@@ -15,6 +15,7 @@ export default function PaymentForm({ clientSecret, userEmail, onSuccess, onErro
     const elements = useElements();
     const [isProcessing, setIsProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
+    const [isReady, setIsReady] = useState(false);
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!stripe || !elements) {
@@ -49,30 +50,41 @@ export default function PaymentForm({ clientSecret, userEmail, onSuccess, onErro
         }
     };
     return (
-        <form onSubmit={handleSubmit} className="payment">
-            <PaymentElement
-                options={{
-                    layout: {
-                        type: 'accordion',
-                        defaultCollapsed: true,
-                        radios: false,
-                        spacedAccordionItems: true,
-                    },
-                    wallets: {
-                        applePay: 'auto',
-                        googlePay: 'auto',
-                    },
-                    defaultValues: {
-                        billingDetails: {
-                            email: userEmail || '',
+        <>
+            {!isReady && (
+                <div className="payment-skeleton">
+                    <div className="skeleton-item" />
+                    <div className="skeleton-item" />
+                    <div className="skeleton-item" />
+                    <button className="skeleton-button" disabled>Payer maintenant</button>
+                </div>
+            )}
+            <form onSubmit={handleSubmit} className={`payment ${!isReady ? 'payment-loading' : ''}`}>
+                <PaymentElement
+                    onReady={() => setIsReady(true)}
+                    options={{
+                        layout: {
+                            type: 'accordion',
+                            defaultCollapsed: true,
+                            radios: false,
+                            spacedAccordionItems: true,
                         },
-                    },
-                }}
-            />
-            {errorMessage && <div className="error">{errorMessage}</div>}
-            <button type="submit" disabled={!stripe || isProcessing} className="button">
-                {isProcessing ? "Traitement..." : "Payer maintenant"}
-            </button>
-        </form>
+                        wallets: {
+                            applePay: 'auto',
+                            googlePay: 'auto',
+                        },
+                        defaultValues: {
+                            billingDetails: {
+                                email: userEmail || '',
+                            },
+                        },
+                    }}
+                />
+                {errorMessage && <div className="error">{errorMessage}</div>}
+                <button type="submit" disabled={!stripe || isProcessing} className="button">
+                    {isProcessing ? "Traitement..." : "Payer maintenant"}
+                </button>
+            </form>
+        </>
     );
 }
