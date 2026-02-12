@@ -107,7 +107,26 @@ async function validateFrenchAddress(address: string | null, zipcode: string, ci
             };
         }
         const score = result.properties.score;
-        if (score > 0.7) {
+        const resultName = (result.properties.name || '').toLowerCase().trim();
+        const inputAddress = (address || '').toLowerCase().trim();
+        const resultCity = (result.properties.city || '').toLowerCase().trim();
+        const inputCity = city.toLowerCase().trim();
+
+        // Vérifier que la rue saisie correspond à celle trouvée par l'API
+        if (inputAddress && resultName && inputAddress !== resultName) {
+            return {
+                status: 'unverified',
+                message: `Vouliez-vous dire "${result.properties.name}" ? Veuillez vérifier votre adresse.`
+            };
+        }
+        // Vérifier que la ville correspond
+        if (resultCity && inputCity && resultCity !== inputCity) {
+            return {
+                status: 'unverified',
+                message: `La ville trouvée est "${result.properties.city}" au lieu de "${city}". Veuillez vérifier.`
+            };
+        }
+        if (score > 0.9) {
             return { status: 'valid' };
         } else {
             return {

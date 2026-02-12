@@ -39,24 +39,23 @@ export default function RelayMapInner({
                     key={point.id}
                     position={[point.latitude, point.longitude]}
                     icon={defaultIcon}
-                    eventHandlers={{
-                        click: () => onSelectPoint(point)
-                    }}
                 >
-                    <Popup>
+                    <Popup closeButton={false}>
                         <div className="popup">
-                            <strong>{point.name}</strong><br />
+                            <strong>{point.name}</strong>
                             {point.address}<br />
                             {point.zipcode} {point.city}
-                            {point.distance && (
-                                <><br /><em>À {(point.distance / 1000).toFixed(1)} km</em></>
-                            )}
-                            <button
-                                className="button"
-                                onClick={() => onSelectPoint(point)}
-                            >
-                                Choisir ce point
-                            </button>
+                            <div className="bottom">
+                                {point.distance && (
+                                    <em>À {(point.distance / 1000).toFixed(1)} km</em>
+                                )}
+                                <button
+                                    className="button"
+                                    onClick={() => onSelectPoint(point)}
+                                >
+                                    Choisir ce point
+                                </button>
+                            </div>
                         </div>
                     </Popup>
                 </Marker>

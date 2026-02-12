@@ -4,28 +4,35 @@
     border-radius: 50px;
     border: 2px solid var(--mainColor);
     z-index: 1;
-}
-.leaflet-popup-content-wrapper {
-    font-size: 16px;
-    color: var(--mainTextColor);
-    background: var(--secondBackgroundColor);
-    padding: 20px;
-    border-radius: 30px;
-}
-.leaflet-popup-tip {
-    background: var(--secondBackgroundColor);
-}
-.leaflet-control-attribution {
-    display: none;
-}
-.leaflet-control-zoom {
-    top: 30px;
-    left: 30px;
-    border: none;
+    .leaflet-popup-content-wrapper {
+        font-size: 16px;
+        color: var(--mainTextColor);
+        background: var(--secondBackgroundColor);
+        padding: 20px;
+        border-radius: 30px;
+    }
+    .leaflet-popup-tip {
+        background: var(--secondBackgroundColor);
+    }
+    .leaflet-control-attribution {
+        display: none;
+    }
+    .leaflet-control-zoom {
+        top: 30px;
+        left: 30px;
+        border: none;
+    }
 }
 .popup {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    .bottom {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
     .button {
-        margin-top: 10px;
         padding: 8px 15px;
         background-color: var(--mainColor);
         color: white;
