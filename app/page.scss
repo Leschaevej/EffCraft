@@ -71,24 +71,46 @@
         background-color: var(--secondBackgroundColor);
         border-radius: 50px;
         .calendarMap {
-            display: flex;
+            display: grid;
+            grid-template-columns: 1fr 1fr 2fr;
+            align-items: center;
             gap: 50px;
-            .mapContaineur {
-                flex: 1;
+            .eventInfo {
                 display: flex;
                 flex-direction: column;
-                justify-content: space-between;
-                .map {
-                    flex-grow: 1;
-                    height: 100%;
-                }
+                align-items: center;
+                gap: 15px;
                 .name {
                     font-size: 32px;
-                    margin-top: 50px;
                     padding: 30px;
                     border-radius: 50px;
                     text-align: center;
                     background-color: var(--mainBackgroundColor);
+                }
+                .address {
+                    font-size: 24px;
+                    text-align: center;
+                }
+                .gmapLink {
+                    padding: 15px 30px;
+                    border-radius: 50px;
+                    text-align: center;
+                    font-size: 20px;
+                    font-weight: bold;
+                    text-decoration: none;
+                    color: white;
+                    background-color: var(--mainColor);
+                    transition: background-color 0.3s ease, color 0.3s ease;
+                    &:hover {
+                        background-color: var(--secondColor);
+                        color: black;
+                    }
+                }
+            }
+            .mapContaineur {
+                height: 100%;
+                .map {
+                    height: 100%;
                 }
             }
         }

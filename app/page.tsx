@@ -236,6 +236,22 @@ export default function Home() {
                                     time={`${nextEvent.heureDebut.substring(0, 2)}H-${nextEvent.heureFin.substring(0, 2)}H`}
                                 />
                             </div>
+                            <div className="eventInfo">
+                                <div className="name">{nextEvent.name}</div>
+                                <div className="address">
+                                    {nextEvent.address.split(',').map((part, i) => (
+                                        <span key={i}>{part.trim()}<br /></span>
+                                    ))}
+                                </div>
+                                <a
+                                    className="gmapLink"
+                                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(nextEvent.address)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    Voir sur Google Maps
+                                </a>
+                            </div>
                             <div className="mapContaineur">
                                 <Map
                                     lat={nextEvent.lat || 0}
@@ -243,7 +259,6 @@ export default function Home() {
                                     name={nextEvent.name}
                                     address={nextEvent.address}
                                 />
-                                <div className="name">{nextEvent.name}</div>
                             </div>
                         </div>
                     ) : (
