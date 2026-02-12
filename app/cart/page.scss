@@ -451,10 +451,10 @@
                     }
                 }
                 .addresses {
-                    display: flex;
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
                     gap: 50px;
                     .address {
-                        flex: 1;
                         padding: 25px;
                         background-color: rgba(255, 255, 255, 0.05);
                         border: 2px solid var(--mainColor);
@@ -474,6 +474,11 @@
                             margin: 8px 0;
                             font-size: 18px;
                             color: var(--mainTextColor);
+                        }
+                        .shipping-info {
+                            border-top: 1px solid var(--mainColor);
+                            margin-top: 15px;
+                            padding-top: 15px;
                         }
                     }
                 }

@@ -634,33 +634,31 @@ export default function Cart() {
                                         {formData.complement && <p>{formData.complement}</p>}
                                         <p>{formData.codePostal} {formData.ville}</p>
                                         <p>{formData.telephone}</p>
-                                        {selectedRelayPoint && (
-                                            <>
-                                                <h4>Point relais :</h4>
-                                                <p><strong>{selectedRelayPoint.name}</strong></p>
-                                                <p>{selectedRelayPoint.address}</p>
-                                                <p>{selectedRelayPoint.zipcode} {selectedRelayPoint.city}</p>
-                                            </>
+                                        {selectedShippingMethod && (
+                                            <div className="shipping-info">
+                                                <p>Mode de livraison : {shippingOptions.find(opt => opt.id === selectedShippingMethod)?.name}</p>
+                                                {selectedRelayPoint && (() => {
+                                                    const toTitleCase = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+                                                    return (
+                                                        <>
+                                                            <p>{toTitleCase(selectedRelayPoint.name)}</p>
+                                                            <p>{toTitleCase(selectedRelayPoint.address)}</p>
+                                                            <p>{selectedRelayPoint.zipcode} {toTitleCase(selectedRelayPoint.city)}</p>
+                                                        </>
+                                                    );
+                                                })()}
+                                            </div>
                                         )}
                                     </div>
-                                    <div className="address">
-                                        <h3>Adresse de facturation</h3>
-                                        {sameAddress ? (
-                                            <>
-                                                <p>{formData.prenom} {formData.nom}</p>
-                                                <p>{formData.rue}</p>
-                                                {formData.complement && <p>{formData.complement}</p>}
-                                                <p>{formData.codePostal} {formData.ville}</p>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <p>{billingData.prenom} {billingData.nom}</p>
-                                                <p>{billingData.rue}</p>
-                                                {billingData.complement && <p>{billingData.complement}</p>}
-                                                <p>{billingData.codePostal} {billingData.ville}</p>
-                                            </>
-                                        )}
-                                    </div>
+                                    {!sameAddress && (
+                                        <div className="address">
+                                            <h3>Adresse de facturation</h3>
+                                            <p>{billingData.prenom} {billingData.nom}</p>
+                                            <p>{billingData.rue}</p>
+                                            {billingData.complement && <p>{billingData.complement}</p>}
+                                            <p>{billingData.codePostal} {billingData.ville}</p>
+                                        </div>
+                                    )}
                                 </div>
                                 <button type="button" onClick={() => setShowRecap(false)}>
                                     Retour
