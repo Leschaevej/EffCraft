@@ -414,6 +414,40 @@ export async function POST(req: NextRequest) {
                     }
                 ],
             });
+            const shippingMethodName = shippingData.shippingMethod
+                ? `${shippingData.shippingMethod.operator} - ${shippingData.shippingMethod.serviceCode}`
+                : "Non spécifié";
+            const relayInfo = shippingData.shippingMethod?.relayPoint
+                ? `<p><strong>Point relais :</strong> ${shippingData.shippingMethod.relayPoint.name}, ${shippingData.shippingMethod.relayPoint.address}, ${shippingData.shippingMethod.relayPoint.zipcode} ${shippingData.shippingMethod.relayPoint.city}</p>`
+                : "";
+            await transporter.sendMail({
+                from: process.env.MAIL_USER,
+                to: process.env.MAIL_USER,
+                subject: `Nouvelle commande ${invoiceNumber} - ${shippingData.prenom} ${shippingData.nom}`,
+                html: `
+                    <h2>Nouvelle commande reçue !</h2>
+                    <h3>Client</h3>
+                    <p>${shippingData.prenom} ${shippingData.nom}<br>
+                    ${session.user.email}</p>
+                    <h3>Articles</h3>
+                    <ul>${productsList}</ul>
+                    <p><strong>Total : ${totalPrice.toFixed(2)} €</strong></p>
+                    <h3>Livraison</h3>
+                    <p><strong>Mode :</strong> ${shippingMethodName}</p>
+                    <p>${shippingData.rue}<br>
+                    ${shippingData.complement ? shippingData.complement + '<br>' : ''}
+                    ${shippingData.codePostal} ${shippingData.ville}<br>
+                    ${shippingData.telephone}</p>
+                    ${relayInfo}
+                `,
+                attachments: [
+                    {
+                        filename: `facture-${invoiceNumber}.pdf`,
+                        content: buffer,
+                        contentType: "application/pdf",
+                    }
+                ],
+            });
         } catch (mailError) {
             console.error("Erreur envoi mail de confirmation:", mailError);
         }
