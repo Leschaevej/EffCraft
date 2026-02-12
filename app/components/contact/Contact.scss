@@ -49,16 +49,22 @@
         border: none;
         color: var(--secondTextColor);
         cursor: pointer;
-        transition: opacity 0.3s;
+        transition: background-color 0.3s ease, color 0.3s ease;
         svg{
             vertical-align: middle;
         }
-        &:disabled {
-            opacity: 0.7;
+        &:hover {
+            background-color: var(--secondColor);
+            color: black;
+        }
+        &.sending {
+            background-color: var(--thirdBackgroundColor);
+            color: var(--thirdColor);
             cursor: not-allowed;
         }
         &.success {
-            background-color: #27ae60;
+            background-color: var(--secondColor);
+            color: black;
         }
         &.error {
             background-color: #e74c3c;
