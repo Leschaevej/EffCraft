@@ -25,6 +25,9 @@ export async function GET(req: NextRequest) {
         if (session.user.role !== "admin" && order.userEmail !== session.user.email) {
             return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
         }
+        if (session.user.role !== "admin" && order.order?.status === "cancel_requested") {
+            return NextResponse.json({ error: "Facture indisponible pendant la demande d'annulation" }, { status: 403 });
+        }
         const { buffer, invoiceNumber } = await generateInvoicePdf(order, orderId);
         return new NextResponse(new Uint8Array(buffer), {
             status: 200,

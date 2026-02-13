@@ -581,6 +581,24 @@
                 font-size: 24px;
                 color: var(--mainTextColor);
             }
+            textarea {
+                width: 100%;
+                padding: 20px;
+                font-size: 18px;
+                border: 3px solid var(--mainColor);
+                border-radius: 20px;
+                background-color: var(--backgroundColor);
+                color: var(--mainTextColor);
+                resize: none;
+                font-family: inherit;
+                &::placeholder {
+                    color: var(--mainColor);
+                }
+                &:focus {
+                    outline: none;
+                    border-color: var(--mainTextColor);
+                }
+            }
             .modal-buttons {
                 display: flex;
                 gap: 30px;

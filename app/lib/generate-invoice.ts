@@ -245,3 +245,209 @@ export async function generateInvoicePdf(order: any, orderId: string): Promise<{
     const buffer = Buffer.from(doc.output("arraybuffer"));
     return { buffer, invoiceNumber };
 }
+
+export async function generateCreditNotePdf(order: any, orderId: string, refundAmount?: number): Promise<{ buffer: Buffer; creditNoteNumber: string; originalInvoiceNumber: string }> {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 20;
+    const contentWidth = pageWidth - margin * 2;
+
+    const invoiceDate = new Date(order.order.createdAt);
+    const creditNoteDate = new Date();
+    const originalInvoiceNumber = `FC-${invoiceDate.getFullYear()}-${orderId.slice(-6).toUpperCase()}`;
+    const creditNoteNumber = `AV-${creditNoteDate.getFullYear()}-${orderId.slice(-6).toUpperCase()}`;
+
+    const totalRefund = refundAmount !== undefined ? refundAmount : order.order.totalPrice;
+
+    // ===== LOGO EN HAUT À DROITE =====
+    try {
+        const logoData = getLogo();
+        doc.addImage(logoData, "WEBP", pageWidth - margin - 38, 10, 38, 38);
+    } catch (e) {
+        console.error("Erreur chargement logo:", e);
+    }
+
+    // ===== TITRE "AVOIR" =====
+    let y = 25;
+    doc.setTextColor(...COLORS.dark);
+    doc.setFontSize(26);
+    doc.setFont("helvetica", "bold");
+    doc.text("AVOIR", margin, y);
+
+    // ===== INFOS CLIENT (gauche) =====
+    y = 40;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...COLORS.dark);
+    const billing = (order.billingData && order.billingData !== "same") ? order.billingData : order.shippingData;
+    if (billing) {
+        doc.text(`${(billing.prenom || "")} ${(billing.nom || "").toUpperCase()}`, margin, y);
+        y += 5;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.text(billing.rue || "", margin, y); y += 4.5;
+        doc.text(`${billing.codePostal || ""} ${billing.ville || ""}`, margin, y); y += 4.5;
+        doc.text(order.userEmail, margin, y);
+    }
+
+    // ===== INFOS AVOIR (sous le bloc client) =====
+    y += 10;
+    doc.setFontSize(8.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...COLORS.gray);
+    doc.text(`Date : ${creditNoteDate.toLocaleDateString("fr-FR")}`, margin, y); y += 4;
+    doc.text(`Avoir N° : ${creditNoteNumber}`, margin, y); y += 4;
+    doc.text(`Réf. facture : ${originalInvoiceNumber}`, margin, y); y += 4;
+    doc.text("SIRET : AJOUTER LE NUMERO", margin, y);
+
+    // ===== INFOS ENTREPRISE (droite, sous le logo) =====
+    let rightY = 54;
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...COLORS.dark);
+    doc.text("EffCraft", pageWidth - margin, rightY, { align: "right" });
+    rightY += 5;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...COLORS.gray);
+    doc.text("Elodie Forner", pageWidth - margin, rightY, { align: "right" }); rightY += 4;
+    doc.text("1 bis cours d'Orbitelle", pageWidth - margin, rightY, { align: "right" }); rightY += 4;
+    doc.text("13100 Aix-en-Provence", pageWidth - margin, rightY, { align: "right" }); rightY += 4;
+    doc.text("contact@effcraft.fr", pageWidth - margin, rightY, { align: "right" });
+
+    // ===== LIGNE DE SÉPARATION =====
+    y = 96;
+    doc.setDrawColor(...COLORS.grayLight);
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, pageWidth - margin, y);
+
+    // ===== TABLEAU DES PRODUITS =====
+    y = 104;
+    const colDesc = margin + 3;
+    const colQty = margin + contentWidth * 0.6;
+    const colPrice = margin + contentWidth * 0.78;
+    const colTotal = margin + contentWidth - 3;
+    const rowHeight = 11;
+    const headerHeight = 12;
+
+    // Header du tableau
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...COLORS.gray);
+    const headerY = y + 8;
+    doc.text("DESCRIPTION", colDesc, headerY);
+    doc.text("QTÉ", colQty, headerY, { align: "center" });
+    doc.text("PRIX UNIT.", colPrice, headerY, { align: "center" });
+    doc.text("TOTAL", colTotal, headerY, { align: "right" });
+
+    y += headerHeight;
+    doc.setDrawColor(...COLORS.dark);
+    doc.setLineWidth(0.4);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 1;
+
+    // Lignes des produits (montants négatifs)
+    let isAlternate = false;
+
+    for (const product of order.products) {
+        if (isAlternate) {
+            doc.setFillColor(...COLORS.tableAlt);
+            doc.rect(margin, y, contentWidth, rowHeight, "F");
+        }
+
+        const textY = y + 7.5;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(...COLORS.dark);
+        doc.text(product.name, colDesc, textY);
+        doc.text("1", colQty, textY, { align: "center" });
+        doc.text(`-${product.price.toFixed(2)} €`, colPrice, textY, { align: "center" });
+        doc.text(`-${product.price.toFixed(2)} €`, colTotal, textY, { align: "right" });
+
+        y += rowHeight;
+        isAlternate = !isAlternate;
+    }
+
+    // Ligne de fin du tableau
+    doc.setDrawColor(...COLORS.grayLight);
+    doc.setLineWidth(0.3);
+    doc.line(margin, y, pageWidth - margin, y);
+
+    // ===== BLOC RÉCAPITULATIF (bas droite) =====
+    y += 10;
+    const summaryX = margin + contentWidth * 0.58;
+    const summaryLabelX = summaryX;
+    const summaryValueX = margin + contentWidth;
+    const summaryRowH = 7;
+
+    const productsTotal = order.products.reduce((sum: number, p: any) => sum + p.price, 0);
+
+    // Sous-total
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...COLORS.gray);
+    doc.text("Sous-total", summaryLabelX, y);
+    doc.setTextColor(...COLORS.dark);
+    doc.text(`-${productsTotal.toFixed(2)} €`, summaryValueX, y, { align: "right" });
+    y += summaryRowH;
+
+    // TVA
+    doc.setTextColor(...COLORS.gray);
+    doc.text("TVA", summaryLabelX, y);
+    doc.setTextColor(...COLORS.dark);
+    doc.text("0,00 €", summaryValueX, y, { align: "right" });
+    y += summaryRowH + 2;
+
+    // Ligne avant le total
+    doc.setDrawColor(...COLORS.grayLight);
+    doc.setLineWidth(0.3);
+    doc.line(summaryX, y - 1, pageWidth - margin, y - 1);
+
+    // Total remboursé
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...COLORS.dark);
+    doc.text("Total remboursé", summaryLabelX, y + 5);
+    doc.text(`-${totalRefund.toFixed(2)} €`, summaryValueX, y + 5, { align: "right" });
+
+    // ===== INFOS PAIEMENT (bas gauche) =====
+    const paymentStartY = y - (summaryRowH * 2 + 2) + 0;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(...COLORS.gray);
+    doc.text("Remboursement : Carte bancaire (Stripe)", margin, paymentStartY);
+
+    // ===== MESSAGE =====
+    y += 20;
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(11);
+    doc.setTextColor(...COLORS.sage);
+    doc.text("Annulation et remboursement effectués.", margin, y);
+
+    // ===== MENTION TVA =====
+    y += 7;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(...COLORS.gray);
+    doc.text("TVA non applicable, art. 293 B du CGI", margin, y);
+
+    // ===== FOOTER =====
+    const footerY = pageHeight - 16;
+    doc.setDrawColor(...COLORS.grayLight);
+    doc.setLineWidth(0.3);
+    doc.line(margin, footerY, pageWidth - margin, footerY);
+
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...COLORS.gray);
+    doc.text(
+        "EffCraft - Elodie Forner - 1 bis cours d'Orbitelle, 13100 Aix-en-Provence - contact@effcraft.fr",
+        pageWidth / 2,
+        footerY + 5,
+        { align: "center" }
+    );
+
+    const buffer = Buffer.from(doc.output("arraybuffer"));
+    return { buffer, creditNoteNumber, originalInvoiceNumber };
+}

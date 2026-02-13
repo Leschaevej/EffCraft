@@ -4,6 +4,7 @@ import { authOptions } from "../../auth/[...nextauth]/route";
 import clientPromise from "../../../lib/mongodb";
 import nodemailer from "nodemailer";
 import { ObjectId } from "mongodb";
+import { notifyClients } from "../../../lib/pusher-server";
 
 export async function POST(req: Request) {
     try {
@@ -24,22 +25,22 @@ export async function POST(req: Request) {
             );
         }
 
-        const allowedReasons = [
-            "Erreur de commande",
-            "Délai trop long",
-            "Changement d'avis",
-            "Produit trouvé ailleurs",
-            "Autre"
-        ];
+        const reasonMap: { [key: string]: string } = {
+            "Erreur de commande": "error",
+            "Délai trop long": "delay",
+            "Changement d'avis": "regret",
+            "Autre": "other"
+        };
 
-        if (!allowedReasons.includes(reason)) {
+        const reasonKey = reasonMap[reason];
+        if (!reasonKey) {
             return NextResponse.json(
                 { error: "Raison invalide" },
                 { status: 400 }
             );
         }
 
-        const cleanMessage = message?.trim().slice(0, 2000) || "";
+        const cleanMessage = message?.trim().slice(0, 200) || "";
 
         const client = await clientPromise;
         const db = client.db("effcraftdatabase");
@@ -107,12 +108,21 @@ export async function POST(req: Request) {
             {
                 $set: {
                     "order.status": "cancel_requested",
+                    "order.previousStatus": order.order.status,
                     "order.cancelRequestedAt": new Date(),
-                    "order.cancelReason": reason,
+                    "order.cancelReason": reasonKey,
                     "order.cancelMessage": cleanMessage || undefined,
                 }
             }
         );
+
+        await notifyClients({
+            type: "order_status_updated",
+            data: {
+                orderId: orderId,
+                status: "cancel_requested"
+            }
+        });
 
         return NextResponse.json({ message: "Demande envoyée avec succès" });
     } catch (error) {

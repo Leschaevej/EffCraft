@@ -7,7 +7,7 @@ import cloudinary from "../../lib/cloudinary";
 import { notifyClients } from "../../lib/pusher-server";
 import { stripe } from "../../lib/stripe-server";
 import nodemailer from "nodemailer";
-import { generateInvoicePdf } from "../../lib/generate-invoice";
+import { generateInvoicePdf, generateCreditNotePdf } from "../../lib/generate-invoice";
 
 export async function GET(req: NextRequest) {
     try {
@@ -145,7 +145,7 @@ export async function PATCH(req: NextRequest) {
                         $set: {
                             "order.status": "cancelled",
                             "order.cancelledAt": new Date(),
-                            "order.refundReason": order.order?.cancelReason || "annulation de la commande",
+                            "order.refundReason": order.order?.cancelReason || "cancelled",
                             products: cancelSlimProducts
                         },
                         $unset: {
@@ -153,7 +153,8 @@ export async function PATCH(req: NextRequest) {
                             billingData: "",
                             "order.cancelReason": "",
                             "order.cancelMessage": "",
-                            "order.cancelRequestedAt": ""
+                            "order.cancelRequestedAt": "",
+                            "order.previousStatus": ""
                         }
                     }
                 );
@@ -164,6 +165,45 @@ export async function PATCH(req: NextRequest) {
                         status: "cancelled"
                     }
                 });
+                try {
+                    const orderDate = new Date(order.order.createdAt).toLocaleDateString("fr-FR");
+                    const productsList = order.products.map((p: any) => `<li>${p.name} - ${p.price.toFixed(2)} €</li>`).join("");
+                    const { buffer: creditNoteBuffer, creditNoteNumber } = await generateCreditNotePdf(order, orderId);
+                    const transporter = nodemailer.createTransport({
+                        host: "ssl0.ovh.net",
+                        port: 465,
+                        secure: true,
+                        auth: {
+                            user: process.env.MAIL_USER,
+                            pass: process.env.MAIL_PASSWORD,
+                        },
+                    });
+                    await transporter.sendMail({
+                        from: process.env.MAIL_USER,
+                        to: order.userEmail,
+                        subject: `EffCraft - Commande du ${orderDate} annulée et remboursée`,
+                        html: `
+                            <h2>Votre commande a été annulée</h2>
+                            <p>Bonjour,</p>
+                            <p>Votre commande du ${orderDate} d'un montant de <strong>${order.order.totalPrice.toFixed(2)} €</strong> a été annulée et le remboursement a été effectué.</p>
+                            <h3>Articles concernés</h3>
+                            <ul>${productsList}</ul>
+                            <p>Le remboursement apparaîtra sur votre compte sous quelques jours ouvrés.</p>
+                            <p>Vous trouverez votre facture d'avoir en pièce jointe.</p>
+                            <p>Si vous avez des questions, n'hésitez pas à nous contacter.</p>
+                            <p>Cordialement,<br>L'équipe EffCraft</p>
+                        `,
+                        attachments: [
+                            {
+                                filename: `avoir-${creditNoteNumber}.pdf`,
+                                content: creditNoteBuffer,
+                                contentType: "application/pdf",
+                            }
+                        ],
+                    });
+                } catch (mailError) {
+                    console.error("Erreur envoi mail de remboursement:", mailError);
+                }
                 return NextResponse.json({
                     success: true,
                     message: "Commande annulée, client remboursé et produits remis en ligne"
@@ -264,6 +304,46 @@ export async function PATCH(req: NextRequest) {
                         status: "returned"
                     }
                 });
+                try {
+                    const returnOrderDate = new Date(refundOrder.order.createdAt).toLocaleDateString("fr-FR");
+                    const returnProductsList = refundOrder.products.map((p: any) => `<li>${p.name} - ${p.price.toFixed(2)} €</li>`).join("");
+                    const refundAmountEuros = refundAmount / 100;
+                    const { buffer: returnCreditNoteBuffer, creditNoteNumber: returnCreditNoteNumber } = await generateCreditNotePdf(refundOrder, orderId, refundAmountEuros);
+                    const returnTransporter = nodemailer.createTransport({
+                        host: "ssl0.ovh.net",
+                        port: 465,
+                        secure: true,
+                        auth: {
+                            user: process.env.MAIL_USER,
+                            pass: process.env.MAIL_PASSWORD,
+                        },
+                    });
+                    await returnTransporter.sendMail({
+                        from: process.env.MAIL_USER,
+                        to: refundOrder.userEmail,
+                        subject: `EffCraft - Retour traité - Commande du ${returnOrderDate}`,
+                        html: `
+                            <h2>Votre retour a été traité</h2>
+                            <p>Bonjour,</p>
+                            <p>Le retour de votre commande du ${returnOrderDate} a été traité. Un remboursement de <strong>${refundAmountEuros.toFixed(2)} €</strong> a été effectué.</p>
+                            <h3>Articles concernés</h3>
+                            <ul>${returnProductsList}</ul>
+                            <p>Le remboursement apparaîtra sur votre compte sous quelques jours ouvrés.</p>
+                            <p>Vous trouverez votre facture d'avoir en pièce jointe.</p>
+                            <p>Si vous avez des questions, n'hésitez pas à nous contacter.</p>
+                            <p>Cordialement,<br>L'équipe EffCraft</p>
+                        `,
+                        attachments: [
+                            {
+                                filename: `avoir-${returnCreditNoteNumber}.pdf`,
+                                content: returnCreditNoteBuffer,
+                                contentType: "application/pdf",
+                            }
+                        ],
+                    });
+                } catch (mailError) {
+                    console.error("Erreur envoi mail de remboursement retour:", mailError);
+                }
                 return NextResponse.json({
                     success: true,
                     message: "Client remboursé avec succès"

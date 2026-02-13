@@ -33,6 +33,8 @@ interface Order {
         returnedAt?: Date;
         preparingAt?: Date;
         readyAt?: Date;
+        cancelReason?: string;
+        cancelMessage?: string;
     };
 }
 const TRACKING_STEPS = [
@@ -67,6 +69,13 @@ const STATUS_LABELS: { [key: string]: string } = {
     return_in_transit: "En transit",
     return_delivered: "Livré",
     returned: "Remboursé"
+};
+const REFUND_REASON_LABELS: { [key: string]: string } = {
+    error: "Erreur de commande",
+    delay: "Délai trop long",
+    regret: "Changement d'avis",
+    other: "Autre",
+    cancelled: "Annulation"
 };
 const getShippingMethodName = (operator?: string, serviceCode?: string): string => {
     if (!operator) return "Non défini";
@@ -217,7 +226,7 @@ export default function OrderPage() {
                                     </div>
                                     {expandedOrderId === order._id && (
                                         <div className="details">
-                                            {orderView === "pending" && (
+                                            {orderView === "pending" && order.order.status !== "cancel_requested" && (
                                                 <div className="tracking">
                                                     {(() => {
                                                         const isReturn = order.order.status.startsWith("return_");
@@ -249,8 +258,16 @@ export default function OrderPage() {
                                                         <p>Total : {order.order.totalPrice.toFixed(2)}€</p>
                                                         {order.order.refundReason && (
                                                             <>
-                                                                <p>Motif de remboursement : {order.order.refundReason}</p>
+                                                                <p>Motif de remboursement : {REFUND_REASON_LABELS[order.order.refundReason!] || order.order.refundReason}</p>
                                                                 <p>Date de remboursement : {new Date(order.order.cancelledAt || order.order.returnedAt || order.order.createdAt).toLocaleDateString()}</p>
+                                                            </>
+                                                        )}
+                                                        {order.order.cancelReason && (
+                                                            <>
+                                                                <p>Raison d'annulation : {REFUND_REASON_LABELS[order.order.cancelReason!] || order.order.cancelReason}</p>
+                                                                {order.order.cancelMessage && (
+                                                                    <p>Message : {order.order.cancelMessage}</p>
+                                                                )}
                                                             </>
                                                         )}
                                                         {!order.order.refundReason && (
@@ -290,7 +307,9 @@ export default function OrderPage() {
                                                         </div>
                                                     )}
                                                     <div className="actions">
-                                                        <button className="invoice" onClick={() => window.open(`/api/invoice?orderId=${order._id}`, '_blank')}>Facture</button>
+                                                        {order.order.status !== "cancel_requested" && (
+                                                            <button className="invoice" onClick={() => window.open(`/api/invoice?orderId=${order._id}`, '_blank')}>Facture</button>
+                                                        )}
                                                         {orderView === "pending" && (
                                                             <>
                                                                 {["paid", "preparing"].includes(order.order.status) && (
@@ -406,7 +425,7 @@ export default function OrderPage() {
                                             value={cancelMessage}
                                             onChange={(e) => setCancelMessage(e.target.value)}
                                             placeholder="Précisez votre demande..."
-                                            maxLength={2000}
+                                            maxLength={200}
                                             rows={4}
                                         />
                                     </div>

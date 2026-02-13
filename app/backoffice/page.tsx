@@ -62,6 +62,13 @@ const STATUS_LABELS: { [key: string]: string } = {
     return_delivered: "Livré",
     returned: "Remboursé"
 };
+const REFUND_REASON_LABELS: { [key: string]: string } = {
+    error: "Erreur de commande",
+    delay: "Délai trop long",
+    regret: "Changement d'avis",
+    other: "Autre",
+    cancelled: "Annulation"
+};
 const getShippingMethodName = (operator?: string, serviceCode?: string): string => {
     if (!operator) return "Non défini";
     const names: { [key: string]: string } = {
@@ -100,6 +107,8 @@ export default function Backoffice() {
     const [showCancelModal, setShowCancelModal] = useState(false);
     const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
     const [cancelModalMessage, setCancelModalMessage] = useState<string | null>(null);
+    const [cancelModalMode, setCancelModalMode] = useState<"choose" | "reject">("choose");
+    const [rejectMessage, setRejectMessage] = useState("");
     const [showReturnModal, setShowReturnModal] = useState(false);
     const [orderToReturn, setOrderToReturn] = useState<Order | null>(null);
     const [showEventForm, setShowEventForm] = useState(false);
@@ -271,6 +280,9 @@ export default function Backoffice() {
     };
     const handleCancelOrder = async (order: Order) => {
         setOrderToCancel(order);
+        setCancelModalMode("choose");
+        setRejectMessage("");
+        setCancelModalMessage(null);
         setShowCancelModal(true);
     };
     const confirmCancelOrder = async () => {
@@ -306,6 +318,48 @@ export default function Backoffice() {
                 setShowCancelModal(false);
                 setOrderToCancel(null);
                 setCancelModalMessage(null);
+            }, 5000);
+        }
+    };
+    const rejectCancelRequest = async () => {
+        if (!orderToCancel || !rejectMessage.trim()) return;
+        setCancelModalMessage("Envoi du refus en cours...");
+        try {
+            const response = await fetch("/api/order/cancel/reject", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderId: orderToCancel._id, message: rejectMessage }),
+            });
+            if (response.ok) {
+                setCancelModalMessage("Demande refusée et client notifié par mail");
+                mutate();
+                setTimeout(() => {
+                    setShowCancelModal(false);
+                    setOrderToCancel(null);
+                    setCancelModalMessage(null);
+                    setCancelModalMode("choose");
+                    setRejectMessage("");
+                }, 5000);
+            } else {
+                const error = await response.json();
+                setCancelModalMessage("Erreur : " + (error.error || "Erreur inconnue"));
+                setTimeout(() => {
+                    setShowCancelModal(false);
+                    setOrderToCancel(null);
+                    setCancelModalMessage(null);
+                    setCancelModalMode("choose");
+                    setRejectMessage("");
+                }, 5000);
+            }
+        } catch (error) {
+            console.error("Erreur refus:", error);
+            setCancelModalMessage("Erreur réseau");
+            setTimeout(() => {
+                setShowCancelModal(false);
+                setOrderToCancel(null);
+                setCancelModalMessage(null);
+                setCancelModalMode("choose");
+                setRejectMessage("");
             }, 5000);
         }
     };
@@ -542,7 +596,7 @@ export default function Backoffice() {
                                                         <p>Total : {order.order.totalPrice.toFixed(2)}€</p>
                                                         {order.order.cancelReason && (
                                                             <>
-                                                                <p>Raison d'annulation : {order.order.cancelReason}</p>
+                                                                <p>Raison d'annulation : {REFUND_REASON_LABELS[order.order.cancelReason!] || order.order.cancelReason}</p>
                                                                 {order.order.cancelMessage && (
                                                                     <p>Message du client : {order.order.cancelMessage}</p>
                                                                 )}
@@ -550,7 +604,7 @@ export default function Backoffice() {
                                                         )}
                                                         {order.order.refundReason && (
                                                             <>
-                                                                <p>Motif de remboursement : {order.order.refundReason}</p>
+                                                                <p>Motif de remboursement : {REFUND_REASON_LABELS[order.order.refundReason!] || order.order.refundReason}</p>
                                                                 <p>Date de remboursement : {new Date(order.order.cancelledAt || order.order.returnedAt || order.order.createdAt).toLocaleDateString()} à {new Date(order.order.cancelledAt || order.order.returnedAt || order.order.createdAt).toLocaleTimeString()}</p>
                                                             </>
                                                         )}
@@ -591,7 +645,9 @@ export default function Backoffice() {
                                                         </div>
                                                     )}
                                                     <div className="actions">
-                                                        <button className="invoice" onClick={() => window.open(`/api/invoice?orderId=${order._id}`, '_blank')}>Facture</button>
+                                                        {order.order.status !== "cancel_requested" && (
+                                                            <button className="invoice" onClick={() => window.open(`/api/invoice?orderId=${order._id}`, '_blank')}>Facture</button>
+                                                        )}
                                                         {["paid", "preparing", "cancel_requested"].includes(order.order.status) && (
                                                             <button
                                                                 className="cancel"
@@ -831,6 +887,8 @@ export default function Backoffice() {
                         setShowCancelModal(false);
                         setOrderToCancel(null);
                         setCancelModalMessage(null);
+                        setCancelModalMode("choose");
+                        setRejectMessage("");
                     }
                 }}>
                     <div className="modal-content" onClick={(e) => {
@@ -843,22 +901,53 @@ export default function Backoffice() {
                                 <h3>
                                     {cancelModalMessage.includes("en cours")
                                         ? "Veuillez patienter"
-                                        : cancelModalMessage.includes("bien été")
+                                        : cancelModalMessage.includes("refusée") || cancelModalMessage.includes("remboursée")
                                         ? "Succès"
                                         : "Erreur"}
                                 </h3>
                                 <p>{cancelModalMessage}</p>
                             </>
+                        ) : cancelModalMode === "reject" ? (
+                            <>
+                                <h3>Refuser la demande d'annulation</h3>
+                                <p>Ce message sera envoyé par mail au client :</p>
+                                <textarea
+                                    value={rejectMessage}
+                                    onChange={(e) => setRejectMessage(e.target.value)}
+                                    placeholder="Ex: Votre colis a déjà été expédié..."
+                                    rows={4}
+                                    maxLength={2000}
+                                />
+                                <div className="modal-buttons">
+                                    <button className="btn-confirm" onClick={rejectCancelRequest} disabled={!rejectMessage.trim()}>Envoyer le refus</button>
+                                    <button className="btn-cancel" onClick={() => setCancelModalMode("choose")}>Retour</button>
+                                </div>
+                            </>
                         ) : (
                             <>
-                                <h3>Annulation et remboursement</h3>
-                                <p>Cette action va annuler la commande et rembourser automatiquement le client. Voulez-vous continuer ?</p>
+                                <h3>Annulation de commande</h3>
+                                {orderToCancel?.order.status === "cancel_requested" ? (
+                                    <>
+                                        <p>Le client a demandé l'annulation de cette commande.</p>
+                                        {orderToCancel.order.cancelReason && (
+                                            <p><strong>Raison :</strong> {REFUND_REASON_LABELS[orderToCancel.order.cancelReason] || orderToCancel.order.cancelReason}</p>
+                                        )}
+                                        {orderToCancel.order.cancelMessage && (
+                                            <p><strong>Message :</strong> {orderToCancel.order.cancelMessage}</p>
+                                        )}
+                                    </>
+                                ) : (
+                                    <p>Cette action va annuler la commande et rembourser automatiquement le client.</p>
+                                )}
                                 <div className="modal-buttons">
-                                    <button className="btn-confirm" onClick={confirmCancelOrder}>Oui</button>
+                                    <button className="btn-confirm" onClick={confirmCancelOrder}>Annuler et rembourser</button>
+                                    {orderToCancel?.order.status === "cancel_requested" && (
+                                        <button className="btn-cancel" onClick={() => setCancelModalMode("reject")}>Refuser</button>
+                                    )}
                                     <button className="btn-cancel" onClick={() => {
                                         setShowCancelModal(false);
                                         setOrderToCancel(null);
-                                    }}>Non</button>
+                                    }}>Retour</button>
                                 </div>
                             </>
                         )}
