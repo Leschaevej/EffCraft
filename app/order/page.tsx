@@ -291,14 +291,16 @@ export default function OrderPage() {
                                                     </div>
                                                     {order.shippingData && (
                                                         <div className="shipping-container">
-                                                            {order.shippingData.shippingMethod?.relayPoint ? (
+                                                            {order.shippingData.shippingMethod?.relayPoint ? (() => {
+                                                                const tc = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+                                                                return (
                                                                 <div className="info">
                                                                     <h3>Point relais</h3>
-                                                                    <p>{order.shippingData.shippingMethod.relayPoint.name}</p>
-                                                                    <p>{order.shippingData.shippingMethod.relayPoint.address}</p>
-                                                                    <p>{order.shippingData.shippingMethod.relayPoint.zipcode} {order.shippingData.shippingMethod.relayPoint.city}</p>
-                                                                </div>
-                                                            ) : (
+                                                                    <p>{tc(order.shippingData.shippingMethod.relayPoint.name)}</p>
+                                                                    <p>{tc(order.shippingData.shippingMethod.relayPoint.address)}</p>
+                                                                    <p>{order.shippingData.shippingMethod.relayPoint.zipcode} {tc(order.shippingData.shippingMethod.relayPoint.city)}</p>
+                                                                </div>);
+                                                            })() : (
                                                                 <div className="info">
                                                                     <h3>Livraison</h3>
                                                                     <p>{order.shippingData.nom || ''} {order.shippingData.prenom || ''}</p>

@@ -488,6 +488,14 @@ export async function POST(req: NextRequest) {
                 result.insertedId.toString()
             );
             const productsList = productsForOrder.map((p: any) => `<li>${p.name} - ${p.price.toFixed(2)} €</li>`).join("");
+            const tc = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+            const relayPoint = shippingData.shippingMethod?.relayPoint;
+            const deliveryHtml = relayPoint
+                ? `<p>${tc(relayPoint.name)}<br>${tc(relayPoint.address)}<br>${relayPoint.zipcode} ${tc(relayPoint.city)}</p>`
+                : `<p>${shippingData.prenom} ${shippingData.nom}<br>${shippingData.rue}<br>${shippingData.codePostal} ${shippingData.ville}</p>`;
+            const billingHtml = billingData && billingData !== "same"
+                ? `<h3>Facturation</h3><p>${billingData.prenom} ${billingData.nom}<br>${billingData.rue}<br>${billingData.codePostal} ${billingData.ville}</p>`
+                : '';
             const transporter = nodemailer.createTransport({
                 host: 'ssl0.ovh.net',
                 port: 465,
@@ -508,10 +516,9 @@ export async function POST(req: NextRequest) {
                     <h3>Récapitulatif</h3>
                     <ul>${productsList}</ul>
                     <p><strong>Total : ${totalPrice.toFixed(2)} €</strong></p>
-                    <h3>Adresse de livraison</h3>
-                    <p>${shippingData.prenom} ${shippingData.nom}<br>
-                    ${shippingData.rue}<br>
-                    ${shippingData.codePostal} ${shippingData.ville}</p>
+                    <h3>Livraison</h3>
+                    ${deliveryHtml}
+                    ${billingHtml}
                     <p>Vous trouverez votre facture en pièce jointe.</p>
                     <p>À bientôt,<br>L'équipe EffCraft</p>
                 `,

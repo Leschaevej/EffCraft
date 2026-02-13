@@ -214,12 +214,13 @@ export async function POST(req: NextRequest) {
             try {
                 const orderDate = new Date(order.order.createdAt).toLocaleDateString("fr-FR");
                 const productsList = order.products.map((p: any) => `<li>${p.name}</li>`).join("");
+                const tc = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
                 const relayPoint = order.shippingData?.shippingMethod?.relayPoint;
                 const deliveryAddress = relayPoint
-                    ? `<p><strong>${relayPoint.name}</strong></p><p>${relayPoint.address}</p><p>${relayPoint.zipcode} ${relayPoint.city}</p>`
-                    : `<p><strong>${order.shippingData?.prenom || ''} ${order.shippingData?.nom || ''}</strong></p><p>${order.shippingData?.rue || ''}</p><p>${order.shippingData?.codePostal || ''} ${order.shippingData?.ville || ''}</p>`;
+                    ? `<p>${tc(relayPoint.name)}<br>${tc(relayPoint.address)}<br>${relayPoint.zipcode} ${tc(relayPoint.city)}</p>`
+                    : `<p>${order.shippingData?.prenom || ''} ${order.shippingData?.nom || ''}<br>${order.shippingData?.rue || ''}<br>${order.shippingData?.codePostal || ''} ${order.shippingData?.ville || ''}</p>`;
                 const billingAddress = order.billingData && order.billingData !== "same"
-                    ? `<h3>Adresse de facturation</h3><p><strong>${order.billingData.prenom || ''} ${order.billingData.nom || ''}</strong></p><p>${order.billingData.rue || ''}</p><p>${order.billingData.codePostal || ''} ${order.billingData.ville || ''}</p>`
+                    ? `<h3>Facturation</h3><p>${order.billingData.prenom || ''} ${order.billingData.nom || ''}<br>${order.billingData.rue || ''}<br>${order.billingData.codePostal || ''} ${order.billingData.ville || ''}</p>`
                     : '';
                 const transporter = nodemailer.createTransport({
                     host: "ssl0.ovh.net",
@@ -238,7 +239,7 @@ export async function POST(req: NextRequest) {
                         <h2>Votre commande a été livrée !</h2>
                         <p>Bonjour,</p>
                         <p>Nous avons le plaisir de vous informer que votre commande du ${orderDate} a bien été livrée.</p>
-                        <h3>Adresse de livraison</h3>
+                        <h3>Livraison</h3>
                         ${deliveryAddress}
                         ${billingAddress}
                         <h3>Articles</h3>

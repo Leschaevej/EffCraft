@@ -634,31 +634,32 @@ export default function Cart() {
                                 </div>
                                 <div className="addresses">
                                     <div className="address">
-                                        <h3>Adresse de livraison</h3>
-                                        <p>{formData.prenom} {formData.nom}</p>
-                                        <p>{formData.rue}</p>
-                                        {formData.complement && <p>{formData.complement}</p>}
-                                        <p>{formData.codePostal} {formData.ville}</p>
-                                        <p>{formData.telephone}</p>
+                                        <h3>Livraison</h3>
                                         {selectedShippingMethod && (
-                                            <div className="shipping-info">
-                                                <p>Mode de livraison : {shippingOptions.find(opt => opt.id === selectedShippingMethod)?.name}</p>
-                                                {selectedRelayPoint && (() => {
-                                                    const toTitleCase = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-                                                    return (
-                                                        <>
-                                                            <p>{toTitleCase(selectedRelayPoint.name)}</p>
-                                                            <p>{toTitleCase(selectedRelayPoint.address)}</p>
-                                                            <p>{selectedRelayPoint.zipcode} {toTitleCase(selectedRelayPoint.city)}</p>
-                                                        </>
-                                                    );
-                                                })()}
-                                            </div>
+                                            <p><strong>{shippingOptions.find(opt => opt.id === selectedShippingMethod)?.name}</strong></p>
                                         )}
+                                        <p>{formData.prenom} {formData.nom}</p>
+                                        {selectedRelayPoint ? (() => {
+                                            const tc = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+                                            return (
+                                                <>
+                                                    <p>{tc(selectedRelayPoint.name)}</p>
+                                                    <p>{tc(selectedRelayPoint.address)}</p>
+                                                    <p>{selectedRelayPoint.zipcode} {tc(selectedRelayPoint.city)}</p>
+                                                </>
+                                            );
+                                        })() : (
+                                            <>
+                                                <p>{formData.rue}</p>
+                                                {formData.complement && <p>{formData.complement}</p>}
+                                                <p>{formData.codePostal} {formData.ville}</p>
+                                            </>
+                                        )}
+                                        <p>{formData.telephone}</p>
                                     </div>
                                     {!sameAddress && (
                                         <div className="address">
-                                            <h3>Adresse de facturation</h3>
+                                            <h3>Facturation</h3>
                                             <p>{billingData.prenom} {billingData.nom}</p>
                                             <p>{billingData.rue}</p>
                                             {billingData.complement && <p>{billingData.complement}</p>}
