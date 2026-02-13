@@ -576,7 +576,7 @@ export default function Backoffice() {
                                                                 <p>Date de remboursement : {new Date(order.order.cancelledAt || order.order.returnedAt || order.order.createdAt).toLocaleDateString()} à {new Date(order.order.cancelledAt || order.order.returnedAt || order.order.createdAt).toLocaleTimeString()}</p>
                                                             </>
                                                         )}
-                                                        {!order.order.refundReason && (
+                                                        {!order.order.refundReason && order.shippingData && (
                                                             <>
                                                                 <p>Mode de livraison : {getShippingMethodName(order.shippingData.shippingMethod?.operator, order.shippingData.shippingMethod?.serviceCode)}</p>
                                                                 <p>

@@ -270,7 +270,7 @@ export default function OrderPage() {
                                                                 )}
                                                             </>
                                                         )}
-                                                        {!order.order.refundReason && (
+                                                        {!order.order.refundReason && order.shippingData && (
                                                             <>
                                                                 <p>Mode de livraison : {getShippingMethodName(order.shippingData.shippingMethod?.operator, order.shippingData.shippingMethod?.serviceCode)}</p>
                                                                 <p>
