@@ -107,8 +107,6 @@ export default function Backoffice() {
     const [showCancelModal, setShowCancelModal] = useState(false);
     const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
     const [cancelModalMessage, setCancelModalMessage] = useState<string | null>(null);
-    const [cancelModalMode, setCancelModalMode] = useState<"choose" | "reject">("choose");
-    const [rejectMessage, setRejectMessage] = useState("");
     const [showReturnModal, setShowReturnModal] = useState(false);
     const [orderToReturn, setOrderToReturn] = useState<Order | null>(null);
     const [showEventForm, setShowEventForm] = useState(false);
@@ -188,28 +186,6 @@ export default function Backoffice() {
         router.replace("/");
         }
     }, [session, status, router]);
-    useEffect(() => {
-        if (activeSection === "orders" && session?.user?.role === "admin") {
-            const handleOrderUpdate = (event: Event) => {
-                const customEvent = event as CustomEvent;
-                if (customEvent.detail?.type === "order_status_updated" && customEvent.detail?.data) {
-                    const { orderId, status } = customEvent.detail.data;
-                    setOrders(prev => prev.map(order =>
-                        order._id === orderId ? { ...order, status } : order
-                    ));
-                } else if (
-                    customEvent.detail?.type === "order_created" ||
-                    customEvent.detail?.type === "order_deleted"
-                ) {
-                    mutate();
-                }
-            };
-            window.addEventListener("cart-update", handleOrderUpdate);
-            return () => {
-                window.removeEventListener("cart-update", handleOrderUpdate);
-            };
-        }
-    }, [activeSection, session, mutate]);
     const handlePrintLabel = async (order: Order) => {
         if (printingOrderId) {
             return;
@@ -280,8 +256,6 @@ export default function Backoffice() {
     };
     const handleCancelOrder = async (order: Order) => {
         setOrderToCancel(order);
-        setCancelModalMode("choose");
-        setRejectMessage("");
         setCancelModalMessage(null);
         setShowCancelModal(true);
     };
@@ -322,23 +296,21 @@ export default function Backoffice() {
         }
     };
     const rejectCancelRequest = async () => {
-        if (!orderToCancel || !rejectMessage.trim()) return;
+        if (!orderToCancel) return;
         setCancelModalMessage("Envoi du refus en cours...");
         try {
             const response = await fetch("/api/order/cancel/reject", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ orderId: orderToCancel._id, message: rejectMessage }),
+                body: JSON.stringify({ orderId: orderToCancel._id }),
             });
             if (response.ok) {
-                setCancelModalMessage("Demande refusée et client notifié par mail");
+                setCancelModalMessage("Demande refusée, commande passée en livraison et client notifié par mail");
                 mutate();
                 setTimeout(() => {
                     setShowCancelModal(false);
                     setOrderToCancel(null);
                     setCancelModalMessage(null);
-                    setCancelModalMode("choose");
-                    setRejectMessage("");
                 }, 5000);
             } else {
                 const error = await response.json();
@@ -347,8 +319,6 @@ export default function Backoffice() {
                     setShowCancelModal(false);
                     setOrderToCancel(null);
                     setCancelModalMessage(null);
-                    setCancelModalMode("choose");
-                    setRejectMessage("");
                 }, 5000);
             }
         } catch (error) {
@@ -358,8 +328,6 @@ export default function Backoffice() {
                 setShowCancelModal(false);
                 setOrderToCancel(null);
                 setCancelModalMessage(null);
-                setCancelModalMode("choose");
-                setRejectMessage("");
             }, 5000);
         }
     };
@@ -887,8 +855,6 @@ export default function Backoffice() {
                         setShowCancelModal(false);
                         setOrderToCancel(null);
                         setCancelModalMessage(null);
-                        setCancelModalMode("choose");
-                        setRejectMessage("");
                     }
                 }}>
                     <div className="modal-content" onClick={(e) => {
@@ -906,22 +872,6 @@ export default function Backoffice() {
                                         : "Erreur"}
                                 </h3>
                                 <p>{cancelModalMessage}</p>
-                            </>
-                        ) : cancelModalMode === "reject" ? (
-                            <>
-                                <h3>Refuser la demande d'annulation</h3>
-                                <p>Ce message sera envoyé par mail au client :</p>
-                                <textarea
-                                    value={rejectMessage}
-                                    onChange={(e) => setRejectMessage(e.target.value)}
-                                    placeholder="Ex: Votre colis a déjà été expédié..."
-                                    rows={4}
-                                    maxLength={2000}
-                                />
-                                <div className="modal-buttons">
-                                    <button className="btn-confirm" onClick={rejectCancelRequest} disabled={!rejectMessage.trim()}>Envoyer le refus</button>
-                                    <button className="btn-cancel" onClick={() => setCancelModalMode("choose")}>Retour</button>
-                                </div>
                             </>
                         ) : (
                             <>
@@ -941,8 +891,8 @@ export default function Backoffice() {
                                 )}
                                 <div className="modal-buttons">
                                     <button className="btn-confirm" onClick={confirmCancelOrder}>Annuler et rembourser</button>
-                                    {orderToCancel?.order.status === "cancel_requested" && (
-                                        <button className="btn-cancel" onClick={() => setCancelModalMode("reject")}>Refuser</button>
+                                    {orderToCancel?.order.status === "cancel_requested" && orderToCancel?.shippingData?.boxtalShipmentId && (
+                                        <button className="btn-cancel" onClick={rejectCancelRequest}>Colis déjà expédié</button>
                                     )}
                                     <button className="btn-cancel" onClick={() => {
                                         setShowCancelModal(false);

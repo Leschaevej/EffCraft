@@ -16,16 +16,14 @@ export async function POST(req: Request) {
             );
         }
 
-        const { orderId, message } = await req.json();
+        const { orderId } = await req.json();
 
-        if (!orderId || !message?.trim()) {
+        if (!orderId) {
             return NextResponse.json(
-                { error: "Message obligatoire" },
+                { error: "orderId manquant" },
                 { status: 400 }
             );
         }
-
-        const cleanMessage = message.trim().slice(0, 2000);
 
         const client = await clientPromise;
         const db = client.db("effcraftdatabase");
@@ -49,8 +47,6 @@ export async function POST(req: Request) {
             );
         }
 
-        const previousStatus = order.order.previousStatus || "paid";
-
         const transporter = nodemailer.createTransport({
             host: "ssl0.ovh.net",
             port: 465,
@@ -62,10 +58,6 @@ export async function POST(req: Request) {
         });
 
         const orderDate = new Date(order.order.createdAt).toLocaleDateString("fr-FR");
-        const escapedMessage = cleanMessage
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/\n/g, "<br>");
 
         await transporter.sendMail({
             from: process.env.MAIL_USER,
@@ -74,10 +66,9 @@ export async function POST(req: Request) {
             html: `
                 <h2>Demande d'annulation refusée</h2>
                 <p>Bonjour,</p>
-                <p>Votre demande d'annulation pour la commande du ${orderDate} d'un montant de ${order.order.totalPrice.toFixed(2)}€ a été refusée.</p>
-                <h3>Message de l'équipe EffCraft :</h3>
-                <p>${escapedMessage}</p>
-                <p>Si vous avez des questions, n'hésitez pas à nous contacter.</p>
+                <p>Votre demande d'annulation pour la commande du ${orderDate} d'un montant de ${order.order.totalPrice.toFixed(2)}€ n'a pas pu être acceptée car votre colis a déjà été expédié.</p>
+                <p>Vous pouvez suivre votre livraison depuis votre espace commandes.</p>
+                <p>Si vous souhaitez retourner votre commande après réception, vous pourrez effectuer une demande de retour depuis votre espace client.</p>
                 <p>Cordialement,<br>L'équipe EffCraft</p>
             `,
         });
@@ -86,7 +77,7 @@ export async function POST(req: Request) {
             { _id: new ObjectId(orderId) },
             {
                 $set: {
-                    "order.status": previousStatus,
+                    "order.status": "in_transit",
                 },
                 $unset: {
                     "order.cancelReason": "",
@@ -101,7 +92,7 @@ export async function POST(req: Request) {
             type: "order_status_updated",
             data: {
                 orderId: orderId,
-                status: previousStatus
+                status: "in_transit"
             }
         });
 

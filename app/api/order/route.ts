@@ -178,19 +178,31 @@ export async function PATCH(req: NextRequest) {
                             pass: process.env.MAIL_PASSWORD,
                         },
                     });
+                    const isClientRequest = order.order?.status === "cancel_requested";
                     await transporter.sendMail({
                         from: process.env.MAIL_USER,
                         to: order.userEmail,
                         subject: `EffCraft - Commande du ${orderDate} annulée et remboursée`,
-                        html: `
-                            <h2>Votre commande a été annulée</h2>
+                        html: isClientRequest
+                            ? `
+                            <h2>Votre demande d'annulation a été acceptée</h2>
                             <p>Bonjour,</p>
-                            <p>Votre commande du ${orderDate} d'un montant de <strong>${order.order.totalPrice.toFixed(2)} €</strong> a été annulée et le remboursement a été effectué.</p>
+                            <p>Suite à votre demande, votre commande du ${orderDate} d'un montant de <strong>${order.order.totalPrice.toFixed(2)} €</strong> a été annulée et le remboursement a été effectué.</p>
                             <h3>Articles concernés</h3>
                             <ul>${productsList}</ul>
                             <p>Le remboursement apparaîtra sur votre compte sous quelques jours ouvrés.</p>
                             <p>Vous trouverez votre facture d'avoir en pièce jointe.</p>
-                            <p>Si vous avez des questions, n'hésitez pas à nous contacter.</p>
+                            <p>Cordialement,<br>L'équipe EffCraft</p>
+                        `
+                            : `
+                            <h2>Votre commande a été annulée</h2>
+                            <p>Bonjour,</p>
+                            <p>Nous sommes désolés de vous informer que votre commande du ${orderDate} d'un montant de <strong>${order.order.totalPrice.toFixed(2)} €</strong> a dû être annulée en raison d'un problème de disponibilité de l'article.</p>
+                            <p>Le remboursement intégral a été effectué et apparaîtra sur votre compte sous quelques jours ouvrés.</p>
+                            <h3>Articles concernés</h3>
+                            <ul>${productsList}</ul>
+                            <p>Vous trouverez votre facture d'avoir en pièce jointe.</p>
+                            <p>Nous nous excusons pour la gêne occasionnée. N'hésitez pas à nous contacter si vous avez des questions.</p>
                             <p>Cordialement,<br>L'équipe EffCraft</p>
                         `,
                         attachments: [

@@ -4,6 +4,7 @@ import { authOptions } from "../auth/[...nextauth]/route";
 import clientPromise from "../../lib/mongodb";
 import { ObjectId } from "mongodb";
 import cloudinary from "../../lib/cloudinary";
+import nodemailer from "nodemailer";
 
 const getBoxtalApiUrl = () => {
     return process.env.BOXTAL_ENV === "production"
@@ -364,6 +365,38 @@ async function syncBoxtalStatus(searchParams: URLSearchParams) {
             { _id: new ObjectId(orderId) },
             updateQuery
         );
+        if (ourStatus === "delivered" && order.order.status !== "delivered") {
+            try {
+                const orderDate = new Date(order.order.createdAt).toLocaleDateString("fr-FR");
+                const productsList = order.products.map((p: any) => `<li>${p.name}</li>`).join("");
+                const transporter = nodemailer.createTransport({
+                    host: "ssl0.ovh.net",
+                    port: 465,
+                    secure: true,
+                    auth: {
+                        user: process.env.MAIL_USER,
+                        pass: process.env.MAIL_PASSWORD,
+                    },
+                });
+                await transporter.sendMail({
+                    from: process.env.MAIL_USER,
+                    to: order.userEmail,
+                    subject: `EffCraft - Votre commande du ${orderDate} a été livrée !`,
+                    html: `
+                        <h2>Votre commande a été livrée !</h2>
+                        <p>Bonjour,</p>
+                        <p>Nous avons le plaisir de vous informer que votre commande du ${orderDate} a bien été livrée.</p>
+                        <h3>Articles</h3>
+                        <ul>${productsList}</ul>
+                        <p>Nous espérons que vos articles vous plairont ! Si vous avez la moindre question ou le moindre souci, n'hésitez pas à nous contacter.</p>
+                        <p>Un grand merci pour votre confiance et à très bientôt sur EffCraft !</p>
+                        <p>Cordialement,<br>L'équipe EffCraft</p>
+                    `,
+                });
+            } catch (mailError) {
+                console.error("Erreur envoi mail de livraison:", mailError);
+            }
+        }
         return NextResponse.json({
             success: true,
             status: ourStatus
