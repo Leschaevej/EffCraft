@@ -8,11 +8,6 @@ import { ObjectId } from "mongodb";
 import { NextRequest } from "next/server";
 import { notifyClients } from "../../lib/pusher-server";
 import { scheduleNextCleanup } from "../cart/route";
-
-interface CartItem {
-    productId: mongoose.Types.ObjectId;
-    addedAt: Date;
-}
 async function dbConnect() {
     if (mongoose.connection.readyState !== 1) {
         await mongoose.connect(process.env.MONGODB_URI!, {
@@ -41,15 +36,15 @@ export async function GET(request: NextRequest) {
     const client = await import("../../lib/mongodb").then((mod) => mod.default);
     const db = client.db("effcraftdatabase");
     if (type === "cart") {
-        const productIds = user.cart.map((item: CartItem) => new ObjectId(item.productId));
+        const productIds = user.cart.map((id: mongoose.Types.ObjectId) => new ObjectId(id));
         const products = await db
         .collection("products")
         .find({ _id: { $in: productIds } })
         .toArray();
         const cartDetailed = user.cart
-        .map((cartItem: CartItem) => {
+        .map((cartId: mongoose.Types.ObjectId) => {
             const product = products.find(
-            (p) => p._id.toString() === cartItem.productId.toString()
+            (p) => p._id.toString() === cartId.toString()
             );
             if (!product) return null;
             return {
@@ -57,7 +52,6 @@ export async function GET(request: NextRequest) {
             name: product.name,
             price: product.price,
             images: product.images,
-            addedAt: cartItem.addedAt,
             };
         })
         .filter(Boolean);
@@ -106,7 +100,7 @@ export async function POST(request: Request) {
             }, { status: 409 });
         }
         const exists = user.cart.some(
-            (item: CartItem) => item.productId.toString() === productId
+            (id: mongoose.Types.ObjectId) => id.toString() === productId
         );
         if (!exists) {
             const now = new Date();
@@ -117,10 +111,7 @@ export async function POST(request: Request) {
             } else {
                 cartExpiresAt = user.cartExpiresAt;
             }
-            user.cart.push({
-                productId: new mongoose.Types.ObjectId(productId),
-                addedAt: now,
-            });
+            user.cart.push(new mongoose.Types.ObjectId(productId));
             product.status = "reserved";
             product.reservedBy = user._id as mongoose.Types.ObjectId;
             await product.save();
@@ -175,7 +166,7 @@ export async function DELETE(request: Request) {
             await product.save();
         }
         user.cart = user.cart.filter(
-            (item: CartItem) => item.productId.toString() !== productId
+            (id: mongoose.Types.ObjectId) => id.toString() !== productId
         );
         if (user.cart.length === 0) {
             user.cartExpiresAt = undefined;

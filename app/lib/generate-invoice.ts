@@ -64,7 +64,7 @@ export async function generateInvoicePdf(order: any, orderId: string): Promise<{
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(...COLORS.dark);
-    const billing = order.billingData || order.shippingData;
+    const billing = (order.billingData && order.billingData !== "same") ? order.billingData : order.shippingData;
     if (billing) {
         doc.text(`${(billing.prenom || "")} ${(billing.nom || "").toUpperCase()}`, margin, y);
         y += 5;

@@ -84,8 +84,8 @@ export async function DELETE(
         { $pull: { favorites: productObjectId } } as any
         );
         await usersCollection.updateMany(
-        { "cart.productId": productObjectId },
-        { $pull: { cart: { productId: productObjectId } } } as any
+        { cart: productObjectId },
+        { $pull: { cart: productObjectId } } as any
         );
         await notifyClients({
         type: "product_deleted",

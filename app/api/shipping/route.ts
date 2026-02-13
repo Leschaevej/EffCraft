@@ -346,7 +346,7 @@ async function syncBoxtalStatus(searchParams: URLSearchParams) {
                     const cleanedProducts = order.products.map((p: any) => ({
                         name: p.name,
                         price: p.price,
-                        images: p.images && p.images.length > 0 ? [p.images[0]] : []
+                        image: p.images?.[0] || "",
                     }));
 
                     updateData.products = cleanedProducts;

@@ -4,13 +4,14 @@ import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { nothingYouCouldDo } from "../font";
-import { FaCheck, FaBoxOpen, FaTruck, FaHome } from "react-icons/fa";
+import { FaCheck, FaBoxOpen, FaTruck, FaHome, FaHourglassHalf } from "react-icons/fa";
 import "./page.scss";
 import { useUserOrders } from "../hooks/useOrders";
 interface Product {
-    _id: string;
+    _id?: string;
     name: string;
-    images: string[];
+    images?: string[];
+    image?: string;
     price: number;
 }
 interface Order {
@@ -50,6 +51,7 @@ const STATUS_STEPS: { [key: string]: number } = {
     preparing: 2,
     in_transit: 3,
     delivered: 4,
+    cancel_requested: 1,
     return_requested: 1,
     return_in_transit: 2,
     return_delivered: 3
@@ -60,6 +62,7 @@ const STATUS_LABELS: { [key: string]: string } = {
     in_transit: "Livraison",
     delivered: "Livré",
     cancelled: "Remboursé",
+    cancel_requested: "Demande en cours",
     return_requested: "Retour confirmé",
     return_in_transit: "En transit",
     return_delivered: "Livré",
@@ -98,6 +101,10 @@ export default function OrderPage() {
     const { orders: swrOrders, isLoading: swrLoading, mutate } = useUserOrders(orderView);
     const [orders, setOrders] = useState<Order[]>([]);
     const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+    const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
+    const [cancelReason, setCancelReason] = useState("");
+    const [cancelMessage, setCancelMessage] = useState("");
+    const [cancelStatus, setCancelStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
     useEffect(() => {
         if (!swrLoading) {
             setOrders(swrOrders);
@@ -115,7 +122,7 @@ export default function OrderPage() {
                 const customEvent = event as CustomEvent;
                 if (customEvent.detail?.type === "order_status_updated" && customEvent.detail?.data) {
                     const { orderId, status } = customEvent.detail.data;
-                    const pendingStatuses = ["paid", "preparing", "in_transit", "return_requested", "return_in_transit"];
+                    const pendingStatuses = ["paid", "preparing", "in_transit", "cancel_requested", "return_requested", "return_in_transit"];
                     const historyStatuses = ["delivered", "cancelled", "returned", "return_delivered"];
                     const shouldBeInCurrentView = orderView === "pending"
                         ? pendingStatuses.includes(status)
@@ -148,6 +155,7 @@ export default function OrderPage() {
             in_transit: <FaTruck />,
             delivered: <FaHome />,
             cancelled: <FaCheck />,
+            cancel_requested: <FaHourglassHalf />,
             returned: <FaCheck />,
             return_requested: <FaCheck />,
             return_in_transit: <FaTruck />,
@@ -190,8 +198,8 @@ export default function OrderPage() {
                                     <div className="head">
                                         <div className="info">
                                             <div className="preview">
-                                                {order.products[0]?.images && order.products[0].images.length > 0 && (
-                                                    <img src={order.products[0].images[0]} alt={order.products[0].name} />
+                                                {(order.products[0]?.image || order.products[0]?.images?.[0]) && (
+                                                    <img src={order.products[0].image || order.products[0].images?.[0]} alt={order.products[0].name} />
                                                 )}
                                             </div>
                                             <p>{new Date(order.order.createdAt).toLocaleDateString()}</p>
@@ -286,7 +294,12 @@ export default function OrderPage() {
                                                         {orderView === "pending" && (
                                                             <>
                                                                 {["paid", "preparing"].includes(order.order.status) && (
-                                                                    <button className="cancel">
+                                                                    <button className="cancel" onClick={() => {
+                                                                        setCancelOrderId(order._id);
+                                                                        setCancelReason("");
+                                                                        setCancelMessage("");
+                                                                        setCancelStatus("idle");
+                                                                    }}>
                                                                         Demander annulation
                                                                     </button>
                                                                 )}
@@ -315,8 +328,8 @@ export default function OrderPage() {
                                                 <div className="products">
                                                     {order.products.map((product, index) => (
                                                         <div key={product._id || `${order._id}-product-${index}`} className="product">
-                                                            {product.images && product.images.length > 0 && (
-                                                                <img src={product.images[0]} alt={product.name} />
+                                                            {(product.image || product.images?.[0]) && (
+                                                                <img src={product.image || product.images?.[0]} alt={product.name} />
                                                             )}
                                                             <p className="name">{product.name}</p>
                                                         </div>
@@ -331,6 +344,87 @@ export default function OrderPage() {
                     )}
                 </div>
             </section>
+            {cancelOrderId && (() => {
+                const cancelOrder = orders.find(o => o._id === cancelOrderId);
+                if (!cancelOrder) return null;
+                const handleSubmit = async () => {
+                    if (!cancelReason) return;
+                    setCancelStatus("sending");
+                    try {
+                        const res = await fetch("/api/order/cancel", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                orderId: cancelOrderId,
+                                reason: cancelReason,
+                                message: cancelMessage,
+                            }),
+                        });
+                        if (res.ok) {
+                            setCancelStatus("sent");
+                            setOrders(prev => prev.map(o =>
+                                o._id === cancelOrderId
+                                    ? { ...o, order: { ...o.order, status: "cancel_requested" } }
+                                    : o
+                            ));
+                        } else {
+                            setCancelStatus("error");
+                        }
+                    } catch {
+                        setCancelStatus("error");
+                    }
+                };
+                return (
+                    <div className="cancel-modal" onClick={() => cancelStatus !== "sending" && setCancelOrderId(null)}>
+                        <div className="cancel-modal-content" onClick={(e) => e.stopPropagation()}>
+                            {cancelStatus === "sent" ? (
+                                <>
+                                    <h3>Demande envoyée</h3>
+                                    <p>Votre demande d'annulation a bien été transmise. Nous reviendrons vers vous rapidement.</p>
+                                    <div className="cancel-modal-actions">
+                                        <button className="back" onClick={() => setCancelOrderId(null)}>Fermer</button>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <h3>Demander une annulation</h3>
+                                    <div className="cancel-modal-recap">
+                                        <p>Commande du {new Date(cancelOrder.order.createdAt).toLocaleDateString()}</p>
+                                        <p>Montant : {cancelOrder.order.totalPrice.toFixed(2)}€</p>
+                                    </div>
+                                    <div className="cancel-modal-form">
+                                        <label>Raison de l'annulation</label>
+                                        <select value={cancelReason} onChange={(e) => setCancelReason(e.target.value)}>
+                                            <option value="">-- Sélectionnez une raison --</option>
+                                            <option value="Erreur de commande">Erreur de commande</option>
+                                            <option value="Délai trop long">Délai trop long</option>
+                                            <option value="Changement d'avis">Changement d&apos;avis</option>
+                                            <option value="Autre">Autre</option>
+                                        </select>
+                                        <label>Message complémentaire (optionnel)</label>
+                                        <textarea
+                                            value={cancelMessage}
+                                            onChange={(e) => setCancelMessage(e.target.value)}
+                                            placeholder="Précisez votre demande..."
+                                            maxLength={2000}
+                                            rows={4}
+                                        />
+                                    </div>
+                                    {cancelStatus === "error" && (
+                                        <p className="cancel-modal-error">Une erreur est survenue. Veuillez réessayer.</p>
+                                    )}
+                                    <div className="cancel-modal-actions">
+                                        <button className="back" onClick={() => setCancelOrderId(null)} disabled={cancelStatus === "sending"}>Retour</button>
+                                        <button className="submit" onClick={handleSubmit} disabled={!cancelReason || cancelStatus === "sending"}>
+                                            {cancelStatus === "sending" ? "Envoi en cours..." : "Envoyer la demande"}
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                );
+            })()}
         </main>
     );
 }

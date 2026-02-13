@@ -42,7 +42,7 @@ export function useOrders(status: 'pending' | 'history') {
 
 export function useUserOrders(orderView: 'pending' | 'history') {
   const statuses = orderView === "pending"
-    ? "paid,preparing,ready,in_transit,out_for_delivery,return_requested,return_preparing,return_in_transit,return_out_for_delivery"
+    ? "paid,preparing,ready,in_transit,out_for_delivery,cancel_requested,return_requested,return_preparing,return_in_transit,return_out_for_delivery"
     : "delivered,cancelled,returned,return_delivered";
 
   const { data, error, isLoading, mutate } = useSWR(

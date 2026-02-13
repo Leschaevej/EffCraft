@@ -4,16 +4,17 @@ import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { nothingYouCouldDo } from "../font";
-import { FaCheck, FaBoxOpen, FaTruck, FaHome, FaPencilAlt, FaTrash } from "react-icons/fa";
+import { FaCheck, FaBoxOpen, FaTruck, FaHome, FaPencilAlt, FaTrash, FaHourglassHalf } from "react-icons/fa";
 import "./page.scss";
 import AddForm from "../components/addForm/AddForm";
 import DeleteForm from "../components/deleteForm/DeleteForm";
 import { useOrders } from "../hooks/useOrders";
 import Calendar from "../components/calendar/Calendar";
 interface Product {
-    _id: string;
+    _id?: string;
     name: string;
-    images: string[];
+    images?: string[];
+    image?: string;
     price: number;
 }
 interface Order {
@@ -39,6 +40,9 @@ interface Order {
         returnedAt?: Date;
         preparingAt?: Date;
         readyAt?: Date;
+        cancelReason?: string;
+        cancelMessage?: string;
+        cancelRequestedAt?: Date;
         cancellationRequested?: boolean;
         cancellationRequestedAt?: Date;
         returnRequested?: boolean;
@@ -52,6 +56,7 @@ const STATUS_LABELS: { [key: string]: string } = {
     in_transit: "Livraison",
     delivered: "Livré",
     cancelled: "Remboursé",
+    cancel_requested: "Annulation demandée",
     return_requested: "Retour confirmé",
     return_in_transit: "En transit",
     return_delivered: "Livré",
@@ -397,6 +402,7 @@ export default function Backoffice() {
             in_transit: <FaTruck />,
             delivered: <FaHome />,
             cancelled: <FaCheck />,
+            cancel_requested: <FaHourglassHalf />,
             returned: <FaCheck />,
             return_requested: <FaCheck />,
             return_in_transit: <FaTruck />,
@@ -491,8 +497,8 @@ export default function Backoffice() {
                                     <div className="head">
                                         <div className="info">
                                             <div className="preview">
-                                                {order.products[0]?.images && order.products[0].images.length > 0 && (
-                                                    <img src={order.products[0].images[0]} alt={order.products[0].name} />
+                                                {(order.products[0]?.image || order.products[0]?.images?.[0]) && (
+                                                    <img src={order.products[0].image || order.products[0].images?.[0]} alt={order.products[0].name} />
                                                 )}
                                             </div>
                                             {order.shippingData && (
@@ -534,6 +540,14 @@ export default function Backoffice() {
                                                         <p>Email : {order.userEmail}</p>
                                                         <p>Date de commande : {new Date(order.order.createdAt).toLocaleDateString()} à {new Date(order.order.createdAt).toLocaleTimeString()}</p>
                                                         <p>Total : {order.order.totalPrice.toFixed(2)}€</p>
+                                                        {order.order.cancelReason && (
+                                                            <>
+                                                                <p>Raison d'annulation : {order.order.cancelReason}</p>
+                                                                {order.order.cancelMessage && (
+                                                                    <p>Message du client : {order.order.cancelMessage}</p>
+                                                                )}
+                                                            </>
+                                                        )}
                                                         {order.order.refundReason && (
                                                             <>
                                                                 <p>Motif de remboursement : {order.order.refundReason}</p>
@@ -578,7 +592,7 @@ export default function Backoffice() {
                                                     )}
                                                     <div className="actions">
                                                         <button className="invoice" onClick={() => window.open(`/api/invoice?orderId=${order._id}`, '_blank')}>Facture</button>
-                                                        {["paid", "preparing"].includes(order.order.status) && (
+                                                        {["paid", "preparing", "cancel_requested"].includes(order.order.status) && (
                                                             <button
                                                                 className="cancel"
                                                                 onClick={() => handleCancelOrder(order)}
@@ -607,8 +621,8 @@ export default function Backoffice() {
                                                 <div className="products">
                                                     {order.products.map((product, index) => (
                                                         <div key={product._id || `${order._id}-product-${index}`} className="product">
-                                                            {product.images && product.images.length > 0 && (
-                                                                <img src={product.images[0]} alt={product.name} />
+                                                            {(product.image || product.images?.[0]) && (
+                                                                <img src={product.image || product.images?.[0]} alt={product.name} />
                                                             )}
                                                             <p className="name">{product.name}</p>
                                                         </div>

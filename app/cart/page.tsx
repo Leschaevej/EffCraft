@@ -17,7 +17,6 @@ export type Bijou = {
     name: string;
     price: number;
     images: string[];
-    addedAt?: string;
 };
 export default function Cart() {
     const { data: session, status } = useSession();
@@ -462,7 +461,7 @@ export default function Cart() {
                         } : undefined,
                     } : undefined,
                 },
-                billingData: sameAddress ? formData : billingData,
+                billingData: sameAddress ? "same" : billingData,
                 totalAmount: totalAmount,
             };
             pendingOrderRef.current = orderData;

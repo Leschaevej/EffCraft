@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
         if (status === 'history') {
             query = { "order.status": { $in: ['delivered', 'cancelled', 'returned', 'return_delivered'] } };
         } else if (status === 'pending') {
-            query = { "order.status": { $in: ['paid', 'preparing', 'in_transit', 'return_requested', 'return_in_transit'] } };
+            query = { "order.status": { $in: ['paid', 'preparing', 'in_transit', 'cancel_requested', 'return_requested', 'return_in_transit'] } };
         } else {
             query = { "order.status": status };
         }
@@ -134,17 +134,26 @@ export async function PATCH(req: NextRequest) {
                         });
                     }
                 }
+                const cancelSlimProducts = order.products.map((p: any) => ({
+                    name: p.name,
+                    price: p.price,
+                    image: p.images?.[0] || "",
+                }));
                 await ordersCollection.updateOne(
                     { _id: new ObjectId(orderId) },
                     {
                         $set: {
                             "order.status": "cancelled",
                             "order.cancelledAt": new Date(),
-                            "order.refundReason": "annulation de la commande"
+                            "order.refundReason": order.order?.cancelReason || "annulation de la commande",
+                            products: cancelSlimProducts
                         },
                         $unset: {
                             shippingData: "",
-                            billingData: ""
+                            billingData: "",
+                            "order.cancelReason": "",
+                            "order.cancelMessage": "",
+                            "order.cancelRequestedAt": ""
                         }
                     }
                 );
@@ -228,13 +237,19 @@ export async function PATCH(req: NextRequest) {
                         { status: 500 }
                     );
                 }
+                const returnSlimProducts = refundOrder.products.map((p: any) => ({
+                    name: p.name,
+                    price: p.price,
+                    image: p.images?.[0] || "",
+                }));
                 await ordersCollection.updateOne(
                     { _id: new ObjectId(orderId) },
                     {
                         $set: {
                             "order.status": "returned",
                             "order.returnedAt": new Date(),
-                            "order.refundReason": refundReason
+                            "order.refundReason": refundReason,
+                            products: returnSlimProducts
                         },
                         $unset: {
                             shippingData: "",
@@ -296,12 +311,14 @@ export async function POST(req: NextRequest) {
                 { status: 400 }
             );
         }
-        const billingValidation = validateAddressData(billingData, false);
-        if (!billingValidation.valid) {
-            return NextResponse.json(
-                { error: billingValidation.error },
-                { status: 400 }
-            );
+        if (billingData !== "same") {
+            const billingValidation = validateAddressData(billingData, false);
+            if (!billingValidation.valid) {
+                return NextResponse.json(
+                    { error: billingValidation.error },
+                    { status: 400 }
+                );
+            }
         }
         const addressValidationResult = await validateFrenchAddress(
             shippingData.rue,
@@ -345,8 +362,8 @@ export async function POST(req: NextRequest) {
             { $pull: { favorites: { $in: productIds } } } as any
         );
         await usersCollection.updateMany(
-            { "cart.productId": { $in: productIds } },
-            { $pull: { cart: { productId: { $in: productIds } } } } as any
+            { cart: { $in: productIds } },
+            { $pull: { cart: { $in: productIds } } } as any
         );
         await usersCollection.updateOne(
             { email: session.user.email },

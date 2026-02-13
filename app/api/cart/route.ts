@@ -84,7 +84,7 @@ async function handleCleanup(returnResponse: boolean = true) {
         let totalProductsFreed = 0;
         for (const user of expiredUsers) {
             if (user.cart.length > 0) {
-                const userCartProductIds = user.cart.map((item: any) => item.productId);
+                const userCartProductIds = user.cart;
                 totalProductsFreed += userCartProductIds.length;
 
                 await Product.updateMany(
