@@ -4,6 +4,7 @@ import { ObjectId } from "mongodb";
 import { notifyClients } from "../../../lib/pusher-server";
 import crypto from "crypto";
 import nodemailer from "nodemailer";
+import cloudinary from "../../../lib/cloudinary";
 
 function verifySignature(payload: string, signature: string, secret: string): boolean {
     const computedSignature = crypto
@@ -160,9 +161,43 @@ export async function POST(req: NextRequest) {
                 console.log(`✅ Mise à jour prévue:`, JSON.stringify(updateData, null, 2));
             }
         }
+        if (order.order.status === "preparing" && updateData["order.status"] && updateData["order.status"] !== "preparing") {
+            if (order.products && order.products.length > 0) {
+                const imagesToDelete: string[] = [];
+                order.products.forEach((p: any) => {
+                    if (p.images && p.images.length > 1) {
+                        imagesToDelete.push(...p.images.slice(1));
+                    }
+                });
+                if (imagesToDelete.length > 0) {
+                    for (const imageUrl of imagesToDelete) {
+                        try {
+                            const match = imageUrl.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
+                            if (match && match[1]) {
+                                await cloudinary.uploader.destroy(match[1]);
+                            }
+                        } catch (error) {
+                            console.error("Erreur suppression image Cloudinary:", error);
+                        }
+                    }
+                }
+                updateData.products = order.products.map((p: any) => ({
+                    name: p.name,
+                    price: p.price,
+                    image: p.images?.[0] || "",
+                }));
+            }
+        }
+        const updateQuery: any = { $set: updateData };
+        if (updateData["order.status"] === "delivered") {
+            updateQuery.$unset = {
+                shippingData: "",
+                billingData: ""
+            };
+        }
         await ordersCollection.updateOne(
             { _id: new ObjectId(order._id) },
-            { $set: updateData }
+            updateQuery
         );
         await notifyClients({
             type: "order_status_updated",

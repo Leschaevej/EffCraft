@@ -3,8 +3,6 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 import clientPromise from "../../lib/mongodb";
 import { ObjectId } from "mongodb";
-import cloudinary from "../../lib/cloudinary";
-import nodemailer from "nodemailer";
 
 const getBoxtalApiUrl = () => {
     return process.env.BOXTAL_ENV === "production"
@@ -26,9 +24,6 @@ export async function GET(request: NextRequest) {
     const action = searchParams.get('action');
     if (action === 'relay') {
         return getRelayPoints(searchParams);
-    }
-    if (action === 'sync-status') {
-        return syncBoxtalStatus(searchParams);
     }
     return getShippingPrices(searchParams);
 }
@@ -239,175 +234,6 @@ function getFallbackShippingOptions() {
         success: true,
         options: fallbackOptions
     });
-}
-async function syncBoxtalStatus(searchParams: URLSearchParams) {
-    try {
-        const orderId = searchParams.get('orderId');
-        if (!orderId) {
-            return NextResponse.json(
-                { error: "ID de commande manquant" },
-                { status: 400 }
-            );
-        }
-        const client = await clientPromise;
-        const db = client.db("effcraftdatabase");
-        const ordersCollection = db.collection("orders");
-        const order = await ordersCollection.findOne({ _id: new ObjectId(orderId) });
-        if (!order || !order.shippingData.boxtalShipmentId) {
-            return NextResponse.json(
-                { error: "Commande ou expédition Boxtal introuvable" },
-                { status: 404 }
-            );
-        }
-        const isProduction = process.env.BOXTAL_ENV === "production";
-        const apiKey = isProduction ? process.env.BOXTAL_V3_PROD_KEY : process.env.BOXTAL_V3_TEST_KEY;
-        const apiSecret = isProduction ? process.env.BOXTAL_V3_PROD_SECRET : process.env.BOXTAL_V3_TEST_SECRET;
-        if (!apiKey || !apiSecret) {
-            return NextResponse.json(
-                { error: "Configuration Boxtal manquante" },
-                { status: 500 }
-            );
-        }
-        const authString = Buffer.from(`${apiKey}:${apiSecret}`).toString('base64');
-        const apiUrl = getBoxtalApiUrl();
-        const response = await fetch(
-            `${apiUrl}/shipping/v3.1/shipping-order/${order.shippingData.boxtalShipmentId}`,
-            {
-                method: "GET",
-                headers: {
-                    "Authorization": `Basic ${authString}`,
-                    "Accept": "application/json"
-                }
-            }
-        );
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error("Erreur récupération statut Boxtal:", errorText);
-            return NextResponse.json(
-                { error: "Impossible de récupérer le statut Boxtal" },
-                { status: response.status }
-            );
-        }
-        const shipmentData = await response.json();
-        const trackingResponse = await fetch(
-            `${apiUrl}/shipping/v3.1/shipping-order/${order.shippingData.boxtalShipmentId}/tracking`,
-            {
-                method: "GET",
-                headers: {
-                    "Authorization": `Basic ${authString}`,
-                    "Accept": "application/json"
-                }
-            }
-        );
-        let ourStatus = order.order.status;
-        const updateData: any = {};
-        if (trackingResponse.ok) {
-            const trackingData = await trackingResponse.json();
-            const trackingStatus = trackingData.content?.[0]?.status;
-            if (trackingStatus === "DELIVERED") {
-                ourStatus = "delivered";
-                updateData["order.status"] = "delivered";
-                if (!order.order.deliveredAt) {
-                    updateData["order.deliveredAt"] = new Date();
-                }
-            } else if (trackingStatus === "OUT_FOR_DELIVERY") {
-                ourStatus = "out_for_delivery";
-                updateData["order.status"] = "out_for_delivery";
-            } else if (trackingStatus === "IN_TRANSIT") {
-                ourStatus = "in_transit";
-                updateData["order.status"] = "in_transit";
-            } else if (shipmentData.content?.status === "PENDING" && order.order.status === "preparing") {
-                ourStatus = "ready";
-                updateData["order.status"] = "ready";
-                if (!order.order.readyAt) {
-                    updateData["order.readyAt"] = new Date();
-                }
-            }
-            if (order.order.status === "preparing" && ourStatus !== "preparing") {
-                if (order.products && order.products.length > 0) {
-                    const imagesToDelete: string[] = [];
-                    order.products.forEach((p: any) => {
-                        if (p.images && p.images.length > 1) {
-                            imagesToDelete.push(...p.images.slice(1));
-                        }
-                    });
-                    if (imagesToDelete.length > 0) {
-                        for (const imageUrl of imagesToDelete) {
-                            try {
-                                const match = imageUrl.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
-                                if (match && match[1]) {
-                                    const publicId = match[1];
-                                    await cloudinary.uploader.destroy(publicId);
-                                }
-                            } catch (error) {
-                                console.error("Erreur suppression image Cloudinary:", error);
-                            }
-                        }
-                    }
-                    const cleanedProducts = order.products.map((p: any) => ({
-                        name: p.name,
-                        price: p.price,
-                        image: p.images?.[0] || "",
-                    }));
-
-                    updateData.products = cleanedProducts;
-                }
-            }
-        }
-        const updateQuery: any = { $set: updateData };
-        if (ourStatus === "delivered") {
-            updateQuery.$unset = {
-                shippingData: "",
-                billingData: ""
-            };
-        }
-        await ordersCollection.updateOne(
-            { _id: new ObjectId(orderId) },
-            updateQuery
-        );
-        if (ourStatus === "delivered" && order.order.status !== "delivered") {
-            try {
-                const orderDate = new Date(order.order.createdAt).toLocaleDateString("fr-FR");
-                const productsList = order.products.map((p: any) => `<li>${p.name}</li>`).join("");
-                const transporter = nodemailer.createTransport({
-                    host: "ssl0.ovh.net",
-                    port: 465,
-                    secure: true,
-                    auth: {
-                        user: process.env.MAIL_USER,
-                        pass: process.env.MAIL_PASSWORD,
-                    },
-                });
-                await transporter.sendMail({
-                    from: process.env.MAIL_USER,
-                    to: order.userEmail,
-                    subject: `EffCraft - Votre commande du ${orderDate} a été livrée !`,
-                    html: `
-                        <h2>Votre commande a été livrée !</h2>
-                        <p>Bonjour,</p>
-                        <p>Nous avons le plaisir de vous informer que votre commande du ${orderDate} a bien été livrée.</p>
-                        <h3>Articles</h3>
-                        <ul>${productsList}</ul>
-                        <p>Nous espérons que vos articles vous plairont ! Si vous avez la moindre question ou le moindre souci, n'hésitez pas à nous contacter.</p>
-                        <p>Un grand merci pour votre confiance et à très bientôt sur EffCraft !</p>
-                        <p>Cordialement,<br>L'équipe EffCraft</p>
-                    `,
-                });
-            } catch (mailError) {
-                console.error("Erreur envoi mail de livraison:", mailError);
-            }
-        }
-        return NextResponse.json({
-            success: true,
-            status: ourStatus
-        });
-    } catch (error: any) {
-        console.error("Erreur synchronisation statut:", error);
-        return NextResponse.json(
-            { error: error.message || "Erreur lors de la synchronisation" },
-            { status: 500 }
-        );
-    }
 }
 async function getRelayPoints(searchParams: URLSearchParams) {
     try {
