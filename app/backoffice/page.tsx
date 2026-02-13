@@ -605,9 +605,17 @@ export default function Backoffice() {
                                                             {order.shippingData.shippingMethod?.relayPoint && (
                                                                 <div className="info">
                                                                     <h3>Point relais</h3>
-                                                                    <p>{order.shippingData.shippingMethod.relayPoint.name} </p>
+                                                                    <p>{order.shippingData.shippingMethod.relayPoint.name}</p>
                                                                     <p>{order.shippingData.shippingMethod.relayPoint.address}</p>
                                                                     <p>{order.shippingData.shippingMethod.relayPoint.zipcode} {order.shippingData.shippingMethod.relayPoint.city}</p>
+                                                                </div>
+                                                            )}
+                                                            {order.billingData && order.billingData !== "same" && (
+                                                                <div className="info">
+                                                                    <h3>Facturation</h3>
+                                                                    <p>{order.billingData.prenom || ''} {order.billingData.nom || ''}</p>
+                                                                    <p>{order.billingData.rue || ''}</p>
+                                                                    <p>{order.billingData.codePostal || ''} {order.billingData.ville || ''}</p>
                                                                 </div>
                                                             )}
                                                         </div>

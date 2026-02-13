@@ -190,6 +190,9 @@ export async function POST(req: NextRequest) {
         }
         const updateQuery: any = { $set: updateData };
         if (updateData["order.status"] === "delivered") {
+            delete updateData["shippingData.boxtalStatus"];
+            delete updateData["shippingData.boxtalLastUpdate"];
+            delete updateData["shippingData.trackingNumber"];
             updateQuery.$unset = {
                 shippingData: "",
                 billingData: ""
@@ -211,6 +214,13 @@ export async function POST(req: NextRequest) {
             try {
                 const orderDate = new Date(order.order.createdAt).toLocaleDateString("fr-FR");
                 const productsList = order.products.map((p: any) => `<li>${p.name}</li>`).join("");
+                const relayPoint = order.shippingData?.shippingMethod?.relayPoint;
+                const deliveryAddress = relayPoint
+                    ? `<p><strong>${relayPoint.name}</strong></p><p>${relayPoint.address}</p><p>${relayPoint.zipcode} ${relayPoint.city}</p>`
+                    : `<p><strong>${order.shippingData?.prenom || ''} ${order.shippingData?.nom || ''}</strong></p><p>${order.shippingData?.rue || ''}</p><p>${order.shippingData?.codePostal || ''} ${order.shippingData?.ville || ''}</p>`;
+                const billingAddress = order.billingData && order.billingData !== "same"
+                    ? `<h3>Adresse de facturation</h3><p><strong>${order.billingData.prenom || ''} ${order.billingData.nom || ''}</strong></p><p>${order.billingData.rue || ''}</p><p>${order.billingData.codePostal || ''} ${order.billingData.ville || ''}</p>`
+                    : '';
                 const transporter = nodemailer.createTransport({
                     host: "ssl0.ovh.net",
                     port: 465,
@@ -228,6 +238,9 @@ export async function POST(req: NextRequest) {
                         <h2>Votre commande a été livrée !</h2>
                         <p>Bonjour,</p>
                         <p>Nous avons le plaisir de vous informer que votre commande du ${orderDate} a bien été livrée.</p>
+                        <h3>Adresse de livraison</h3>
+                        ${deliveryAddress}
+                        ${billingAddress}
                         <h3>Articles</h3>
                         <ul>${productsList}</ul>
                         <p>Nous espérons que vos articles vous plairont ! Si vous avez la moindre question ou le moindre souci, n'hésitez pas à nous contacter.</p>

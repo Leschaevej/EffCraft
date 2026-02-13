@@ -23,6 +23,7 @@ interface Order {
         shippingMethod?: any;
         [key: string]: any;
     };
+    billingData: any;
     order: {
         totalPrice: number;
         status: string;
@@ -290,18 +291,27 @@ export default function OrderPage() {
                                                     </div>
                                                     {order.shippingData && (
                                                         <div className="shipping-container">
-                                                            <div className="info">
-                                                                <h3>Livraison</h3>
-                                                                <p>{order.shippingData.nom || ''} {order.shippingData.prenom || ''}</p>
-                                                                <p>{order.shippingData.rue || ''}</p>
-                                                                <p>{order.shippingData.codePostal || ''} {order.shippingData.ville || ''}</p>
-                                                            </div>
-                                                            {order.shippingData.shippingMethod?.relayPoint && (
+                                                            {order.shippingData.shippingMethod?.relayPoint ? (
                                                                 <div className="info">
                                                                     <h3>Point relais</h3>
-                                                                    <p>{order.shippingData.shippingMethod.relayPoint.name} </p>
+                                                                    <p>{order.shippingData.shippingMethod.relayPoint.name}</p>
                                                                     <p>{order.shippingData.shippingMethod.relayPoint.address}</p>
                                                                     <p>{order.shippingData.shippingMethod.relayPoint.zipcode} {order.shippingData.shippingMethod.relayPoint.city}</p>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="info">
+                                                                    <h3>Livraison</h3>
+                                                                    <p>{order.shippingData.nom || ''} {order.shippingData.prenom || ''}</p>
+                                                                    <p>{order.shippingData.rue || ''}</p>
+                                                                    <p>{order.shippingData.codePostal || ''} {order.shippingData.ville || ''}</p>
+                                                                </div>
+                                                            )}
+                                                            {order.billingData && order.billingData !== "same" && (
+                                                                <div className="info">
+                                                                    <h3>Facturation</h3>
+                                                                    <p>{order.billingData.prenom || ''} {order.billingData.nom || ''}</p>
+                                                                    <p>{order.billingData.rue || ''}</p>
+                                                                    <p>{order.billingData.codePostal || ''} {order.billingData.ville || ''}</p>
                                                                 </div>
                                                             )}
                                                         </div>
