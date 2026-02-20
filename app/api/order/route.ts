@@ -180,21 +180,16 @@ export async function PATCH(req: NextRequest) {
                     });
                     const isClientRequest = order.order?.status === "cancel_requested";
                     const cancelThreadId = order.emailThreadId || `<order-${orderId}@effcraft.fr>`;
-                    const cancelSubject = order.emailSubject
-                        ? `Re: ${order.emailSubject}`
-                        : `EffCraft - Commande du ${orderDate} annulée et remboursée`;
+                    const cancelSubject = order.emailSubject || `EffCraft - Commande du ${orderDate} annulée et remboursée`;
                     await transporter.sendMail({
                         from: `"EffCraft" <${process.env.MAIL_USER}>`,
                         to: order.userEmail,
                         subject: cancelSubject,
                         inReplyTo: cancelThreadId,
                         references: cancelThreadId,
-                        priority: "high",
                         headers: {
                             "X-Mailer": "EffCraft Mailer",
                             "Organization": "EffCraft",
-                            "X-Priority": "1",
-                            "Importance": "high",
                         },
                         html: isClientRequest
                             ? `
@@ -344,21 +339,16 @@ export async function PATCH(req: NextRequest) {
                         },
                     });
                     const returnThreadId = refundOrder.emailThreadId || `<order-${orderId}@effcraft.fr>`;
-                    const returnSubject = refundOrder.emailSubject
-                        ? `Re: ${refundOrder.emailSubject}`
-                        : `EffCraft - Retour traité - Commande du ${returnOrderDate}`;
+                    const returnSubject = refundOrder.emailSubject || `EffCraft - Retour traité - Commande du ${returnOrderDate}`;
                     await returnTransporter.sendMail({
                         from: `"EffCraft" <${process.env.MAIL_USER}>`,
                         to: refundOrder.userEmail,
                         subject: returnSubject,
                         inReplyTo: returnThreadId,
                         references: returnThreadId,
-                        priority: "high",
                         headers: {
                             "X-Mailer": "EffCraft Mailer",
                             "Organization": "EffCraft",
-                            "X-Priority": "1",
-                            "Importance": "high",
                         },
                         html: `
                             <h2>Votre retour a été traité</h2>

@@ -96,12 +96,9 @@ export async function POST(req: Request) {
             subject: cancelAdminSubject,
             inReplyTo: cancelAdminThreadId,
             references: cancelAdminThreadId,
-            priority: "high",
             headers: {
                 "X-Mailer": "EffCraft Mailer",
                 "Organization": "EffCraft",
-                "X-Priority": "1",
-                "Importance": "high",
             },
             html: `
                 <h3>Demande d'annulation de commande</h3>
