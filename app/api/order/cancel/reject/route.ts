@@ -63,7 +63,7 @@ export async function POST(req: Request) {
         await transporter.sendMail({
             from: `"EffCraft" <${process.env.MAIL_USER}>`,
             to: order.userEmail,
-            subject: `EffCraft - Demande d'annulation refusée - Commande du ${orderDate}`,
+            subject: `EffCraft - Mise à jour de votre commande du ${orderDate}`,
             inReplyTo: threadId,
             references: threadId,
             headers: {
@@ -71,9 +71,10 @@ export async function POST(req: Request) {
                 "Organization": "EffCraft",
             },
             html: `
-                <h2>Demande d'annulation refusée</h2>
+                <h2>Mise à jour de votre commande</h2>
                 <p>Bonjour,</p>
-                <p>Votre demande d'annulation pour la commande du ${orderDate} d'un montant de ${order.order.totalPrice.toFixed(2)}€ n'a pas pu être acceptée car votre colis a déjà été expédié.</p>
+                <p>Nous avons bien reçu votre demande concernant votre commande du ${orderDate} d'un montant de ${order.order.totalPrice.toFixed(2)}€.</p>
+                <p>Malheureusement, votre colis est déjà en cours d'acheminement et nous ne sommes plus en mesure de l'intercepter.</p>
                 <p>Vous pouvez suivre votre livraison depuis votre espace commandes.</p>
                 <p>Si vous souhaitez retourner votre commande après réception, vous pourrez effectuer une demande de retour depuis votre espace client.</p>
                 <p>Cordialement,<br>L'équipe EffCraft</p>
