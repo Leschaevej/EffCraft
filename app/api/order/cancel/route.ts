@@ -85,11 +85,18 @@ export async function POST(req: Request) {
             .replace(/>/g, "&gt;")
             .replace(/\n/g, "<br>");
 
+        const cancelAdminThreadId = order.emailThreadId || `<order-${orderId}@effcraft.fr>`;
         await transporter.sendMail({
-            from: process.env.MAIL_USER,
+            from: `"EffCraft" <${process.env.MAIL_USER}>`,
             to: process.env.MAIL_USER,
             replyTo: session.user.email,
             subject: `Demande d'annulation - Commande du ${orderDate}`,
+            inReplyTo: cancelAdminThreadId,
+            references: cancelAdminThreadId,
+            headers: {
+                "X-Mailer": "EffCraft Mailer",
+                "Organization": "EffCraft",
+            },
             html: `
                 <h3>Demande d'annulation de commande</h3>
                 <p><strong>Client :</strong> ${session.user.email}</p>

@@ -58,11 +58,18 @@ export async function POST(req: Request) {
         });
 
         const orderDate = new Date(order.order.createdAt).toLocaleDateString("fr-FR");
+        const threadId = order.emailThreadId || `<order-${orderId}@effcraft.fr>`;
 
         await transporter.sendMail({
-            from: process.env.MAIL_USER,
+            from: `"EffCraft" <${process.env.MAIL_USER}>`,
             to: order.userEmail,
             subject: `EffCraft - Demande d'annulation refusée - Commande du ${orderDate}`,
+            inReplyTo: threadId,
+            references: threadId,
+            headers: {
+                "X-Mailer": "EffCraft Mailer",
+                "Organization": "EffCraft",
+            },
             html: `
                 <h2>Demande d'annulation refusée</h2>
                 <p>Bonjour,</p>
