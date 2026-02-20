@@ -56,6 +56,7 @@ const STATUS_STEPS: { [key: string]: number } = {
     delivered: 4,
     cancel_requested: 1,
     return_requested: 1,
+    return_preparing: 1,
     return_in_transit: 2,
     return_delivered: 3
 };
@@ -66,7 +67,8 @@ const STATUS_LABELS: { [key: string]: string } = {
     delivered: "Livré",
     cancelled: "Remboursé",
     cancel_requested: "Demande en cours",
-    return_requested: "Retour confirmé",
+    return_requested: "Demande de retour en cours",
+    return_preparing: "Retour en préparation",
     return_in_transit: "En transit",
     return_delivered: "Livré",
     returned: "Remboursé"
@@ -115,6 +117,11 @@ export default function OrderPage() {
     const [cancelReason, setCancelReason] = useState("");
     const [cancelMessage, setCancelMessage] = useState("");
     const [cancelStatus, setCancelStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+    const [returnOrderId, setReturnOrderId] = useState<string | null>(null);
+    const [returnReason, setReturnReason] = useState("");
+    const [returnMessage, setReturnMessage] = useState("");
+    const [returnPhotos, setReturnPhotos] = useState<File[]>([]);
+    const [returnStatus, setReturnStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
     useEffect(() => {
         if (!swrLoading) {
             setOrders(swrOrders);
@@ -132,7 +139,7 @@ export default function OrderPage() {
                 const customEvent = event as CustomEvent;
                 if (customEvent.detail?.type === "order_status_updated" && customEvent.detail?.data) {
                     const { orderId, status } = customEvent.detail.data;
-                    const pendingStatuses = ["paid", "preparing", "in_transit", "cancel_requested", "return_requested", "return_in_transit"];
+                    const pendingStatuses = ["paid", "preparing", "in_transit", "cancel_requested", "return_requested", "return_preparing", "return_in_transit"];
                     const historyStatuses = ["delivered", "cancelled", "returned", "return_delivered"];
                     const shouldBeInCurrentView = orderView === "pending"
                         ? pendingStatuses.includes(status)
@@ -334,11 +341,6 @@ export default function OrderPage() {
                                                                         Demander annulation
                                                                     </button>
                                                                 )}
-                                                                {order.order.status === "delivered" && (
-                                                                    <button className="return">
-                                                                        Demander un retour
-                                                                    </button>
-                                                                )}
                                                             </>
                                                         )}
                                                         {orderView === "history" && order.order.status === "delivered" && order.order.deliveredAt && (
@@ -348,7 +350,13 @@ export default function OrderPage() {
                                                                 const diffTime = now.getTime() - deliveredDate.getTime();
                                                                 const diffDays = diffTime / (1000 * 60 * 60 * 24);
                                                                 return diffDays <= 14 ? (
-                                                                    <button className="return">
+                                                                    <button className="return" onClick={() => {
+                                                                        setReturnOrderId(order._id);
+                                                                        setReturnReason("");
+                                                                        setReturnMessage("");
+                                                                        setReturnPhotos([]);
+                                                                        setReturnStatus("idle");
+                                                                    }}>
                                                                         Demander un retour
                                                                     </button>
                                                                 ) : null;
@@ -448,6 +456,94 @@ export default function OrderPage() {
                                         <button className="back" onClick={() => setCancelOrderId(null)} disabled={cancelStatus === "sending"}>Retour</button>
                                         <button className="submit" onClick={handleSubmit} disabled={!cancelReason || cancelStatus === "sending"}>
                                             {cancelStatus === "sending" ? "Envoi en cours..." : "Envoyer la demande"}
+                                        </button>
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                );
+            })()}
+            {returnOrderId && (() => {
+                const returnOrder = orders.find(o => o._id === returnOrderId);
+                if (!returnOrder) return null;
+                const handleReturnSubmit = async () => {
+                    if (!returnReason) return;
+                    setReturnStatus("sending");
+                    try {
+                        const formData = new FormData();
+                        formData.append("orderId", returnOrderId);
+                        formData.append("reason", returnReason);
+                        formData.append("message", returnMessage);
+                        returnPhotos.forEach(photo => formData.append("photos", photo));
+                        const res = await fetch("/api/order/return/request", {
+                            method: "POST",
+                            body: formData,
+                        });
+                        if (res.ok) {
+                            setReturnStatus("sent");
+                            mutate();
+                        } else {
+                            setReturnStatus("error");
+                        }
+                    } catch {
+                        setReturnStatus("error");
+                    }
+                };
+                return (
+                    <div className="cancel-modal" onClick={() => returnStatus !== "sending" && setReturnOrderId(null)}>
+                        <div className="cancel-modal-content" onClick={(e) => e.stopPropagation()}>
+                            {returnStatus === "sent" ? (
+                                <>
+                                    <h3>Demande envoyée</h3>
+                                    <p>Votre demande de retour a bien été transmise. Nous reviendrons vers vous rapidement.</p>
+                                    <div className="cancel-modal-actions">
+                                        <button className="back" onClick={() => setReturnOrderId(null)}>Fermer</button>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <h3>Demander un retour</h3>
+                                    <div className="cancel-modal-recap">
+                                        <p>Commande du {new Date(returnOrder.order.createdAt).toLocaleDateString()}</p>
+                                        <p>Montant : {returnOrder.order.totalPrice.toFixed(2)}€</p>
+                                    </div>
+                                    <div className="cancel-modal-form">
+                                        <label>Raison du retour</label>
+                                        <select value={returnReason} onChange={(e) => setReturnReason(e.target.value)}>
+                                            <option value="">-- Sélectionnez une raison --</option>
+                                            <option value="Produit défectueux">Produit défectueux</option>
+                                            <option value="Produit non conforme">Produit non conforme à la description</option>
+                                            <option value="Changement d'avis">Changement d&apos;avis</option>
+                                            <option value="Erreur de commande">Erreur de commande</option>
+                                            <option value="Autre">Autre</option>
+                                        </select>
+                                        <label>Message complémentaire (optionnel)</label>
+                                        <textarea
+                                            value={returnMessage}
+                                            onChange={(e) => setReturnMessage(e.target.value)}
+                                            placeholder="Décrivez votre problème..."
+                                            maxLength={500}
+                                            rows={4}
+                                        />
+                                        <label>Photos (optionnel)</label>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            multiple
+                                            onChange={(e) => setReturnPhotos(Array.from(e.target.files || []))}
+                                        />
+                                        {returnPhotos.length > 0 && (
+                                            <p style={{ fontSize: "0.85em", opacity: 0.7 }}>{returnPhotos.length} photo(s) sélectionnée(s)</p>
+                                        )}
+                                    </div>
+                                    {returnStatus === "error" && (
+                                        <p className="cancel-modal-error">Une erreur est survenue. Veuillez réessayer.</p>
+                                    )}
+                                    <div className="cancel-modal-actions">
+                                        <button className="back" onClick={() => setReturnOrderId(null)} disabled={returnStatus === "sending"}>Retour</button>
+                                        <button className="submit" onClick={handleReturnSubmit} disabled={!returnReason || returnStatus === "sending"}>
+                                            {returnStatus === "sending" ? "Envoi en cours..." : "Envoyer la demande"}
                                         </button>
                                     </div>
                                 </>

@@ -47,6 +47,9 @@ interface Order {
         cancellationRequestedAt?: Date;
         returnRequested?: boolean;
         returnRequestedAt?: Date;
+        returnReason?: string;
+        returnMessage?: string;
+        returnPhotos?: string[];
         paymentIntentId?: string;
     };
 }
@@ -57,7 +60,8 @@ const STATUS_LABELS: { [key: string]: string } = {
     delivered: "Livré",
     cancelled: "Remboursé",
     cancel_requested: "Annulation demandée",
-    return_requested: "Retour confirmé",
+    return_requested: "Retour demandé",
+    return_preparing: "Retour en préparation",
     return_in_transit: "En transit",
     return_delivered: "Livré",
     returned: "Remboursé"
@@ -109,6 +113,7 @@ export default function Backoffice() {
     const [cancelModalMessage, setCancelModalMessage] = useState<string | null>(null);
     const [showReturnModal, setShowReturnModal] = useState(false);
     const [orderToReturn, setOrderToReturn] = useState<Order | null>(null);
+    const [returnModalMessage, setReturnModalMessage] = useState<string | null>(null);
     const [showEventForm, setShowEventForm] = useState(false);
     const [editingEventId, setEditingEventId] = useState<string | null>(null);
     const [eventForm, setEventForm] = useState({
@@ -382,33 +387,80 @@ export default function Backoffice() {
     };
     const handleRefundReturn = async (order: Order) => {
         setOrderToReturn(order);
+        setReturnModalMessage(null);
         setShowReturnModal(true);
     };
-    const handleReturnChoice = async (fullRefund: boolean) => {
+    const rejectReturnRequest = async () => {
         if (!orderToReturn) return;
-        setShowReturnModal(false);
+        setReturnModalMessage("Envoi du refus en cours...");
         try {
-            const response = await fetch("/api/order", {
-                method: "PATCH",
+            const response = await fetch("/api/order/return/reject", {
+                method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    orderId: orderToReturn._id,
-                    action: "refund-return",
-                    fullRefund
-                }),
+                body: JSON.stringify({ orderId: orderToReturn._id }),
             });
             if (response.ok) {
-                alert("Client remboursé avec succès");
+                setReturnModalMessage("Demande de retour refusée, client notifié par mail");
                 mutate();
+                setTimeout(() => {
+                    setShowReturnModal(false);
+                    setOrderToReturn(null);
+                    setReturnModalMessage(null);
+                }, 5000);
             } else {
                 const error = await response.json();
-                alert("Erreur lors du remboursement: " + (error.error || "Erreur inconnue"));
+                setReturnModalMessage("Erreur : " + (error.error || "Erreur inconnue"));
+                setTimeout(() => {
+                    setShowReturnModal(false);
+                    setOrderToReturn(null);
+                    setReturnModalMessage(null);
+                }, 5000);
             }
         } catch (error) {
-            console.error("Erreur remboursement:", error);
-            alert("Erreur lors du remboursement: " + error);
+            console.error("Erreur refus retour:", error);
+            setReturnModalMessage("Erreur réseau");
+            setTimeout(() => {
+                setShowReturnModal(false);
+                setOrderToReturn(null);
+                setReturnModalMessage(null);
+            }, 5000);
         }
-        setOrderToReturn(null);
+    };
+    const acceptReturnRequest = async () => {
+        if (!orderToReturn) return;
+        setReturnModalMessage("Génération du bordereau de retour en cours...");
+        try {
+            const response = await fetch("/api/order/return/accept", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderId: orderToReturn._id }),
+            });
+            if (response.ok) {
+                setReturnModalMessage("Retour accepté, bordereau envoyé au client par mail");
+                mutate();
+                setTimeout(() => {
+                    setShowReturnModal(false);
+                    setOrderToReturn(null);
+                    setReturnModalMessage(null);
+                }, 5000);
+            } else {
+                const error = await response.json();
+                setReturnModalMessage("Erreur : " + (error.error || "Erreur inconnue"));
+                setTimeout(() => {
+                    setShowReturnModal(false);
+                    setOrderToReturn(null);
+                    setReturnModalMessage(null);
+                }, 5000);
+            }
+        } catch (error) {
+            console.error("Erreur acceptation retour:", error);
+            setReturnModalMessage("Erreur réseau");
+            setTimeout(() => {
+                setShowReturnModal(false);
+                setOrderToReturn(null);
+                setReturnModalMessage(null);
+            }, 5000);
+        }
     };
     const handleReturnOrderWithMutate = async (order: Order) => {
         await handleReturnOrder(order);
@@ -634,10 +686,10 @@ export default function Backoffice() {
                                                                 Annuler
                                                             </button>
                                                         )}
-                                                        {order.order.status === "delivered" && (
+                                                        {order.order.status === "return_requested" && (
                                                             <button
                                                                 className="return"
-                                                                onClick={() => handleReturnOrder(order)}
+                                                                onClick={() => handleRefundReturn(order)}
                                                             >
                                                                 Retour
                                                             </button>
@@ -916,56 +968,44 @@ export default function Backoffice() {
             )}
             {showReturnModal && orderToReturn && (
                 <div className="modal-overlay" onClick={() => {
-                    setShowReturnModal(false);
-                    setOrderToReturn(null);
+                    if (!returnModalMessage) {
+                        setShowReturnModal(false);
+                        setOrderToReturn(null);
+                    }
                 }}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-                        <h3>Motif du retour</h3>
-                        <p>Sélectionnez le motif :</p>
-                        <div className="modal-buttons">
-                            <button
-                                className="btn-cancel"
-                                onClick={() => handleReturnChoice(false)}
-                            >
-                                {(() => {
-                                    const FIXED_PRICES: { [key: string]: number } = {
-                                        "MONR-CpourToi": 5.90,
-                                        "SOGP-RelaisColis": 5.90,
-                                        "POFR-ColissimoAccess": 9.90,
-                                        "CHRP-Chrono18": 12.90
-                                    };
-                                    const shippingCode = `${orderToReturn.shippingData?.shippingMethod?.operator || "MONR"}-${orderToReturn.shippingData?.shippingMethod?.serviceCode || "CpourToi"}`;
-                                    const shippingCost = FIXED_PRICES[shippingCode] || 5.90;
-                                    return (
-                                        <>
-                                            <span className="button-title">Changement d'avis</span>
-                                            <span className="button-calc">{orderToReturn.order.totalPrice.toFixed(2)} - {(shippingCost * 2).toFixed(2)} = {(orderToReturn.order.totalPrice - (shippingCost * 2)).toFixed(2)}€</span>
-                                        </>
-                                    );
-                                })()}
-                            </button>
-                            <button
-                                className="btn-confirm"
-                                onClick={() => handleReturnChoice(true)}
-                            >
-                                {(() => {
-                                    const FIXED_PRICES: { [key: string]: number } = {
-                                        "MONR-CpourToi": 5.90,
-                                        "SOGP-RelaisColis": 5.90,
-                                        "POFR-ColissimoAccess": 9.90,
-                                        "CHRP-Chrono18": 12.90
-                                    };
-                                    const shippingCode = `${orderToReturn.shippingData?.shippingMethod?.operator || "MONR"}-${orderToReturn.shippingData?.shippingMethod?.serviceCode || "CpourToi"}`;
-                                    const shippingCost = FIXED_PRICES[shippingCode] || 5.90;
-                                    return (
-                                        <>
-                                            <span className="button-title">Produit défectueux</span>
-                                            <span className="button-calc">{orderToReturn.order.totalPrice.toFixed(2)} - {shippingCost.toFixed(2)} = {(orderToReturn.order.totalPrice - shippingCost).toFixed(2)}€</span>
-                                        </>
-                                    );
-                                })()}
-                            </button>
-                        </div>
+                        {returnModalMessage ? (
+                            <>
+                                <h3>{returnModalMessage.includes("cours") ? "Veuillez patienter" : returnModalMessage.includes("Erreur") ? "Erreur" : "Succès"}</h3>
+                                <p>{returnModalMessage}</p>
+                            </>
+                        ) : (
+                            <>
+                                <h3>Demande de retour</h3>
+                                <p>Le client a demandé le retour de cette commande.</p>
+                                {orderToReturn.order.returnReason && (
+                                    <p><strong>Raison :</strong> {orderToReturn.order.returnReason}</p>
+                                )}
+                                {orderToReturn.order.returnMessage && (
+                                    <p><strong>Message :</strong> {orderToReturn.order.returnMessage}</p>
+                                )}
+                                {orderToReturn.order.returnPhotos && orderToReturn.order.returnPhotos.length > 0 && (
+                                    <div className="return-photos">
+                                        <p><strong>Photos :</strong></p>
+                                        <div className="photos-grid">
+                                            {orderToReturn.order.returnPhotos.map((url: string, i: number) => (
+                                                <img key={i} src={url} alt={`Photo ${i + 1}`} style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 4 }} />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="modal-buttons">
+                                    <button className="btn-confirm" onClick={acceptReturnRequest}>Accepter le retour</button>
+                                    <button className="btn-cancel" onClick={rejectReturnRequest}>Refuser le retour</button>
+                                    <button className="btn-cancel" onClick={() => { setShowReturnModal(false); setOrderToReturn(null); }}>Retour</button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             )}
