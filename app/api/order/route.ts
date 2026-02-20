@@ -180,15 +180,21 @@ export async function PATCH(req: NextRequest) {
                     });
                     const isClientRequest = order.order?.status === "cancel_requested";
                     const cancelThreadId = order.emailThreadId || `<order-${orderId}@effcraft.fr>`;
+                    const cancelSubject = order.emailSubject
+                        ? `Re: ${order.emailSubject}`
+                        : `EffCraft - Commande du ${orderDate} annulée et remboursée`;
                     await transporter.sendMail({
                         from: `"EffCraft" <${process.env.MAIL_USER}>`,
                         to: order.userEmail,
-                        subject: `EffCraft - Commande du ${orderDate} annulée et remboursée`,
+                        subject: cancelSubject,
                         inReplyTo: cancelThreadId,
                         references: cancelThreadId,
+                        priority: "high",
                         headers: {
                             "X-Mailer": "EffCraft Mailer",
                             "Organization": "EffCraft",
+                            "X-Priority": "1",
+                            "Importance": "high",
                         },
                         html: isClientRequest
                             ? `
@@ -338,15 +344,21 @@ export async function PATCH(req: NextRequest) {
                         },
                     });
                     const returnThreadId = refundOrder.emailThreadId || `<order-${orderId}@effcraft.fr>`;
+                    const returnSubject = refundOrder.emailSubject
+                        ? `Re: ${refundOrder.emailSubject}`
+                        : `EffCraft - Retour traité - Commande du ${returnOrderDate}`;
                     await returnTransporter.sendMail({
                         from: `"EffCraft" <${process.env.MAIL_USER}>`,
                         to: refundOrder.userEmail,
-                        subject: `EffCraft - Retour traité - Commande du ${returnOrderDate}`,
+                        subject: returnSubject,
                         inReplyTo: returnThreadId,
                         references: returnThreadId,
+                        priority: "high",
                         headers: {
                             "X-Mailer": "EffCraft Mailer",
                             "Organization": "EffCraft",
+                            "X-Priority": "1",
+                            "Importance": "high",
                         },
                         html: `
                             <h2>Votre retour a été traité</h2>
@@ -494,10 +506,6 @@ export async function POST(req: NextRequest) {
         const result = await ordersCollection.insertOne(order);
         const orderId = result.insertedId.toString();
         const emailThreadId = `<order-${orderId}@effcraft.fr>`;
-        await ordersCollection.updateOne(
-            { _id: result.insertedId },
-            { $set: { emailThreadId } }
-        );
         await notifyClients({
             type: "order_created",
             data: { orderId }
@@ -506,6 +514,11 @@ export async function POST(req: NextRequest) {
             const { buffer, invoiceNumber } = await generateInvoicePdf(
                 { ...order, order: { ...order.order, createdAt: order.order.createdAt } },
                 orderId
+            );
+            const emailSubject = `Commande EffCraft ${invoiceNumber}`;
+            await ordersCollection.updateOne(
+                { _id: result.insertedId },
+                { $set: { emailThreadId, emailSubject } }
             );
             const productsList = productsForOrder.map((p: any) => `<li>${p.name} - ${p.price.toFixed(2)} €</li>`).join("");
             const tc = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
@@ -528,8 +541,7 @@ export async function POST(req: NextRequest) {
             await transporter.sendMail({
                 from: `"EffCraft" <${process.env.MAIL_USER}>`,
                 to: session.user.email,
-                subject: `EffCraft - Confirmation de commande ${invoiceNumber}`,
-                messageId: emailThreadId,
+                subject: emailSubject,
                 headers: {
                     "X-Mailer": "EffCraft Mailer",
                     "Organization": "EffCraft",
@@ -564,7 +576,7 @@ export async function POST(req: NextRequest) {
             await transporter.sendMail({
                 from: `"EffCraft" <${process.env.MAIL_USER}>`,
                 to: process.env.MAIL_USER,
-                subject: `Nouvelle commande ${invoiceNumber} - ${shippingData.prenom} ${shippingData.nom}`,
+                subject: `Re: ${emailSubject} - ${shippingData.prenom} ${shippingData.nom}`,
                 inReplyTo: emailThreadId,
                 references: emailThreadId,
                 headers: {

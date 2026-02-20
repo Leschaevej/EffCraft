@@ -60,15 +60,21 @@ export async function POST(req: Request) {
         const orderDate = new Date(order.order.createdAt).toLocaleDateString("fr-FR");
         const threadId = order.emailThreadId || `<order-${orderId}@effcraft.fr>`;
 
+        const rejectSubject = order.emailSubject
+            ? `Re: ${order.emailSubject}`
+            : `EffCraft - Mise à jour de votre commande du ${orderDate}`;
         await transporter.sendMail({
             from: `"EffCraft" <${process.env.MAIL_USER}>`,
             to: order.userEmail,
-            subject: `EffCraft - Mise à jour de votre commande du ${orderDate}`,
+            subject: rejectSubject,
             inReplyTo: threadId,
             references: threadId,
+            priority: "high",
             headers: {
                 "X-Mailer": "EffCraft Mailer",
                 "Organization": "EffCraft",
+                "X-Priority": "1",
+                "Importance": "high",
             },
             html: `
                 <h2>Mise à jour de votre commande</h2>

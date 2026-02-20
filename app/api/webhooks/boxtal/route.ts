@@ -232,15 +232,21 @@ export async function POST(req: NextRequest) {
                     },
                 });
                 const deliveryThreadId = order.emailThreadId || `<order-${order._id.toString()}@effcraft.fr>`;
+                const deliverySubject = order.emailSubject
+                    ? `Re: ${order.emailSubject}`
+                    : `EffCraft - Votre commande du ${orderDate} a été livrée !`;
                 await transporter.sendMail({
                     from: `"EffCraft" <${process.env.MAIL_USER}>`,
                     to: order.userEmail,
-                    subject: `EffCraft - Votre commande du ${orderDate} a été livrée !`,
+                    subject: deliverySubject,
                     inReplyTo: deliveryThreadId,
                     references: deliveryThreadId,
+                    priority: "high",
                     headers: {
                         "X-Mailer": "EffCraft Mailer",
                         "Organization": "EffCraft",
+                        "X-Priority": "1",
+                        "Importance": "high",
                     },
                     html: `
                         <h2>Votre commande a été livrée !</h2>
