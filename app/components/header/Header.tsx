@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { FaShoppingBag, FaHeart, FaBars, FaUser } from "react-icons/fa";
 import { signIn, signOut, useSession } from "next-auth/react";
+import { usePusher } from "../../hooks/usePusher";
 import "./Header.scss";
 
 function CartTimer() {
@@ -83,11 +84,14 @@ function CartTimer() {
 export default function Header() {
     const pathname = usePathname();
     const router = useRouter();
-    const { data: session, status } = useSession();
+    const { data: session, status, update } = useSession();
     const [menuVisible, setMenuVisible] = useState(false);
     const [loginVisible, setLoginVisible] = useState(false);
     const [menuOpen, setMenuOpen] = useState(false);
     const [loginOpen, setLoginOpen] = useState(false);
+    const [magicEmail, setMagicEmail] = useState("");
+    const [magicStatus, setMagicStatus] = useState<"idle" | "sending" | "sent" | "error" | "connected">("idle");
+    const magicStatusRef = useRef(magicStatus);
     const [lastScrollY, setLastScrollY] = useState(0);
     const [showHeader, setShowHeader] = useState(true);
     const [isClosingMenuOrLogin, setIsClosingMenuOrLogin] = useState(false);
@@ -203,6 +207,33 @@ export default function Header() {
             }
         }
     }, []);
+    // Garde la ref à jour pour l'utiliser dans le callback Pusher
+    useEffect(() => {
+        magicStatusRef.current = magicStatus;
+    }, [magicStatus]);
+
+    // Pusher : dès que le lien magique est cliqué, connecte l'onglet original via one-time token
+    const handleMagicLinkSignedIn = useCallback(async (data: { email: string; oneTimeToken: string }) => {
+        await signIn("magic-link-credentials", {
+            email: data.email,
+            oneTimeToken: data.oneTimeToken,
+            redirect: false,
+        });
+        await update();
+        setMagicStatus("connected");
+        setMagicEmail("");
+        setTimeout(() => {
+            setLoginOpen(false);
+            setTimeout(() => {
+                setLoginVisible(false);
+                setTimeout(() => {
+                    setMagicStatus("idle");
+                }, 50);
+            }, 350);
+        }, 2000);
+    }, [update]);
+
+    usePusher("magic_link_signed_in", handleMagicLinkSignedIn);
     const handleLogoClick = (e: React.MouseEvent) => {
         if (pathname === "/") {
             e.preventDefault();
@@ -299,7 +330,11 @@ export default function Header() {
             )}
             {loginVisible && (
                 <div className={`login ${loginOpen ? "open" : "closed"}`}>
-                    {status === "loading" ? (
+                    {magicStatus === "connected" ? (
+                        <div className="magic-sent">
+                            <p className="magic-connected">Vous êtes connecté !</p>
+                        </div>
+                    ) : status === "loading" ? (
                         <p>Chargement...</p>
                     ) : session?.user ? (
                         <>
@@ -323,23 +358,60 @@ export default function Header() {
                                 Se déconnecter
                             </button>
                         </>
+                    ) : magicStatus === "sent" ? (
+                        <div className="magic-sent">
+                            <p>Vérifiez votre boîte mail !</p>
+                            <p className="magic-hint">Un lien de connexion vous a été envoyé.</p>
+                            <button className="magic-back" onClick={() => { setMagicStatus("idle"); setMagicEmail(""); }}>Retour</button>
+                        </div>
                     ) : (
                         <>
                             <button className="google" onClick={() => {
                                 sessionStorage.setItem("scrollPos", window.scrollY.toString());
-                                signIn("google");
+                                signIn("google", { callbackUrl: window.location.href });
                             }}>
                                 <img src="/google.webp" alt="Google" />
                                 Se connecter avec Google
                             </button>
-                            <button className="facebook" onClick={() => alert("Connexion Facebook")}>
-                                <img src="/facebook.webp" alt="Facebook" />
-                                Se connecter avec Facebook
-                            </button>
-                            <button className="apple" onClick={() => alert("Connexion Apple")}>
-                                <img src="/apple.webp" alt="Apple" />
-                                Se connecter avec Apple
-                            </button>
+                            <div className="magic-divider"><span>ou</span></div>
+                            <div className="magic-form">
+                                <input
+                                    type="email"
+                                    placeholder="Votre adresse email"
+                                    value={magicEmail}
+                                    onChange={(e) => setMagicEmail(e.target.value)}
+                                    disabled={magicStatus === "sending"}
+                                />
+                                <button
+                                    className="magic-submit"
+                                    disabled={!magicEmail.includes("@") || magicStatus === "sending"}
+                                    onClick={async () => {
+                                        setMagicStatus("sending");
+                                        try {
+                                            const res = await fetch("/api/auth/magic-link", {
+                                                method: "POST",
+                                                headers: { "Content-Type": "application/json" },
+                                                body: JSON.stringify({
+                                                    email: magicEmail,
+                                                    callbackUrl: window.location.href,
+                                                }),
+                                            });
+                                            if (res.ok) {
+                                                setMagicStatus("sent");
+                                            } else {
+                                                setMagicStatus("error");
+                                            }
+                                        } catch {
+                                            setMagicStatus("error");
+                                        }
+                                    }}
+                                >
+                                    {magicStatus === "sending" ? "Envoi..." : "Recevoir un lien"}
+                                </button>
+                                {magicStatus === "error" && (
+                                    <p className="magic-error">Une erreur est survenue, réessayez.</p>
+                                )}
+                            </div>
                         </>
                     )}
                 </div>

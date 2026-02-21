@@ -154,6 +154,90 @@
             border: 3px solid var(--mainColor);
         }
     }
+    .magic-divider {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        &::before, &::after {
+            content: "";
+            flex: 1;
+            height: 1px;
+            background: var(--mainTextColor);
+            opacity: 0.2;
+        }
+        span {
+            font-size: 18px;
+            opacity: 0.4;
+        }
+    }
+    .magic-form {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        input {
+            padding: 16px 24px;
+            font-size: 22px;
+            border-radius: 50px;
+            border: 3px solid transparent;
+            background-color: var(--secondBackgroundColor);
+            color: var(--mainTextColor);
+            box-shadow: -4px 4px 4px rgba(0, 0, 0, 0.3);
+            outline: none;
+            transition: border-color 0.3s ease;
+            &:focus {
+                border-color: var(--mainColor);
+            }
+        }
+        .magic-submit {
+            padding: 16px 40px;
+            font-size: 22px;
+            border-radius: 50px;
+            background-color: var(--mainColor);
+            color: #fff;
+            border: 3px solid transparent;
+            box-shadow: -4px 4px 4px rgba(0, 0, 0, 0.3);
+            cursor: pointer;
+            transition: opacity 0.3s ease;
+            &:disabled {
+                opacity: 0.4;
+                cursor: not-allowed;
+            }
+        }
+        .magic-error {
+            font-size: 16px;
+            color: red;
+            text-align: center;
+        }
+    }
+    .magic-sent {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        text-align: center;
+        p {
+            font-size: 28px;
+        }
+        .magic-connected {
+            font-size: 24px;
+            font-weight: 600;
+        }
+        .magic-hint {
+            font-size: 18px;
+            opacity: 0.6;
+        }
+        .magic-back {
+            font-size: 18px;
+            padding: 12px 30px;
+            border-radius: 50px;
+            background-color: var(--secondBackgroundColor);
+            border: 3px solid transparent;
+            box-shadow: -4px 4px 4px rgba(0, 0, 0, 0.3);
+            transition: border-color 0.3s ease;
+            &:hover {
+                border-color: var(--mainColor);
+            }
+        }
+    }
 }
 .timer {
     display: flex;

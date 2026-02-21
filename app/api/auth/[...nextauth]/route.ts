@@ -1,5 +1,6 @@
 import NextAuth, { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import CredentialsProvider from "next-auth/providers/credentials";
 import mongoose from "mongoose";
 import clientPromise from "../../../lib/mongodb";
 import User from "../../../lib/models/User";
@@ -10,8 +11,46 @@ const adminEmails = process.env.ADMIN_EMAILS
 export const authOptions: NextAuthOptions = {
     providers: [
         GoogleProvider({
-        clientId: process.env.GOOGLE_CLIENT_ID!,
-        clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+            clientId: process.env.GOOGLE_CLIENT_ID!,
+            clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+        }),
+        CredentialsProvider({
+            id: "magic-link-credentials",
+            name: "Magic Link",
+            credentials: {
+                email: { label: "Email", type: "email" },
+                oneTimeToken: { label: "Token", type: "text" },
+            },
+            async authorize(credentials) {
+                if (!credentials?.email || !credentials?.oneTimeToken) return null;
+                const email = credentials.email.toLowerCase().trim();
+                try {
+                    const client = await clientPromise;
+                    const db = client.db("effcraftdatabase");
+                    // Valider le one-time token
+                    const record = await db.collection("magic_session_tokens").findOneAndDelete({
+                        token: credentials.oneTimeToken,
+                        email,
+                        expires: { $gt: new Date() },
+                    });
+                    if (!record) return null;
+                    if (mongoose.connection.readyState !== 1) {
+                        await mongoose.connect(process.env.MONGODB_URI!, {
+                            bufferCommands: false,
+                            serverSelectionTimeoutMS: 10000,
+                        });
+                    }
+                    const dbUser = await User.findOne({ email });
+                    if (!dbUser) return null;
+                    return {
+                        id: dbUser._id.toString(),
+                        email: dbUser.email,
+                        name: dbUser.name,
+                    };
+                } catch {
+                    return null;
+                }
+            },
         }),
     ],
     callbacks: {
