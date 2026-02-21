@@ -233,6 +233,32 @@ export default function Header() {
         }, 2000);
     }, [update]);
 
+    useEffect(() => {
+        const handleMessage = async (e: MessageEvent) => {
+            if (e.origin !== window.location.origin) return;
+            if (!e.data || e.data.type !== "google-signed-in") return;
+            if (e.data.error || !e.data.email || !e.data.oneTimeToken) return;
+            await signIn("magic-link-credentials", {
+                email: e.data.email,
+                oneTimeToken: e.data.oneTimeToken,
+                redirect: false,
+            });
+            await update();
+            setMagicStatus("connected");
+            setTimeout(() => {
+                setLoginOpen(false);
+                setTimeout(() => {
+                    setLoginVisible(false);
+                    setTimeout(() => {
+                        setMagicStatus("idle");
+                    }, 50);
+                }, 350);
+            }, 2000);
+        };
+        window.addEventListener("message", handleMessage);
+        return () => window.removeEventListener("message", handleMessage);
+    }, [update]);
+
     usePusher("magic_link_signed_in", handleMagicLinkSignedIn);
     const handleLogoClick = (e: React.MouseEvent) => {
         if (pathname === "/") {
@@ -366,9 +392,31 @@ export default function Header() {
                         </div>
                     ) : (
                         <>
-                            <button className="google" onClick={() => {
-                                sessionStorage.setItem("scrollPos", window.scrollY.toString());
-                                signIn("google", { callbackUrl: window.location.href });
+                            <button className="google" onClick={async () => {
+                                const callbackUrl = `${window.location.origin}/api/auth/google`;
+                                const csrf = await fetch("/api/auth/csrf").then(r => r.json());
+                                const width = 500;
+                                const height = 600;
+                                const left = window.screenX + (window.outerWidth - width) / 2;
+                                const top = window.screenY + (window.outerHeight - height) / 2;
+                                window.open("", "google-signin-popup", `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`);
+                                const form = document.createElement("form");
+                                form.method = "POST";
+                                form.action = `/api/auth/signin/google`;
+                                form.target = "google-signin-popup";
+                                const csrfInput = document.createElement("input");
+                                csrfInput.type = "hidden";
+                                csrfInput.name = "csrfToken";
+                                csrfInput.value = csrf.csrfToken;
+                                const cbInput = document.createElement("input");
+                                cbInput.type = "hidden";
+                                cbInput.name = "callbackUrl";
+                                cbInput.value = callbackUrl;
+                                form.appendChild(csrfInput);
+                                form.appendChild(cbInput);
+                                document.body.appendChild(form);
+                                form.submit();
+                                document.body.removeChild(form);
                             }}>
                                 <img src="/google.webp" alt="Google" />
                                 Se connecter avec Google
@@ -388,7 +436,7 @@ export default function Header() {
                                     onClick={async () => {
                                         setMagicStatus("sending");
                                         try {
-                                            const res = await fetch("/api/auth/magic-link", {
+                                            const res = await fetch("/api/auth/link", {
                                                 method: "POST",
                                                 headers: { "Content-Type": "application/json" },
                                                 body: JSON.stringify({

@@ -59,7 +59,7 @@ export async function POST(req: Request) {
         }
 
         const baseUrl = process.env.NEXTAUTH_URL || "https://effcraft.fr";
-        const magicUrl = `${baseUrl}/api/auth/magic-link?token=${token}`;
+        const magicUrl = `${baseUrl}/api/auth/link?token=${token}`;
 
         const transporter = nodemailer.createTransport({
             host: "ssl0.ovh.net",
