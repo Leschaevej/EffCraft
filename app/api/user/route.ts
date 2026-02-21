@@ -20,8 +20,9 @@ export async function GET(request: NextRequest) {
     if (!session?.user?.email) {
         return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
+    const sessionEmail = session.user.email.toLowerCase().trim();
     await dbConnect();
-    const user = await User.findOne({ email: session.user.email });
+    const user = await User.findOne({ email: { $regex: new RegExp(`^${sessionEmail}$`, "i") } });
     if (!user) {
         return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
     }
@@ -79,12 +80,13 @@ export async function POST(request: Request) {
     if (!session?.user?.email) {
         return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
+    const sessionEmail = session.user.email.toLowerCase().trim();
     await dbConnect();
     const { action, productId } = await request.json();
     if (!productId || !ObjectId.isValid(productId)) {
         return NextResponse.json({ error: "ID produit invalide" }, { status: 400 });
     }
-    const user = await User.findOne({ email: session.user.email });
+    const user = await User.findOne({ email: { $regex: new RegExp(`^${sessionEmail}$`, "i") } });
     if (!user) {
         return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
     }
@@ -148,12 +150,13 @@ export async function DELETE(request: Request) {
     if (!session?.user?.email) {
         return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
     }
+    const sessionEmail = session.user.email.toLowerCase().trim();
     await dbConnect();
     const { action, productId } = await request.json();
     if (!productId || !ObjectId.isValid(productId)) {
         return NextResponse.json({ error: "ID produit invalide" }, { status: 400 });
     }
-    const user = await User.findOne({ email: session.user.email });
+    const user = await User.findOne({ email: { $regex: new RegExp(`^${sessionEmail}$`, "i") } });
     if (!user) {
         return NextResponse.json({ error: "Utilisateur non trouvé" }, { status: 404 });
     }

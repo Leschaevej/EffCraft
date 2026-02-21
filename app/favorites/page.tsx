@@ -6,6 +6,7 @@ import CardSkeleton from "../components/card/CardSkeleton";
 import { useSession, signIn } from "next-auth/react";
 import { nothingYouCouldDo } from "../font";
 import { useFavorites } from "../hooks/useFavorites";
+import { usePusher } from "../hooks/usePusher";
 import "./page.scss";
 
 type Bijou = {
@@ -17,9 +18,20 @@ type Bijou = {
     images: string[];
 };
 export default function Favorites() {
-    const { data: session, status } = useSession();
+    const { data: session, status, update } = useSession();
     const [favorites, setFavorites] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [magicEmail, setMagicEmail] = useState("");
+    const [magicStatus, setMagicStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+
+    usePusher("magic_link_signed_in", async (data: { email: string; oneTimeToken: string }) => {
+        await signIn("magic-link-credentials", {
+            email: data.email,
+            oneTimeToken: data.oneTimeToken,
+            redirect: false,
+        });
+        await update();
+    });
 
     const fetchFavorites = async (showLoading = false) => {
         if (status === "loading") {
@@ -83,23 +95,53 @@ export default function Favorites() {
             <div className="conteneur">
                 <h2 className={nothingYouCouldDo.className}>Vos favoris</h2>
                     {status === "unauthenticated" ? (
-                    <>
-                        <div className="loginFav">
-                        <p>Veuillez vous connecter pour voir vos favoris !</p>
-                        <button className="google" onClick={() => signIn("google")}>
-                            <img src="/google.webp" alt="Google" />
-                            Se connecter avec Google
-                        </button>
-                        <button className="facebook" onClick={() => alert("Connexion Facebook")}>
-                            <img src="/facebook.webp" alt="Facebook" />
-                            Se connecter avec Facebook
-                        </button>
-                        <button className="apple" onClick={() => alert("Connexion Apple")}>
-                            <img src="/apple.webp" alt="Apple" />
-                            Se connecter avec Apple
-                        </button>
-                        </div>
-                    </>
+                    <div className="loginFav">
+                        <p>Connectez-vous pour voir vos favoris</p>
+                        {magicStatus === "sent" ? (
+                            <div className="magic-sent">
+                                <p>Vérifiez votre boîte mail !</p>
+                                <span>Un lien de connexion vous a été envoyé.</span>
+                                <button className="magic-back" onClick={() => { setMagicStatus("idle"); setMagicEmail(""); }}>Retour</button>
+                            </div>
+                        ) : (
+                            <>
+                                <button className="google" onClick={() => signIn("google", { callbackUrl: window.location.href })}>
+                                    <img src="/google.webp" alt="Google" />
+                                    Se connecter avec Google
+                                </button>
+                                <div className="magic-divider"><span>ou</span></div>
+                                <div className="magic-form">
+                                    <input
+                                        type="email"
+                                        placeholder="Votre adresse email"
+                                        value={magicEmail}
+                                        onChange={(e) => setMagicEmail(e.target.value)}
+                                        disabled={magicStatus === "sending"}
+                                    />
+                                    <button
+                                        className="magic-submit"
+                                        disabled={!magicEmail.includes("@") || magicStatus === "sending"}
+                                        onClick={async () => {
+                                            setMagicStatus("sending");
+                                            try {
+                                                const res = await fetch("/api/auth/magic-link", {
+                                                    method: "POST",
+                                                    headers: { "Content-Type": "application/json" },
+                                                    body: JSON.stringify({ email: magicEmail, callbackUrl: window.location.href }),
+                                                });
+                                                setMagicStatus(res.ok ? "sent" : "error");
+                                            } catch {
+                                                setMagicStatus("error");
+                                            }
+                                        }}
+                                    >
+                                        {magicStatus === "sending" ? "Envoi..." : "Recevoir un lien"}
+                                    </button>
+                                    {magicStatus === "error" && <span className="magic-error">Une erreur est survenue, réessayez.</span>}
+                                </div>
+                            </>
+                        )}
+                    </div>
                 ) : (
                 <>
                     {loading ? (

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import clientPromise from "../../../lib/mongodb";
 import pusherServer from "../../../lib/pusher-server";
 import nodemailer from "nodemailer";
 import crypto from "crypto";
@@ -10,6 +9,15 @@ const adminEmails = process.env.ADMIN_EMAILS
     ? process.env.ADMIN_EMAILS.split(",").map((e) => e.trim())
     : [];
 
+async function connectMongoose() {
+    if (mongoose.connection.readyState !== 1) {
+        await mongoose.connect(process.env.MONGODB_URI!, {
+            bufferCommands: false,
+            serverSelectionTimeoutMS: 10000,
+        });
+    }
+}
+
 // POST : génère et envoie le lien magique
 export async function POST(req: Request) {
     try {
@@ -18,20 +26,37 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Email invalide" }, { status: 400 });
         }
 
+        const normalizedEmail = email.toLowerCase().trim();
         const token = crypto.randomBytes(32).toString("hex");
         const expires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-        const client = await clientPromise;
-        const db = client.db("effcraftdatabase");
+        await connectMongoose();
 
-        await db.collection("magic_link_tokens").insertOne({
-            email: email.toLowerCase().trim(),
-            token,
-            expires,
-            used: false,
-            callbackUrl: callbackUrl || "/",
-            createdAt: new Date(),
-        });
+        // Chercher le user existant (insensible à la casse)
+        const escapedEmail = normalizedEmail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        let dbUser = await User.findOne({ email: { $regex: new RegExp(`^${escapedEmail}$`, "i") } });
+        if (dbUser) {
+            // User existant : stocker le token
+            dbUser.magicLinkToken = token;
+            dbUser.magicLinkTokenExpires = expires;
+            dbUser.magicLinkTokenUsed = false;
+            dbUser.magicLinkCallbackUrl = callbackUrl || "/";
+            await dbUser.save();
+        } else {
+            // Nouveau user : créer avec le token
+            dbUser = new User({
+                email: normalizedEmail,
+                name: normalizedEmail.split("@")[0],
+                role: adminEmails.includes(normalizedEmail) ? "admin" : "user",
+                favorites: [],
+                cart: [],
+                magicLinkToken: token,
+                magicLinkTokenExpires: expires,
+                magicLinkTokenUsed: false,
+                magicLinkCallbackUrl: callbackUrl || "/",
+            });
+            await dbUser.save();
+        }
 
         const baseUrl = process.env.NEXTAUTH_URL || "https://effcraft.fr";
         const magicUrl = `${baseUrl}/api/auth/magic-link?token=${token}`;
@@ -75,12 +100,11 @@ export async function POST(req: Request) {
     }
 }
 
-// GET : vérifie le token, crée la session NextAuth, redirige vers la page d'origine
+// GET : vérifie le token, génère un oneTimeToken via Pusher, ferme l'onglet
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
         const token = searchParams.get("token");
-        const baseUrl = process.env.NEXTAUTH_URL || "https://effcraft.fr";
 
         const pageHtml = (message: string, isError = false) => new NextResponse(
             `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
@@ -102,55 +126,39 @@ small{font-size:13px;opacity:0.5;}
             return pageHtml("Lien invalide.", true);
         }
 
-        const client = await clientPromise;
-        const db = client.db("effcraftdatabase");
+        await connectMongoose();
 
-        const record = await db.collection("magic_link_tokens").findOne({
-            token,
-            used: false,
-            expires: { $gt: new Date() },
+        // Trouver l'utilisateur avec ce token valide et non utilisé
+        // On accepte magicLinkTokenUsed: false OU le champ absent (undefined)
+        const dbUser = await User.findOne({
+            magicLinkToken: token,
+            magicLinkTokenUsed: { $ne: true },
+            magicLinkTokenExpires: { $gt: new Date() },
         });
 
-        if (!record) {
+        if (!dbUser) {
             return pageHtml("Ce lien a déjà été utilisé ou a expiré.", true);
         }
 
-        // Marquer le token comme utilisé
-        await db.collection("magic_link_tokens").updateOne(
-            { token },
-            { $set: { used: true } }
-        );
+        const email = dbUser.email;
 
-        const email = record.email;
-        const callbackUrl = record.callbackUrl || "/";
-
-        // Créer l'utilisateur s'il n'existe pas
-        if (mongoose.connection.readyState !== 1) {
-            await mongoose.connect(process.env.MONGODB_URI!, {
-                bufferCommands: false,
-                serverSelectionTimeoutMS: 10000,
-            });
-        }
-        let dbUser = await User.findOne({ email });
-        if (!dbUser) {
-            dbUser = new User({
-                email,
-                name: email.split("@")[0],
-                role: adminEmails.includes(email) ? "admin" : "user",
-                favorites: [],
-                cart: [],
-            });
-            await dbUser.save();
-        }
-
-        // Générer un one-time token valable 60 secondes pour que le Header se connecte
+        // Générer un one-time token valable 60 secondes
         const oneTimeToken = crypto.randomBytes(32).toString("hex");
-        await db.collection("magic_session_tokens").insertOne({
-            token: oneTimeToken,
-            email,
-            expires: new Date(Date.now() + 60 * 1000),
-            createdAt: new Date(),
-        });
+        await User.updateOne(
+            { _id: dbUser._id },
+            {
+                $set: {
+                    magicSessionToken: oneTimeToken,
+                    magicSessionTokenExpires: new Date(Date.now() + 60 * 1000),
+                    magicLinkTokenUsed: true,
+                },
+                $unset: {
+                    magicLinkToken: "",
+                    magicLinkTokenExpires: "",
+                    magicLinkCallbackUrl: "",
+                },
+            }
+        );
 
         // Envoyer via Pusher pour que l'onglet original se connecte
         await pusherServer.trigger("effcraft-channel", "magic_link_signed_in", {

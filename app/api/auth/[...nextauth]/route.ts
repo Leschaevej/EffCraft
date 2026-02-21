@@ -2,12 +2,21 @@ import NextAuth, { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import mongoose from "mongoose";
-import clientPromise from "../../../lib/mongodb";
 import User from "../../../lib/models/User";
 
 const adminEmails = process.env.ADMIN_EMAILS
   ? process.env.ADMIN_EMAILS.split(",").map((e) => e.trim())
   : [];
+
+async function connectMongoose() {
+    if (mongoose.connection.readyState !== 1) {
+        await mongoose.connect(process.env.MONGODB_URI!, {
+            bufferCommands: false,
+            serverSelectionTimeoutMS: 10000,
+        });
+    }
+}
+
 export const authOptions: NextAuthOptions = {
     providers: [
         GoogleProvider({
@@ -25,22 +34,24 @@ export const authOptions: NextAuthOptions = {
                 if (!credentials?.email || !credentials?.oneTimeToken) return null;
                 const email = credentials.email.toLowerCase().trim();
                 try {
-                    const client = await clientPromise;
-                    const db = client.db("effcraftdatabase");
-                    // Valider le one-time token
-                    const record = await db.collection("magic_session_tokens").findOneAndDelete({
-                        token: credentials.oneTimeToken,
-                        email,
-                        expires: { $gt: new Date() },
-                    });
-                    if (!record) return null;
-                    if (mongoose.connection.readyState !== 1) {
-                        await mongoose.connect(process.env.MONGODB_URI!, {
-                            bufferCommands: false,
-                            serverSelectionTimeoutMS: 10000,
-                        });
-                    }
-                    const dbUser = await User.findOne({ email });
+                    await connectMongoose();
+                    const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                    // Trouver l'utilisateur avec le magicSessionToken valide et le consommer
+                    const dbUser = await User.findOneAndUpdate(
+                        {
+                            email: { $regex: new RegExp(`^${escapedEmail}$`, "i") },
+                            magicSessionToken: credentials.oneTimeToken,
+                            magicSessionTokenExpires: { $gt: new Date() },
+                        },
+                        {
+                            $unset: {
+                                magicSessionToken: "",
+                                magicSessionTokenExpires: "",
+                                magicLinkTokenUsed: "",
+                            },
+                        },
+                        { new: true }
+                    );
                     if (!dbUser) return null;
                     return {
                         id: dbUser._id.toString(),
@@ -54,22 +65,22 @@ export const authOptions: NextAuthOptions = {
         }),
     ],
     callbacks: {
-        signIn: async ({ user }) => {
+        signIn: async ({ user, account }) => {
+        // Le CredentialsProvider (magic link) crée déjà le user dans authorize()
+        // Pas besoin de le recréer ici
+        if (account?.provider === "magic-link-credentials") return true;
         try {
             if (!user.email) throw new Error("Email utilisateur manquant");
-            await clientPromise;
-            if (mongoose.connection.readyState !== 1) {
-            await mongoose.connect(process.env.MONGODB_URI!, {
-                bufferCommands: false,
-                serverSelectionTimeoutMS: 10000,
-            });
-            }
-            let dbUser = await User.findOne({ email: user.email });
+            const email = user.email.toLowerCase().trim();
+            await connectMongoose();
+            // Escape les caractères spéciaux du regex (ex: le "." dans l'email)
+            const escapedEmail = email.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            let dbUser = await User.findOne({ email: { $regex: new RegExp(`^${escapedEmail}$`, "i") } });
             if (!dbUser) {
             dbUser = new User({
-                email: user.email,
+                email,
                 name: user.name,
-                role: adminEmails.includes(user.email) ? "admin" : "user",
+                role: adminEmails.includes(email) ? "admin" : "user",
                 favorites: [],
                 cart: [],
             });
@@ -80,7 +91,7 @@ export const authOptions: NextAuthOptions = {
                 dbUser.name = user.name;
                 updateNeeded = true;
             }
-            const expectedRole = adminEmails.includes(user.email) ? "admin" : "user";
+            const expectedRole = adminEmails.includes(email) ? "admin" : "user";
             if (dbUser.role !== expectedRole) {
                 dbUser.role = expectedRole;
                 updateNeeded = true;
@@ -91,12 +102,14 @@ export const authOptions: NextAuthOptions = {
             }
             return true;
         } catch (error) {
+            console.error("[NextAuth signIn callback] Erreur:", error);
             return false;
         }
         },
         jwt: async ({ token, user }) => {
         if (user?.email) {
-            token.role = adminEmails.includes(user.email) ? "admin" : "user";
+            const email = user.email.toLowerCase().trim();
+            token.role = adminEmails.includes(email) ? "admin" : "user";
             token.firstName = user.name?.split(" ")[0] ?? null;
         }
         return token;
