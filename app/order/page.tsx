@@ -46,7 +46,7 @@ const TRACKING_STEPS = [
     { label: "Livré", icon: <FaHome /> }
 ];
 const RETURN_TRACKING_STEPS = [
-    { label: "Retour confirmé", icon: <FaCheck /> },
+    { label: "Retour demandé", icon: <FaCheck /> },
     { label: "Livraison", icon: <FaTruck /> },
     { label: "Livré", icon: <FaHome /> }
 ];
@@ -68,7 +68,7 @@ const STATUS_LABELS: { [key: string]: string } = {
     delivered: "Livré",
     cancelled: "Remboursé",
     cancel_requested: "Demande en cours",
-    return_requested: "Demande de retour en cours",
+    return_requested: "Retour demandé",
     return_preparing: "Retour en préparation",
     return_in_transit: "Livraison",
     return_delivered: "Livré",
