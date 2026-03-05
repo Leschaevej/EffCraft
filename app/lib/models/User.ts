@@ -27,6 +27,6 @@ const UserSchema = new Schema<IUser>({
     magicLinkCallbackUrl: { type: String },
     magicSessionToken: { type: String },
     magicSessionTokenExpires: { type: Date },
-});
+}, { versionKey: false });
 const User = (mongoose.models.User as mongoose.Model<IUser>) || model<IUser>("User", UserSchema);
 export default User;

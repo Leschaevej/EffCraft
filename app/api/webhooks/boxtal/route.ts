@@ -102,7 +102,12 @@ export async function POST(req: NextRequest) {
         const client = await clientPromise;
         const db = client.db("effcraftdatabase");
         const ordersCollection = db.collection("orders");
-        const order = await ordersCollection.findOne({ "shippingData.boxtalShipmentId": shipmentId });
+        const order = await ordersCollection.findOne({
+            $or: [
+                { "shippingData.boxtalShipmentId": shipmentId },
+                { "order.boxtalReturnShipmentId": shipmentId }
+            ]
+        });
         if (!order) {
             console.warn(`Commande introuvable pour shipmentId: ${shipmentId}`);
             return NextResponse.json({ success: true, message: "Commande introuvable" });
@@ -190,12 +195,22 @@ export async function POST(req: NextRequest) {
         }
         const updateQuery: any = { $set: updateData };
         if (updateData["order.status"] === "delivered") {
-            delete updateData["shippingData.boxtalStatus"];
-            delete updateData["shippingData.boxtalLastUpdate"];
-            delete updateData["shippingData.trackingNumber"];
+            // Garder uniquement les infos nécessaires pour un éventuel retour
             updateData["order.boxtalShipmentId"] = order.shippingData?.boxtalShipmentId;
+            updateData["order.shippingMethod"] = order.shippingData?.shippingMethod;
+            updateData["shippingData.prenom"] = order.shippingData?.prenom;
+            updateData["shippingData.nom"] = order.shippingData?.nom;
+            updateData["shippingData.telephone"] = order.shippingData?.telephone;
+            updateData["shippingData.rue"] = order.shippingData?.rue;
+            updateData["shippingData.ville"] = order.shippingData?.ville;
+            updateData["shippingData.codePostal"] = order.shippingData?.codePostal;
+            updateData["shippingData.shippingMethod"] = order.shippingData?.shippingMethod;
+            // Supprimer les champs inutiles
             updateQuery.$unset = {
-                shippingData: "",
+                "shippingData.boxtalShipmentId": "",
+                "shippingData.boxtalStatus": "",
+                "shippingData.boxtalLastUpdate": "",
+                "shippingData.trackingNumber": "",
                 billingData: ""
             };
         }

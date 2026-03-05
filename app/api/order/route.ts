@@ -289,7 +289,8 @@ export async function PATCH(req: NextRequest) {
                     "POFR-ColissimoAccess": 9.90,
                     "CHRP-Chrono18": 12.90
                 };
-                const shippingCode = `${refundOrder.shippingData?.shippingMethod?.operator || "MONR"}-${refundOrder.shippingData?.shippingMethod?.serviceCode || "CpourToi"}`;
+                const returnShippingMethod = refundOrder.shippingData?.shippingMethod || refundOrder.order?.shippingMethod;
+                const shippingCode = `${returnShippingMethod?.operator || "MONR"}-${returnShippingMethod?.serviceCode || "CpourToi"}`;
                 const shippingCost = FIXED_PRICES[shippingCode] || 5.90;
                 let refundAmount;
                 let refundReason;
@@ -334,7 +335,7 @@ export async function PATCH(req: NextRequest) {
                             "order.status": "returned",
                             "order.returnedAt": new Date(),
                             "order.refundReason": refundReason,
-                            "order.shippingMethod": refundOrder.shippingData?.shippingMethod || null,
+                            "order.shippingMethod": returnShippingMethod || null,
                             products: returnSlimProducts
                         },
                         $unset: {

@@ -32,6 +32,24 @@ export async function GET(req: NextRequest) {
             .sort({ "order.createdAt": -1 })
             .toArray();
 
+        // Nettoyer shippingData des commandes livrées depuis plus de 14 jours
+        const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+        const toClean = orders
+            .filter(o =>
+                o.order?.status === "delivered" &&
+                o.order?.deliveredAt &&
+                new Date(o.order.deliveredAt) < fourteenDaysAgo &&
+                o.shippingData
+            )
+            .map(o => o._id);
+
+        if (toClean.length > 0) {
+            ordersCollection.updateMany(
+                { _id: { $in: toClean } },
+                { $unset: { shippingData: "" } }
+            ).catch(err => console.error("Erreur nettoyage shippingData:", err));
+        }
+
         return NextResponse.json({ orders });
     } catch (error: any) {
         console.error("Erreur récupération commandes:", error);
