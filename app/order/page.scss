@@ -113,81 +113,136 @@
                         }
                     }
                     .details {
-                        display: flex;
-                        flex-direction: column;
-                        gap: 30px;
-                        overflow: visible;
-                        .tracking {
-                            display: flex;
-                            justify-content: space-between;
-                            align-items: flex-start;
-                            position: relative;
-                            .step {
-                                display: flex;
-                                flex-direction: column;
-                                align-items: center;
-                                position: relative;
-                                flex: 0 0 auto;
-                                .icon {
-                                    display: flex;
-                                    align-items: center;
-                                    justify-content: center;
-                                    font-size: 60px;
-                                    margin-bottom: 15px;
-                                    z-index: 2;
-                                    color: var(--thirdColor);
-                                    position: relative;
-                                }
-                                .label {
-                                    width: 120px;
-                                    text-align: center;
-                                }
-                                &.active {
-                                    .icon {
-                                        color: var(--mainColor);
-                                    }
-                                    .label {
-                                        color: var(--mainColor);
-                                    }
-                                }
-                            }
-                            .connector {
-                                flex: 1;
-                                display: flex;
-                                align-items: center;
-                                padding: 0 10px;
-                                margin-top: 30px;
-                                &::before {
-                                    content: '';
-                                    width: 100%;
-                                    border-top: 10px dotted var(--thirdColor);
-                                }
-                                &.active::before {
-                                    border-top-color: var(--mainColor);
-                                }
-                            }
-                        }
                         .content {
                             display: flex;
                             justify-content: space-between;
+                            gap: 50px;
                             h3 {
                                 color: var(--mainColor);
                             }
-                            .infos{
+                            .infos {
                                 display: flex;
                                 flex-direction: column;
                                 gap: 30px;
-                                .info {
+                                flex: 1;
+                                .tracking {
                                     display: flex;
-                                    flex-direction: column;
-                                    gap: 10px;
+                                    justify-content: space-between;
+                                    align-items: flex-start;
+                                    position: relative;
+                                    .step {
+                                        display: flex;
+                                        flex-direction: column;
+                                        align-items: center;
+                                        position: relative;
+                                        flex: 0 0 auto;
+                                        .icon {
+                                            display: flex;
+                                            align-items: center;
+                                            justify-content: center;
+                                            font-size: 40px;
+                                            margin-bottom: 10px;
+                                            z-index: 2;
+                                            color: var(--thirdColor);
+                                            position: relative;
+                                        }
+                                        .label {
+                                            width: 80px;
+                                            text-align: center;
+                                            font-size: 13px;
+                                        }
+                                        &.active {
+                                            .icon { color: var(--mainColor); }
+                                            .label { color: var(--mainColor); }
+                                        }
+                                    }
+                                    .connector {
+                                        flex: 1;
+                                        height: 6px;
+                                        margin-top: 20px;
+                                        position: relative;
+                                        // Points gris par défaut
+                                        background-image: radial-gradient(circle, var(--thirdColor) 40%, transparent 41%);
+                                        background-size: 14px 6px;
+                                        background-repeat: repeat-x;
+                                        background-position: 0 center;
+                                        &.active {
+                                            background-image: radial-gradient(circle, var(--mainColor) 40%, transparent 41%);
+                                        }
+                                        &.next {
+                                            // Points gris de base
+                                            background-image: radial-gradient(circle, var(--thirdColor) 40%, transparent 41%);
+                                            // Wave verte qui défile : points verts sur un masque glissant
+                                            &::after {
+                                                content: '';
+                                                position: absolute;
+                                                inset: 0;
+                                                background-image: radial-gradient(circle, var(--mainColor) 40%, transparent 41%);
+                                                background-size: 14px 6px;
+                                                background-repeat: repeat-x;
+                                                background-position: 0 center;
+                                                // Masque qui révèle une portion de ~4 points et glisse
+                                                mask-image: linear-gradient(90deg, transparent 0%, black 20%, black 80%, transparent 100%);
+                                                mask-size: 70% 100%;
+                                                mask-repeat: no-repeat;
+                                                mask-position: -70% center;
+                                                animation: wave-dots 1.8s linear infinite;
+                                            }
+                                        }
+                                    }
+                                    @keyframes wave-dots {
+                                        0%   { mask-position: -70% center; }
+                                        100% { mask-position: 170% center; }
+                                    }
                                 }
-                                .shipping-container {
+                                .info-row {
                                     display: flex;
                                     flex-direction: row;
                                     gap: 50px;
                                     .info {
                                         flex: 1;
+                                        display: flex;
+                                        flex-direction: column;
+                                        gap: 10px;
+                                    }
+                                }
+                                .actions {
+                                    display: flex;
+                                    flex-direction: row;
+                                    gap: 20px;
+                                    flex-wrap: wrap;
+                                    button {
+                                        padding: 15px 30px;
+                                        border: none;
+                                        border-radius: 25px;
+                                        font-size: 20px;
+                                        cursor: pointer;
+                                        transition: color 0.3s ease, background-color 0.3s ease;
+                                        white-space: nowrap;
+                                        &.invoice {
+                                            background-color: var(--mainColor);
+                                            color: var(--secondTextColor);
+                                            &:hover {
+                                                background-color: var(--secondColor);
+                                                color: var(--mainTextColor);
+                                            }
+                                        }
+                                        &.cancel {
+                                            background-color: var(--errorColor);
+                                            color: var(--secondTextColor);
+                                            &:hover {
+                                                background-color: var(--secondErrorColor);
+                                                color: var(--mainTextColor);
+                                            }
+                                        }
+                                        &.return {
+                                            background-color: var(--errorColor);
+                                            color: var(--secondTextColor);
+                                            &:hover {
+                                                background-color: var(--secondErrorColor);
+                                                color: var(--mainTextColor);
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -195,55 +250,15 @@
                                 display: grid;
                                 grid-template-columns: repeat(2, 1fr);
                                 gap: 30px;
-                                direction: rtl;
+                                align-self: start;
                                 .product {
                                     display: flex;
                                     flex-direction: column;
                                     align-items: center;
                                     gap: 10px;
-                                    direction: ltr;
                                     img {
                                         height: 200px;
                                         border-radius: 10px;
-                                    }
-                                }
-                            }
-                        }
-                        .actions {
-                            display: flex;
-                            flex-direction: column;
-                            gap: 20px;
-                            align-items: flex-start;
-                            button {
-                                padding: 15px 30px;
-                                border: none;
-                                border-radius: 25px;
-                                font-size: 24px;
-                                cursor: pointer;
-                                transition: color 0.3s ease, background-color 0.3s ease;
-                                white-space: nowrap;
-                                &.invoice {
-                                    background-color: var(--mainColor);
-                                    color: var(--secondTextColor);
-                                    &:hover {
-                                        background-color: var(--secondColor);
-                                        color: var(--mainTextColor);
-                                    }
-                                }
-                                &.cancel {
-                                    background-color: var(--errorColor);
-                                    color: var(--secondTextColor);
-                                    &:hover {
-                                        background-color: var(--secondErrorColor);
-                                        color: var(--mainTextColor);
-                                    }
-                                }
-                                &.return {
-                                    background-color: var(--errorColor);
-                                    color: var(--secondTextColor);
-                                    &:hover {
-                                        background-color: var(--secondErrorColor);
-                                        color: var(--mainTextColor);
                                     }
                                 }
                             }
@@ -338,30 +353,58 @@
                         }
                     }
                     .details {
-                        display: flex;
-                        flex-direction: column;
-                        gap: 30px;
                         .content {
                             display: flex;
                             justify-content: space-between;
+                            gap: 50px;
                             h3 {
                                 color: var(--mainColor);
                             }
-                            .infos{
+                            .infos {
                                 display: flex;
                                 flex-direction: column;
                                 gap: 30px;
-                                .info {
-                                    display: flex;
-                                    flex-direction: column;
-                                    gap: 10px;
-                                }
-                                .shipping-container {
+                                flex: 1;
+                                .info-row {
                                     display: flex;
                                     flex-direction: row;
                                     gap: 50px;
                                     .info {
                                         flex: 1;
+                                        display: flex;
+                                        flex-direction: column;
+                                        gap: 10px;
+                                    }
+                                }
+                                .actions {
+                                    display: flex;
+                                    flex-direction: row;
+                                    gap: 20px;
+                                    flex-wrap: wrap;
+                                    button {
+                                        padding: 15px 30px;
+                                        border: none;
+                                        border-radius: 25px;
+                                        font-size: 20px;
+                                        cursor: pointer;
+                                        transition: color 0.3s ease, background-color 0.3s ease;
+                                        white-space: nowrap;
+                                        &.invoice {
+                                            background-color: var(--mainColor);
+                                            color: var(--secondTextColor);
+                                            &:hover {
+                                                background-color: var(--secondColor);
+                                                color: var(--mainTextColor);
+                                            }
+                                        }
+                                        &.return {
+                                            background-color: var(--errorColor);
+                                            color: var(--secondTextColor);
+                                            &:hover {
+                                                background-color: var(--secondErrorColor);
+                                                color: var(--mainTextColor);
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -369,55 +412,15 @@
                                 display: grid;
                                 grid-template-columns: repeat(2, 1fr);
                                 gap: 30px;
-                                direction: rtl;
+                                align-self: start;
                                 .product {
                                     display: flex;
                                     flex-direction: column;
                                     align-items: center;
                                     gap: 10px;
-                                    direction: ltr;
                                     img {
                                         height: 200px;
                                         border-radius: 10px;
-                                    }
-                                }
-                            }
-                        }
-                        .actions {
-                            display: flex;
-                            flex-direction: column;
-                            gap: 20px;
-                            align-items: flex-start;
-                            button {
-                                padding: 15px 30px;
-                                border: none;
-                                border-radius: 25px;
-                                font-size: 24px;
-                                cursor: pointer;
-                                transition: color 0.3s ease, background-color 0.3s ease;
-                                white-space: nowrap;
-                                &.invoice {
-                                    background-color: var(--mainColor);
-                                    color: var(--secondTextColor);
-                                    &:hover {
-                                        background-color: var(--secondColor);
-                                        color: var(--mainTextColor);
-                                    }
-                                }
-                                &.cancel {
-                                    background-color: var(--errorColor);
-                                    color: var(--secondTextColor);
-                                    &:hover {
-                                        background-color: var(--secondErrorColor);
-                                        color: var(--mainTextColor);
-                                    }
-                                }
-                                &.return {
-                                    background-color: var(--errorColor);
-                                    color: var(--secondTextColor);
-                                    &:hover {
-                                        background-color: var(--secondErrorColor);
-                                        color: var(--mainTextColor);
                                     }
                                 }
                             }

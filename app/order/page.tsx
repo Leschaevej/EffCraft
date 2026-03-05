@@ -36,6 +36,7 @@ interface Order {
         readyAt?: Date;
         cancelReason?: string;
         cancelMessage?: string;
+        returnRejected?: boolean;
     };
 }
 const TRACKING_STEPS = [
@@ -69,7 +70,7 @@ const STATUS_LABELS: { [key: string]: string } = {
     cancel_requested: "Demande en cours",
     return_requested: "Demande de retour en cours",
     return_preparing: "Retour en préparation",
-    return_in_transit: "En transit",
+    return_in_transit: "Livraison",
     return_delivered: "Livré",
     returned: "Remboursé"
 };
@@ -234,97 +235,101 @@ export default function OrderPage() {
                                     </div>
                                     {expandedOrderId === order._id && (
                                         <div className="details">
-                                            {orderView === "pending" && order.order.status !== "cancel_requested" && (
-                                                <div className="tracking">
-                                                    {(() => {
-                                                        const isReturn = order.order.status.startsWith("return_");
-                                                        const steps = isReturn ? RETURN_TRACKING_STEPS : TRACKING_STEPS;
-                                                        return steps.map((step, index) => {
-                                                            const currentStep = getTrackingStep(order);
-                                                            const isActive = index + 1 <= currentStep;
-                                                            const isConnectorActive = index + 1 <= currentStep;
-                                                            return (
-                                                                <React.Fragment key={index}>
-                                                                    <div className={`step ${isActive ? "active" : ""}`}>
-                                                                        <div className="icon">{step.icon}</div>
-                                                                        <p className="label">{step.label}</p>
-                                                                    </div>
-                                                                    {index < steps.length - 1 && (
-                                                                        <div className={`connector ${isConnectorActive ? "active" : ""}`}></div>
-                                                                    )}
-                                                                </React.Fragment>
-                                                            );
-                                                        });
-                                                    })()}
-                                                </div>
-                                            )}
                                             <div className="content">
                                                 <div className="infos">
-                                                    <div className="info">
-                                                        <h3>Informations de commande</h3>
-                                                        <p>Date de commande : {new Date(order.order.createdAt).toLocaleDateString()}</p>
-                                                        <p>Total : {order.order.totalPrice.toFixed(2)}€</p>
-                                                        {order.order.refundReason && (
+                                                    {orderView === "pending" && order.order.status !== "cancel_requested" && (
+                                                        <div className="tracking">
+                                                            {(() => {
+                                                                const isReturn = order.order.status.startsWith("return_");
+                                                                const steps = isReturn ? RETURN_TRACKING_STEPS : TRACKING_STEPS;
+                                                                return steps.map((step, index) => {
+                                                                    const currentStep = getTrackingStep(order);
+                                                                    const isActive = index + 1 <= currentStep;
+                                                                    const isConnectorActive = index + 1 <= currentStep;
+                                                                    return (
+                                                                        <React.Fragment key={index}>
+                                                                            <div className={`step ${isActive ? "active" : ""}`}>
+                                                                                <div className="icon">{step.icon}</div>
+                                                                                <p className="label">{step.label}</p>
+                                                                            </div>
+                                                                            {index < steps.length - 1 && (
+                                                                                <div className={`connector ${isConnectorActive ? "active" : ""} ${index + 1 === currentStep ? "next" : ""}`}></div>
+                                                                            )}
+                                                                        </React.Fragment>
+                                                                    );
+                                                                });
+                                                            })()}
+                                                        </div>
+                                                    )}
+                                                    <div className="info-row">
+                                                        <div className="info">
+                                                            <h3>Informations de commande</h3>
+                                                            <p>Date de commande : {new Date(order.order.createdAt).toLocaleDateString()}</p>
+                                                            <p>Total : {order.order.totalPrice.toFixed(2)}€</p>
+                                                            {order.order.refundReason && (
+                                                                <>
+                                                                    <p>Motif de remboursement : {REFUND_REASON_LABELS[order.order.refundReason!] || order.order.refundReason}</p>
+                                                                    <p>Date de remboursement : {new Date(order.order.cancelledAt || order.order.returnedAt || order.order.createdAt).toLocaleDateString()}</p>
+                                                                </>
+                                                            )}
+                                                            {order.order.cancelReason && (
+                                                                <>
+                                                                    <p>Raison d'annulation : {REFUND_REASON_LABELS[order.order.cancelReason!] || order.order.cancelReason}</p>
+                                                                    {order.order.cancelMessage && (
+                                                                        <p>Message : {order.order.cancelMessage}</p>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                            {!order.order.refundReason && order.shippingData && (
+                                                                <>
+                                                                    <p>Mode de livraison : {getShippingMethodName(order.shippingData.shippingMethod?.operator, order.shippingData.shippingMethod?.serviceCode)}</p>
+                                                                    <p>
+                                                                        N° de suivi : {order.shippingData.trackingNumber ? (
+                                                                            (() => {
+                                                                                const trackingUrl = getTrackingUrl(order.shippingData.trackingNumber, order.shippingData.shippingMethod?.operator);
+                                                                                return trackingUrl ? (
+                                                                                    <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--mainColor)', textDecoration: 'underline' }}>
+                                                                                        {order.shippingData.trackingNumber}
+                                                                                    </a>
+                                                                                ) : order.shippingData.trackingNumber;
+                                                                            })()
+                                                                        ) : "En attente"}
+                                                                    </p>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                        {order.shippingData && (
+
                                                             <>
-                                                                <p>Motif de remboursement : {REFUND_REASON_LABELS[order.order.refundReason!] || order.order.refundReason}</p>
-                                                                <p>Date de remboursement : {new Date(order.order.cancelledAt || order.order.returnedAt || order.order.createdAt).toLocaleDateString()}</p>
-                                                            </>
-                                                        )}
-                                                        {order.order.cancelReason && (
-                                                            <>
-                                                                <p>Raison d'annulation : {REFUND_REASON_LABELS[order.order.cancelReason!] || order.order.cancelReason}</p>
-                                                                {order.order.cancelMessage && (
-                                                                    <p>Message : {order.order.cancelMessage}</p>
+                                                                {order.shippingData.shippingMethod?.relayPoint ? (() => {
+                                                                    const tc = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+                                                                    return (
+                                                                        <div className="info">
+                                                                            <h3>Point relais</h3>
+                                                                            <p>{tc(order.shippingData.shippingMethod.relayPoint.name)}</p>
+                                                                            <p>{tc(order.shippingData.shippingMethod.relayPoint.address)}</p>
+                                                                            <p>{order.shippingData.shippingMethod.relayPoint.zipcode} {tc(order.shippingData.shippingMethod.relayPoint.city)}</p>
+                                                                        </div>
+                                                                    );
+                                                                })() : (
+                                                                    <div className="info">
+                                                                        <h3>Livraison</h3>
+                                                                        <p>{order.shippingData.nom || ''} {order.shippingData.prenom || ''}</p>
+                                                                        <p>{order.shippingData.rue || ''}</p>
+                                                                        <p>{order.shippingData.codePostal || ''} {order.shippingData.ville || ''}</p>
+                                                                    </div>
+                                                                )}
+                                                                {order.billingData && order.billingData !== "same" && (
+                                                                    <div className="info">
+                                                                        <h3>Facturation</h3>
+                                                                        <p>{order.billingData.prenom || ''} {order.billingData.nom || ''}</p>
+                                                                        <p>{order.billingData.rue || ''}</p>
+                                                                        <p>{order.billingData.codePostal || ''} {order.billingData.ville || ''}</p>
+                                                                    </div>
                                                                 )}
                                                             </>
                                                         )}
-                                                        {!order.order.refundReason && order.shippingData && (
-                                                            <>
-                                                                <p>Mode de livraison : {getShippingMethodName(order.shippingData.shippingMethod?.operator, order.shippingData.shippingMethod?.serviceCode)}</p>
-                                                                <p>
-                                                                    N° de suivi : {order.shippingData.trackingNumber ? (
-                                                                        (() => {
-                                                                            const trackingUrl = getTrackingUrl(order.shippingData.trackingNumber, order.shippingData.shippingMethod?.operator);
-                                                                            return trackingUrl ? (
-                                                                                <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--mainColor)', textDecoration: 'underline' }}>
-                                                                                    {order.shippingData.trackingNumber}
-                                                                                </a>
-                                                                            ) : order.shippingData.trackingNumber;
-                                                                        })()
-                                                                    ) : "En attente"}
-                                                                </p>
-                                                            </>
-                                                        )}
                                                     </div>
-                                                    {order.shippingData && (
-                                                        <div className="shipping-container">
-                                                            {order.shippingData.shippingMethod?.relayPoint ? (() => {
-                                                                const tc = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-                                                                return (
-                                                                <div className="info">
-                                                                    <h3>Point relais</h3>
-                                                                    <p>{tc(order.shippingData.shippingMethod.relayPoint.name)}</p>
-                                                                    <p>{tc(order.shippingData.shippingMethod.relayPoint.address)}</p>
-                                                                    <p>{order.shippingData.shippingMethod.relayPoint.zipcode} {tc(order.shippingData.shippingMethod.relayPoint.city)}</p>
-                                                                </div>);
-                                                            })() : (
-                                                                <div className="info">
-                                                                    <h3>Livraison</h3>
-                                                                    <p>{order.shippingData.nom || ''} {order.shippingData.prenom || ''}</p>
-                                                                    <p>{order.shippingData.rue || ''}</p>
-                                                                    <p>{order.shippingData.codePostal || ''} {order.shippingData.ville || ''}</p>
-                                                                </div>
-                                                            )}
-                                                            {order.billingData && order.billingData !== "same" && (
-                                                                <div className="info">
-                                                                    <h3>Facturation</h3>
-                                                                    <p>{order.billingData.prenom || ''} {order.billingData.nom || ''}</p>
-                                                                    <p>{order.billingData.rue || ''}</p>
-                                                                    <p>{order.billingData.codePostal || ''} {order.billingData.ville || ''}</p>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
                                                     <div className="actions">
                                                         {order.order.status !== "cancel_requested" && (
                                                             <button className="invoice" onClick={() => window.open(`/api/invoice?orderId=${order._id}`, '_blank')}>Facture</button>
@@ -343,7 +348,7 @@ export default function OrderPage() {
                                                                 )}
                                                             </>
                                                         )}
-                                                        {orderView === "history" && order.order.status === "delivered" && order.order.deliveredAt && (
+                                                        {orderView === "history" && order.order.status === "delivered" && order.order.deliveredAt && !order.order.returnRejected && (
                                                             (() => {
                                                                 const deliveredDate = new Date(order.order.deliveredAt);
                                                                 const now = new Date();

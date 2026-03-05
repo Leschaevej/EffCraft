@@ -68,7 +68,7 @@ export async function POST(req: Request) {
         await ordersCollection.updateOne(
             { _id: new ObjectId(orderId) },
             {
-                $set: { "order.status": "delivered" },
+                $set: { "order.status": "delivered", "order.returnRejected": true },
                 $unset: {
                     "order.returnReason": "",
                     "order.returnMessage": "",

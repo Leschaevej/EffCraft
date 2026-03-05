@@ -609,71 +609,72 @@ export default function Backoffice() {
                                         <div className="details">
                                             <div className="content">
                                                 <div className="infos">
-                                                    <div className="info">
-                                                        <h3>Informations de commande</h3>
-                                                        <p>Email : {order.userEmail}</p>
-                                                        <p>Date de commande : {new Date(order.order.createdAt).toLocaleDateString()} à {new Date(order.order.createdAt).toLocaleTimeString()}</p>
-                                                        <p>Total : {order.order.totalPrice.toFixed(2)}€</p>
-                                                        {order.order.cancelReason && (
-                                                            <>
-                                                                <p>Raison d'annulation : {REFUND_REASON_LABELS[order.order.cancelReason!] || order.order.cancelReason}</p>
-                                                                {order.order.cancelMessage && (
-                                                                    <p>Message du client : {order.order.cancelMessage}</p>
-                                                                )}
-                                                            </>
-                                                        )}
-                                                        {order.order.refundReason && (
-                                                            <>
-                                                                <p>Motif de remboursement : {REFUND_REASON_LABELS[order.order.refundReason!] || order.order.refundReason}</p>
-                                                                <p>Date de remboursement : {new Date(order.order.cancelledAt || order.order.returnedAt || order.order.createdAt).toLocaleDateString()} à {new Date(order.order.cancelledAt || order.order.returnedAt || order.order.createdAt).toLocaleTimeString()}</p>
-                                                            </>
-                                                        )}
-                                                        {!order.order.refundReason && order.shippingData && (
-                                                            <>
-                                                                <p>Mode de livraison : {getShippingMethodName(order.shippingData.shippingMethod?.operator, order.shippingData.shippingMethod?.serviceCode)}</p>
-                                                                <p>
-                                                                    N° de suivi : {order.shippingData.trackingNumber ? (
-                                                                        (() => {
-                                                                            const trackingUrl = getTrackingUrl(order.shippingData.trackingNumber, order.shippingData.shippingMethod?.operator);
-                                                                            return trackingUrl ? (
-                                                                                <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--mainColor)', textDecoration: 'underline' }}>
-                                                                                    {order.shippingData.trackingNumber}
-                                                                                </a>
-                                                                            ) : order.shippingData.trackingNumber;
-                                                                        })()
-                                                                    ) : "En attente"}
-                                                                </p>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                    {order.shippingData && (
-                                                        <div className="shipping-container">
+                                                    <div className="info-row">
+                                                        <div className="info">
+                                                            <h3>Informations de commande</h3>
+                                                            <p>Email : {order.userEmail}</p>
+                                                            <p>Date : {new Date(order.order.createdAt).toLocaleDateString()} à {new Date(order.order.createdAt).toLocaleTimeString()}</p>
+                                                            <p>Total : {order.order.totalPrice.toFixed(2)}€</p>
+                                                            {order.order.cancelReason && (
+                                                                <>
+                                                                    <p>Raison d'annulation : {REFUND_REASON_LABELS[order.order.cancelReason!] || order.order.cancelReason}</p>
+                                                                    {order.order.cancelMessage && (
+                                                                        <p>Message : {order.order.cancelMessage}</p>
+                                                                    )}
+                                                                </>
+                                                            )}
+                                                            {order.order.refundReason && (
+                                                                <>
+                                                                    <p>Motif remboursement : {REFUND_REASON_LABELS[order.order.refundReason!] || order.order.refundReason}</p>
+                                                                    <p>Date remboursement : {new Date(order.order.cancelledAt || order.order.returnedAt || order.order.createdAt).toLocaleDateString()}</p>
+                                                                </>
+                                                            )}
+                                                            {!order.order.refundReason && order.shippingData && (
+                                                                <>
+                                                                    <p>Livraison : {getShippingMethodName(order.shippingData.shippingMethod?.operator, order.shippingData.shippingMethod?.serviceCode)}</p>
+                                                                    <p>
+                                                                        N° suivi : {order.shippingData.trackingNumber ? (
+                                                                            (() => {
+                                                                                const trackingUrl = getTrackingUrl(order.shippingData.trackingNumber, order.shippingData.shippingMethod?.operator);
+                                                                                return trackingUrl ? (
+                                                                                    <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--mainColor)', textDecoration: 'underline' }}>
+                                                                                        {order.shippingData.trackingNumber}
+                                                                                    </a>
+                                                                                ) : order.shippingData.trackingNumber;
+                                                                            })()
+                                                                        ) : "En attente"}
+                                                                    </p>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                        {order.shippingData && (
                                                             <div className="info">
                                                                 <h3>Livraison</h3>
                                                                 <p>{order.shippingData.nom || ''} {order.shippingData.prenom || ''}</p>
                                                                 <p>{order.shippingData.rue || ''}</p>
                                                                 <p>{order.shippingData.codePostal || ''} {order.shippingData.ville || ''}</p>
+                                                                {order.shippingData.shippingMethod?.relayPoint && (() => {
+                                                                    const tc = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+                                                                    return (
+                                                                        <>
+                                                                            <p style={{ marginTop: 10, fontWeight: 600 }}>Point relais</p>
+                                                                            <p>{tc(order.shippingData.shippingMethod.relayPoint.name)}</p>
+                                                                            <p>{tc(order.shippingData.shippingMethod.relayPoint.address)}</p>
+                                                                            <p>{order.shippingData.shippingMethod.relayPoint.zipcode} {tc(order.shippingData.shippingMethod.relayPoint.city)}</p>
+                                                                        </>
+                                                                    );
+                                                                })()}
                                                             </div>
-                                                            {order.shippingData.shippingMethod?.relayPoint && (() => {
-                                                                const tc = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-                                                                return (
-                                                                <div className="info">
-                                                                    <h3>Point relais</h3>
-                                                                    <p>{tc(order.shippingData.shippingMethod.relayPoint.name)}</p>
-                                                                    <p>{tc(order.shippingData.shippingMethod.relayPoint.address)}</p>
-                                                                    <p>{order.shippingData.shippingMethod.relayPoint.zipcode} {tc(order.shippingData.shippingMethod.relayPoint.city)}</p>
-                                                                </div>);
-                                                            })()}
-                                                            {order.billingData && order.billingData !== "same" && (
-                                                                <div className="info">
-                                                                    <h3>Facturation</h3>
-                                                                    <p>{order.billingData.prenom || ''} {order.billingData.nom || ''}</p>
-                                                                    <p>{order.billingData.rue || ''}</p>
-                                                                    <p>{order.billingData.codePostal || ''} {order.billingData.ville || ''}</p>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    )}
+                                                        )}
+                                                        {order.billingData && order.billingData !== "same" && (
+                                                            <div className="info">
+                                                                <h3>Facturation</h3>
+                                                                <p>{order.billingData.prenom || ''} {order.billingData.nom || ''}</p>
+                                                                <p>{order.billingData.rue || ''}</p>
+                                                                <p>{order.billingData.codePostal || ''} {order.billingData.ville || ''}</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                     <div className="actions">
                                                         {order.order.status !== "cancel_requested" && (
                                                             <button className="invoice" onClick={() => window.open(`/api/invoice?orderId=${order._id}`, '_blank')}>Facture</button>
