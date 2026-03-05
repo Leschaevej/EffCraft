@@ -3,7 +3,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 import clientPromise from "../../lib/mongodb";
 import { ObjectId } from "mongodb";
-import { generateInvoicePdf } from "../../lib/generate-invoice";
+import { generateInvoicePdf, generateCreditNotePdf } from "../../lib/generate-invoice";
+
+const CREDIT_NOTE_STATUSES = ["cancelled", "returned", "return_delivered"];
 
 export async function GET(req: NextRequest) {
     try {
@@ -28,6 +30,19 @@ export async function GET(req: NextRequest) {
         if (session.user.role !== "admin" && order.order?.status === "cancel_requested") {
             return NextResponse.json({ error: "Facture indisponible pendant la demande d'annulation" }, { status: 403 });
         }
+
+        if (CREDIT_NOTE_STATUSES.includes(order.order?.status)) {
+            const refundAmount = order.order?.refundAmount;
+            const { buffer, creditNoteNumber } = await generateCreditNotePdf(order, orderId, refundAmount);
+            return new NextResponse(new Uint8Array(buffer), {
+                status: 200,
+                headers: {
+                    "Content-Type": "application/pdf",
+                    "Content-Disposition": `inline; filename="avoir-${creditNoteNumber}.pdf"`,
+                },
+            });
+        }
+
         const { buffer, invoiceNumber } = await generateInvoicePdf(order, orderId);
         return new NextResponse(new Uint8Array(buffer), {
             status: 200,
@@ -37,9 +52,9 @@ export async function GET(req: NextRequest) {
             },
         });
     } catch (error: any) {
-        console.error("Erreur génération facture:", error);
+        console.error("Erreur génération document:", error);
         return NextResponse.json(
-            { error: error.message || "Erreur lors de la génération de la facture" },
+            { error: error.message || "Erreur lors de la génération du document" },
             { status: 500 }
         );
     }

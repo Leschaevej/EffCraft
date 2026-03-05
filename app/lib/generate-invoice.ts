@@ -180,7 +180,7 @@ export async function generateInvoicePdf(order: any, orderId: string): Promise<{
 
     // Livraison
     doc.setTextColor(...COLORS.gray);
-    doc.text(`Livraison (${shippingName})`, summaryLabelX, y);
+    doc.text("Livraison", summaryLabelX, y);
     doc.setTextColor(...COLORS.dark);
     doc.text(`${shippingCost.toFixed(2)} €`, summaryValueX, y, { align: "right" });
     y += summaryRowH;
@@ -383,6 +383,11 @@ export async function generateCreditNotePdf(order: any, orderId: string, refundA
 
     const productsTotal = order.products.reduce((sum: number, p: any) => sum + p.price, 0);
 
+    const shippingMethod = order.order?.shippingMethod || order.shippingData?.shippingMethod;
+    const shippingCode = `${shippingMethod?.operator || "MONR"}-${shippingMethod?.serviceCode || "CpourToi"}`;
+    const shippingCost = FIXED_PRICES[shippingCode] || 5.90;
+    const shippingName = SHIPPING_NAMES[shippingMethod?.operator] || "Mondial Relay";
+
     // Sous-total
     doc.setFontSize(9);
     doc.setFont("helvetica", "normal");
@@ -390,6 +395,13 @@ export async function generateCreditNotePdf(order: any, orderId: string, refundA
     doc.text("Sous-total", summaryLabelX, y);
     doc.setTextColor(...COLORS.dark);
     doc.text(`-${productsTotal.toFixed(2)} €`, summaryValueX, y, { align: "right" });
+    y += summaryRowH;
+
+    // Livraison
+    doc.setTextColor(...COLORS.gray);
+    doc.text("Livraison", summaryLabelX, y);
+    doc.setTextColor(...COLORS.dark);
+    doc.text(`-${shippingCost.toFixed(2)} €`, summaryValueX, y, { align: "right" });
     y += summaryRowH;
 
     // TVA
@@ -412,11 +424,13 @@ export async function generateCreditNotePdf(order: any, orderId: string, refundA
     doc.text(`-${totalRefund.toFixed(2)} €`, summaryValueX, y + 5, { align: "right" });
 
     // ===== INFOS PAIEMENT (bas gauche) =====
-    const paymentStartY = y - (summaryRowH * 2 + 2) + 0;
+    const paymentStartY = y - (summaryRowH * 3 + 2);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8.5);
     doc.setTextColor(...COLORS.gray);
     doc.text("Remboursement : Carte bancaire (Stripe)", margin, paymentStartY);
+    doc.text(`Livraison : ${shippingName}`, margin, paymentStartY + 5);
+
 
     // ===== MESSAGE =====
     y += 20;

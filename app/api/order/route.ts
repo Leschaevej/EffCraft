@@ -116,22 +116,38 @@ export async function PATCH(req: NextRequest) {
                     );
                 }
                 const productsCollection = db.collection("products");
+                const isClientCancelRequest = order.order?.status === "cancel_requested";
                 if (order.products && order.products.length > 0) {
-                    for (const product of order.products) {
-                        const restoredProduct = {
-                            name: product.name,
-                            price: product.price,
-                            description: product.description,
-                            category: product.category,
-                            images: product.images || [],
-                            status: "available",
-                            createdAt: new Date(),
-                        };
-                        const insertResult = await productsCollection.insertOne(restoredProduct);
-                        await notifyClients({
-                            type: "product_created",
-                            data: { productId: insertResult.insertedId.toString() }
-                        });
+                    if (isClientCancelRequest) {
+                        // Demande client → on remet le produit en ligne
+                        for (const product of order.products) {
+                            const restoredProduct = {
+                                name: product.name,
+                                price: product.price,
+                                description: product.description,
+                                category: product.category,
+                                images: product.images || [],
+                                status: "available",
+                                createdAt: new Date(),
+                            };
+                            const insertResult = await productsCollection.insertOne(restoredProduct);
+                            await notifyClients({
+                                type: "product_created",
+                                data: { productId: insertResult.insertedId.toString() }
+                            });
+                        }
+                    } else {
+                        // Annulation admin → on supprime toutes les images sauf la 1ère (gardée pour l'historique)
+                        for (const product of order.products) {
+                            for (const imageUrl of (product.images || []).slice(1)) {
+                                try {
+                                    const matches = imageUrl.match(/effcraft\/products\/[^.]+/);
+                                    if (matches) await cloudinary.uploader.destroy(matches[0]);
+                                } catch (e) {
+                                    console.error("Erreur suppression image Cloudinary:", e);
+                                }
+                            }
+                        }
                     }
                 }
                 const cancelSlimProducts = order.products.map((p: any) => ({
@@ -146,6 +162,7 @@ export async function PATCH(req: NextRequest) {
                             "order.status": "cancelled",
                             "order.cancelledAt": new Date(),
                             "order.refundReason": order.order?.cancelReason || "cancelled",
+                            "order.shippingMethod": order.shippingData?.shippingMethod || null,
                             products: cancelSlimProducts
                         },
                         $unset: {
@@ -309,6 +326,7 @@ export async function PATCH(req: NextRequest) {
                             "order.status": "returned",
                             "order.returnedAt": new Date(),
                             "order.refundReason": refundReason,
+                            "order.shippingMethod": refundOrder.shippingData?.shippingMethod || null,
                             products: returnSlimProducts
                         },
                         $unset: {
@@ -454,6 +472,7 @@ export async function POST(req: NextRequest) {
             description: p.description,
             category: p.category,
             images: p.images || [],
+            cloudinaryFolder: p.cloudinaryFolder,
         }));
         const totalPrice = totalAmount;
         await productsCollection.deleteMany({
