@@ -193,6 +193,7 @@ export async function POST(req: NextRequest) {
             delete updateData["shippingData.boxtalStatus"];
             delete updateData["shippingData.boxtalLastUpdate"];
             delete updateData["shippingData.trackingNumber"];
+            updateData["order.boxtalShipmentId"] = order.shippingData?.boxtalShipmentId;
             updateQuery.$unset = {
                 shippingData: "",
                 billingData: ""

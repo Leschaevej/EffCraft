@@ -74,20 +74,20 @@ export async function POST(req: Request) {
                 fromAddress: {
                     type: "RESIDENTIAL",
                     contact: {
-                        firstName: order.shippingData?.prenom,
-                        lastName: order.shippingData?.nom,
+                        firstName: order.returnInfo?.prenom || order.shippingData?.prenom,
+                        lastName: order.returnInfo?.nom || order.shippingData?.nom,
                         email: order.userEmail,
-                        phone: order.shippingData?.telephone?.replace(/\+/g, "")
+                        phone: (order.returnInfo?.telephone || order.shippingData?.telephone)?.replace(/\+/g, "")
                     },
-                    location: order.shippingData?.shippingMethod?.relayPoint ? {
-                        street: order.shippingData.shippingMethod.relayPoint.address,
-                        city: order.shippingData.shippingMethod.relayPoint.city,
-                        postalCode: order.shippingData.shippingMethod.relayPoint.zipcode,
+                    location: (order.returnInfo?.shippingMethod || order.shippingData?.shippingMethod)?.relayPoint ? {
+                        street: (order.returnInfo?.shippingMethod || order.shippingData?.shippingMethod).relayPoint.address,
+                        city: (order.returnInfo?.shippingMethod || order.shippingData?.shippingMethod).relayPoint.city,
+                        postalCode: (order.returnInfo?.shippingMethod || order.shippingData?.shippingMethod).relayPoint.zipcode,
                         countryIsoCode: "FR"
                     } : {
-                        street: order.shippingData?.rue,
-                        city: order.shippingData?.ville,
-                        postalCode: order.shippingData?.codePostal,
+                        street: order.returnInfo?.rue || order.shippingData?.rue,
+                        city: order.returnInfo?.ville || order.shippingData?.ville,
+                        postalCode: order.returnInfo?.codePostal || order.shippingData?.codePostal,
                         countryIsoCode: "FR"
                     }
                 },
@@ -109,11 +109,11 @@ export async function POST(req: Request) {
                     }
                 },
                 service: {
-                    operator: order.shippingData?.shippingMethod?.operator || "MONR",
-                    code: order.shippingData?.shippingMethod?.serviceCode || "CpourToi"
+                    operator: (order.returnInfo?.shippingMethod || order.shippingData?.shippingMethod)?.operator || "MONR",
+                    code: (order.returnInfo?.shippingMethod || order.shippingData?.shippingMethod)?.serviceCode || "CpourToi"
                 }
             },
-            shippingOfferCode: `${order.shippingData?.shippingMethod?.operator || "MONR"}-${order.shippingData?.shippingMethod?.serviceCode || "CpourToi"}`
+            shippingOfferCode: `${(order.returnInfo?.shippingMethod || order.shippingData?.shippingMethod)?.operator || "MONR"}-${(order.returnInfo?.shippingMethod || order.shippingData?.shippingMethod)?.serviceCode || "CpourToi"}`
         };
 
         const createReturnResponse = await fetch(`${apiUrl}/shipping/v3.1/shipping-order`, {

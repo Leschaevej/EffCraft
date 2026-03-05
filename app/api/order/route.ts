@@ -314,6 +314,14 @@ export async function PATCH(req: NextRequest) {
                         { status: 500 }
                     );
                 }
+                for (const photoUrl of (refundOrder.order?.returnPhotos || [])) {
+                    try {
+                        const matches = photoUrl.match(/effcraft\/returns\/[^.]+/);
+                        if (matches) await cloudinary.uploader.destroy(matches[0]);
+                    } catch (e) {
+                        console.error("Erreur suppression photo retour Cloudinary:", e);
+                    }
+                }
                 const returnSlimProducts = refundOrder.products.map((p: any) => ({
                     name: p.name,
                     price: p.price,
