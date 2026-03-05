@@ -170,8 +170,7 @@ export async function PATCH(req: NextRequest) {
                             "order.cancelReason": "",
                             "order.cancelMessage": "",
                             "order.cancelRequestedAt": "",
-                            "order.previousStatus": "",
-                            "order.preparingAt": ""
+                            "order.previousStatus": ""
                         }
                     }
                 );

@@ -119,7 +119,6 @@ export async function POST(req: Request) {
                     "order.cancelMessage": "",
                     "order.cancelRequestedAt": "",
                     "order.previousStatus": "",
-                    "order.preparingAt": "",
                 }
             }
         );

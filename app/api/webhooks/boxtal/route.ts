@@ -114,7 +114,6 @@ export async function POST(req: NextRequest) {
         }
         const updateData: any = {};
         updateData["shippingData.boxtalStatus"] = status;
-        updateData["shippingData.boxtalLastUpdate"] = new Date();
         const isReturn = order.order.status === "return_requested" || order.order.status?.startsWith("return_");
         if (isReturn) {
             console.log(`🔄 Retour : statut actuel ${order.order.status}, nouveau statut Boxtal: ${status}`);
@@ -136,7 +135,6 @@ export async function POST(req: NextRequest) {
             if (status === "ANNOUNCED" || status === "PENDING" || status === "READY_TO_SHIP" || status === "AT_PICKUP_LOCATION" || status === "PICKED_UP") {
                 if (order.order.status === "paid") {
                     updateData["order.status"] = "preparing";
-                    updateData["order.preparingAt"] = new Date();
                 }
                 if (trackingNumber) {
                     updateData["shippingData.trackingNumber"] = trackingNumber;
@@ -209,7 +207,6 @@ export async function POST(req: NextRequest) {
             updateQuery.$unset = {
                 "shippingData.boxtalShipmentId": "",
                 "shippingData.boxtalStatus": "",
-                "shippingData.boxtalLastUpdate": "",
                 "shippingData.trackingNumber": "",
                 billingData: ""
             };

@@ -630,8 +630,7 @@ async function getShippingLabel(req: NextRequest) {
                 { _id: new ObjectId(orderId) },
                 {
                     $set: {
-                        "order.status": "preparing",
-                        "order.preparingAt": new Date()
+                        "order.status": "preparing"
                     }
                 }
             );

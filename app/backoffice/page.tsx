@@ -38,7 +38,6 @@ interface Order {
         refundReason?: string;
         cancelledAt?: Date;
         returnedAt?: Date;
-        preparingAt?: Date;
         readyAt?: Date;
         cancelReason?: string;
         cancelMessage?: string;
