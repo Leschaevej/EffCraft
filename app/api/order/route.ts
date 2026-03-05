@@ -162,7 +162,6 @@ export async function PATCH(req: NextRequest) {
                             "order.status": "cancelled",
                             "order.cancelledAt": new Date(),
                             "order.refundReason": order.order?.cancelReason || "cancelled",
-                            "order.shippingMethod": order.shippingData?.shippingMethod || null,
                             products: cancelSlimProducts
                         },
                         $unset: {
@@ -171,7 +170,8 @@ export async function PATCH(req: NextRequest) {
                             "order.cancelReason": "",
                             "order.cancelMessage": "",
                             "order.cancelRequestedAt": "",
-                            "order.previousStatus": ""
+                            "order.previousStatus": "",
+                            "order.preparingAt": ""
                         }
                     }
                 );

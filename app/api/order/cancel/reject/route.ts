@@ -5,6 +5,7 @@ import clientPromise from "../../../../lib/mongodb";
 import nodemailer from "nodemailer";
 import { ObjectId } from "mongodb";
 import { notifyClients } from "../../../../lib/pusher-server";
+import cloudinary from "../../../../lib/cloudinary";
 
 export async function POST(req: Request) {
     try {
@@ -82,17 +83,43 @@ export async function POST(req: Request) {
             `,
         });
 
+        // Nettoyage produits : supprimer images supplémentaires Cloudinary + réduire products
+        const slimProducts = [];
+        if (order.products && order.products.length > 0) {
+            for (const product of order.products) {
+                if (product.images && product.images.length > 1) {
+                    for (const imageUrl of product.images.slice(1)) {
+                        try {
+                            const match = imageUrl.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
+                            if (match && match[1]) {
+                                await cloudinary.uploader.destroy(match[1]);
+                            }
+                        } catch (e) {
+                            console.error("Erreur suppression image Cloudinary:", e);
+                        }
+                    }
+                }
+                slimProducts.push({
+                    name: product.name,
+                    price: product.price,
+                    image: product.images?.[0] || product.image || "",
+                });
+            }
+        }
+
         await ordersCollection.updateOne(
             { _id: new ObjectId(orderId) },
             {
                 $set: {
                     "order.status": "in_transit",
+                    ...(slimProducts.length > 0 && { products: slimProducts }),
                 },
                 $unset: {
                     "order.cancelReason": "",
                     "order.cancelMessage": "",
                     "order.cancelRequestedAt": "",
                     "order.previousStatus": "",
+                    "order.preparingAt": "",
                 }
             }
         );
