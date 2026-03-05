@@ -113,7 +113,6 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ success: true, message: "Commande introuvable" });
         }
         const updateData: any = {};
-        updateData["shippingData.boxtalStatus"] = status;
         const isReturn = order.order.status === "return_requested" || order.order.status?.startsWith("return_");
         if (isReturn) {
             console.log(`🔄 Retour : statut actuel ${order.order.status}, nouveau statut Boxtal: ${status}`);
@@ -192,6 +191,9 @@ export async function POST(req: NextRequest) {
             }
         }
         const updateQuery: any = { $set: updateData };
+        if (updateData["order.status"] !== "delivered") {
+            updateData["shippingData.boxtalStatus"] = status;
+        }
         if (updateData["order.status"] === "delivered") {
             // Garder uniquement les infos nécessaires pour un éventuel retour
             updateData["order.boxtalShipmentId"] = order.shippingData?.boxtalShipmentId;
