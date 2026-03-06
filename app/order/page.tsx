@@ -1,12 +1,43 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { nothingYouCouldDo } from "../font";
 import { FaCheck, FaBoxOpen, FaTruck, FaHome, FaHourglassHalf } from "react-icons/fa";
 import "./page.scss";
 import { useUserOrders } from "../hooks/useOrders";
+
+const DOT_SIZE = 8;
+const DOT_GAP = 8;
+
+function Connector({ active, next }: { active: boolean; next: boolean }) {
+    const ref = useRef<HTMLDivElement>(null);
+    const [count, setCount] = useState(0);
+    useEffect(() => {
+        const update = () => {
+            if (ref.current) {
+                const w = ref.current.offsetWidth;
+                setCount(Math.floor(w / (DOT_SIZE + DOT_GAP)));
+            }
+        };
+        update();
+        const obs = new ResizeObserver(update);
+        if (ref.current) obs.observe(ref.current);
+        return () => obs.disconnect();
+    }, []);
+    return (
+        <div ref={ref} className="connector">
+            {Array.from({ length: count }).map((_, i) => (
+                <span
+                    key={i}
+                    className={`dot ${active ? "active" : ""} ${next ? "next" : ""}`}
+                    style={next ? { animationDelay: `${(i / count) * 2}s` } : undefined}
+                />
+            ))}
+        </div>
+    );
+}
 interface Product {
     _id?: string;
     name: string;
@@ -252,7 +283,7 @@ export default function OrderPage() {
                                                                                 <p className="label">{step.label}</p>
                                                                             </div>
                                                                             {index < steps.length - 1 && (
-                                                                                <div className={`connector ${isConnectorActive ? "active" : ""} ${index + 1 === currentStep ? "next" : ""}`}></div>
+                                                                                <Connector active={isConnectorActive} next={index + 1 === currentStep} />
                                                                             )}
                                                                         </React.Fragment>
                                                                     );
