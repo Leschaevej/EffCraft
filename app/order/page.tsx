@@ -517,7 +517,6 @@ export default function OrderPage() {
                         });
                         if (res.ok) {
                             setReturnStatus("sent");
-                            mutate();
                         } else {
                             setReturnStatus("error");
                         }
@@ -526,14 +525,14 @@ export default function OrderPage() {
                     }
                 };
                 return (
-                    <div className="cancel-modal" onClick={() => returnStatus !== "sending" && setReturnOrderId(null)}>
+                    <div className="cancel-modal" onClick={() => { if (returnStatus !== "sending") { setReturnOrderId(null); setReturnStatus("idle"); } }}>
                         <div className="cancel-modal-content" onClick={(e) => e.stopPropagation()}>
                             {returnStatus === "sent" ? (
                                 <>
                                     <h3>Demande envoyée</h3>
                                     <p>Votre demande de retour a bien été transmise. Nous reviendrons vers vous rapidement.</p>
                                     <div className="cancel-modal-actions">
-                                        <button className="back" onClick={() => setReturnOrderId(null)}>Fermer</button>
+                                        <button className="back" onClick={() => { setReturnOrderId(null); setReturnStatus("idle"); }}>Fermer</button>
                                     </div>
                                 </>
                             ) : (
@@ -576,7 +575,7 @@ export default function OrderPage() {
                                         <p className="cancel-modal-error">Une erreur est survenue. Veuillez réessayer.</p>
                                     )}
                                     <div className="cancel-modal-actions">
-                                        <button className="back" onClick={() => setReturnOrderId(null)} disabled={returnStatus === "sending"}>Retour</button>
+                                        <button className="back" onClick={() => { setReturnOrderId(null); setReturnStatus("idle"); }} disabled={returnStatus === "sending"}>Retour</button>
                                         <button className="submit" onClick={handleReturnSubmit} disabled={!returnReason || returnStatus === "sending"}>
                                             {returnStatus === "sending" ? "Envoi en cours..." : "Envoyer la demande"}
                                         </button>

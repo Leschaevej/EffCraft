@@ -153,7 +153,7 @@ export default function AddForm({ onProductAdded }: AddFormProps) {
 
   return (
     <form className="addForm" onSubmit={handleSubmit} noValidate>
-      <div className="image">
+      <div className="imageDiv">
         <input
           type="file"
           accept="image/*"
@@ -162,6 +162,21 @@ export default function AddForm({ onProductAdded }: AddFormProps) {
           style={{ display: "none" }}
           onChange={handleImageChange}
         />
+        <div
+          className={`render ${errors.images ? "error" : ""}`}
+          onClick={handleBigRectClick}
+          role={!imageToCrop && imagesPreview.length < MAX_IMAGES ? "button" : undefined}
+          tabIndex={!imageToCrop && imagesPreview.length < MAX_IMAGES ? 0 : undefined}
+          aria-label="Ajouter une image"
+        >
+          {imageToCrop ? (
+            <Cropper src={imageToCrop} onCancel={handleCropCancel} onConfirm={handleCropConfirm} />
+          ) : imagesPreview.length >= MAX_IMAGES ? (
+            <span>Limite atteinte (4 images max)</span>
+          ) : (
+            <span>Cliquez ici pour ajouter une image</span>
+          )}
+        </div>
         <div className="verfication">
           {imagesPreview.length === 0 ? (
             <div className="placeholder" />
@@ -181,83 +196,70 @@ export default function AddForm({ onProductAdded }: AddFormProps) {
             ))
           )}
         </div>
-        <div
-          className={`render ${errors.images ? "error" : ""}`}
-          onClick={handleBigRectClick}
-          role={!imageToCrop && imagesPreview.length < MAX_IMAGES ? "button" : undefined}
-          tabIndex={!imageToCrop && imagesPreview.length < MAX_IMAGES ? 0 : undefined}
-          aria-label="Ajouter une image"
-        >
-          {imageToCrop ? (
-            <Cropper src={imageToCrop} onCancel={handleCropCancel} onConfirm={handleCropConfirm} />
-          ) : imagesPreview.length >= MAX_IMAGES ? (
-            <span>Limite atteinte (4 images max)</span>
-          ) : (
-            <span>Cliquez ici pour ajouter une image</span>
-          )}
-        </div>
       </div>
 
-      <div>
-        <input
-          type="text"
-          id="name"
-          name="name"
-          required
-          placeholder="Nom du produit"
-          autoComplete="off"
-          className={errors.name ? "error" : ""}
-          onChange={handleNameChange}
-        />
-      </div>
-
-      <div className="priceCategory">
-        <input
-          type="number"
-          id="price"
-          name="price"
-          required
-          min="0"
-          step="1"
-          placeholder="Prix (€)"
-          autoComplete="off"
-          className={errors.price ? "error" : ""}
-          onChange={handlePriceChange}
-        />
-        <div className={`select-wrapper ${errors.category ? "error" : ""}`}>
-          <Select
-            className="custom-select"
-            classNamePrefix="custom-select"
-            options={categoryOptions}
-            value={selectedCategory}
-            onChange={handleCategoryChange}
-            placeholder="Catégorie"
-            name="category"
-            inputId="category"
-            instanceId="category-select"
+      <div className="formDiv">
+        <div>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            required
+            placeholder="Nom du produit"
+            autoComplete="off"
+            className={errors.name ? "error" : ""}
+            onChange={handleNameChange}
           />
         </div>
-      </div>
 
-      <div>
-        <textarea
-          id="description"
-          name="description"
-          required
-          placeholder="Description"
-          autoComplete="off"
-          className={errors.description ? "error" : ""}
-          onChange={handleDescriptionChange}
-        />
-      </div>
+        <div className="priceCategory">
+          <input
+            type="number"
+            id="price"
+            name="price"
+            required
+            min="0"
+            step="1"
+            placeholder="Prix (€)"
+            autoComplete="off"
+            className={errors.price ? "error" : ""}
+            onChange={handlePriceChange}
+          />
+          <div className={`select-wrapper ${errors.category ? "error" : ""}`}>
+            <Select
+              className="custom-select"
+              classNamePrefix="custom-select"
+              options={categoryOptions}
+              value={selectedCategory}
+              onChange={handleCategoryChange}
+              placeholder="Catégorie"
+              name="category"
+              inputId="category"
+              instanceId="category-select"
+            />
+          </div>
+        </div>
 
-      <button className="send" type="submit" disabled={isSubmitting}>
-        {isSubmitting
-          ? "Envoi en cours..."
-          : submitSuccess
-          ? "Bijoux ajouté à la collection"
-          : "Ajouter"}
-      </button>
+        <div>
+          <textarea
+            id="description"
+            name="description"
+            required
+            placeholder="Description"
+            autoComplete="off"
+            className={errors.description ? "error" : ""}
+            onChange={handleDescriptionChange}
+          />
+        </div>
+
+        <button className="send" type="submit" disabled={isSubmitting}>
+          {isSubmitting
+            ? "Envoi en cours..."
+            : submitSuccess
+            ? "Bijoux ajouté à la collection"
+            : "Ajouter"}
+        </button>
+      </div>
     </form>
   );
 }

@@ -1,7 +1,7 @@
 .cropper-container {
     width: 100%;
     overflow: hidden;
-    border-radius: 50px;
+    border-radius: var(--productImageRadius);
     background-color: #999999;
     position: relative;
     cursor: grab;

@@ -1,39 +1,62 @@
 .addForm {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 30px;
-    .image {
+    align-items: stretch;
+    .imageDiv {
         display: flex;
-        justify-content: flex-end;
-        gap: 200px;
-        padding: 30px 0 0 0;
+        flex-direction: column;
+        gap: 15px;
+        flex-shrink: 0;
+        width: calc(200px * (4 / 5) * 2 + 15px);
+        .render {
+            width: 100%;
+            aspect-ratio: 4 / 5;
+            background-color: #999999;
+            border-radius: var(--productImageRadius);
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+            text-align: center;
+            user-select: none;
+            outline: none;
+            &.error {
+                box-shadow: 0 0 0 3px var(--errorColor);
+            }
+        }
         .verfication {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 30px;
-            flex: 1;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            .placeholder {
+                grid-column: 1 / -1;
+            }
             .validate {
                 position: relative;
-                width: 100%;
                 aspect-ratio: 4 / 5;
-                border-radius: 10%;
+                border-radius: var(--productImageRadius);
                 overflow: hidden;
                 img {
                     width: 100%;
                     height: 100%;
+                    object-fit: cover;
                 }
                 .remove {
                     position: absolute;
-                    top: 15px;
-                    right: 15px;
+                    top: 8px;
+                    right: 8px;
                     background-color: var(--errorColor);
                     border: none;
                     border-radius: 50%;
-                    width: 30px;
-                    height: 30px;
+                    width: 22px;
+                    height: 22px;
                     color: white;
-                    font-size: 24px;
-                    line-height: 24px;
+                    font-size: 18px;
+                    line-height: 18px;
                     cursor: pointer;
                     display: flex;
                     justify-content: center;
@@ -45,25 +68,12 @@
                 }
             }
         }
-        .render {
-            flex: 1;
-            aspect-ratio: 4 / 5;
-            background-color: #999999;
-            border-radius: 10%;
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            font-weight: bold;
-            font-size: 24px;
-            text-align: center;
-            user-select: none;
-            outline: none;
-            &.error {
-                box-shadow: 0 0 0 3px var(--errorColor);
-            }
-        }
+    }
+    .formDiv {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 30px;
     }
     input,
     textarea {
