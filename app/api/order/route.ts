@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
         const ordersCollection = db.collection("orders");
         let query: any;
         if (status === 'history') {
-            query = { "order.status": { $in: ['delivered', 'cancelled', 'returned', 'return_delivered'] } };
+            query = { "order.status": { $in: ['delivered', 'cancelled', 'returned', 'return_delivered', 'return_rejected'] } };
         } else if (status === 'pending') {
             query = { "order.status": { $in: ['paid', 'preparing', 'in_transit', 'cancel_requested', 'return_requested', 'return_preparing', 'return_in_transit'] } };
         } else {

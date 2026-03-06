@@ -5,6 +5,7 @@ import clientPromise from "../../../../lib/mongodb";
 import nodemailer from "nodemailer";
 import { ObjectId } from "mongodb";
 import { notifyClients } from "../../../../lib/pusher-server";
+import cloudinary from "../../../../lib/cloudinary";
 
 export async function POST(req: Request) {
     try {
@@ -65,14 +66,28 @@ export async function POST(req: Request) {
             `,
         });
 
+        if (order.order.returnPhotos?.length > 0) {
+            for (const photoUrl of order.order.returnPhotos) {
+                try {
+                    const match = photoUrl.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
+                    if (match && match[1]) {
+                        await cloudinary.uploader.destroy(match[1]);
+                    }
+                } catch (e) {
+                    console.error("Erreur suppression photo retour Cloudinary:", e);
+                }
+            }
+        }
+
         await ordersCollection.updateOne(
             { _id: new ObjectId(orderId) },
             {
-                $set: { "order.status": "delivered", "order.returnRejected": true },
+                $set: { "order.status": "return_rejected" },
                 $unset: {
-                    "order.returnReason": "",
-                    "order.returnMessage": "",
+                    "order.returnRejected": "",
                     "order.returnPhotos": "",
+                    "order.returnMessage": "",
+                    "order.returnReason": "",
                     "order.returnRequestedAt": "",
                 }
             }
@@ -80,7 +95,7 @@ export async function POST(req: Request) {
 
         await notifyClients({
             type: "order_status_updated",
-            data: { orderId, status: "delivered" }
+            data: { orderId, status: "return_rejected" }
         });
 
         return NextResponse.json({ message: "Demande de retour refusée, client notifié" });

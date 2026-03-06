@@ -66,7 +66,7 @@ interface Order {
         readyAt?: Date;
         cancelReason?: string;
         cancelMessage?: string;
-        returnRejected?: boolean;
+        boxtalReturnShipmentId?: string;
     };
 }
 const TRACKING_STEPS = [
@@ -76,7 +76,8 @@ const TRACKING_STEPS = [
     { label: "Livré", icon: <FaHome /> }
 ];
 const RETURN_TRACKING_STEPS = [
-    { label: "Retour demandé", icon: <FaCheck /> },
+    { label: "Confirmé", icon: <FaCheck /> },
+    { label: "En préparation", icon: <FaBoxOpen /> },
     { label: "Livraison", icon: <FaTruck /> },
     { label: "Livré", icon: <FaHome /> }
 ];
@@ -87,9 +88,9 @@ const STATUS_STEPS: { [key: string]: number } = {
     delivered: 4,
     cancel_requested: 1,
     return_requested: 1,
-    return_preparing: 1,
-    return_in_transit: 2,
-    return_delivered: 3
+    return_preparing: 2,
+    return_in_transit: 3,
+    return_delivered: 4
 };
 const STATUS_LABELS: { [key: string]: string } = {
     paid: "Confirmé",
@@ -98,11 +99,12 @@ const STATUS_LABELS: { [key: string]: string } = {
     delivered: "Livré",
     cancelled: "Remboursé",
     cancel_requested: "Demande en cours",
-    return_requested: "Retour demandé",
-    return_preparing: "Retour en préparation",
+    return_requested: "Confirmé",
+    return_preparing: "En préparation",
     return_in_transit: "Livraison",
     return_delivered: "Livré",
-    returned: "Remboursé"
+    returned: "Remboursé",
+    return_rejected: "Retour refusé"
 };
 const REFUND_REASON_LABELS: { [key: string]: string } = {
     error: "Erreur de commande",
@@ -149,6 +151,7 @@ export default function OrderPage() {
     const [cancelMessage, setCancelMessage] = useState("");
     const [cancelStatus, setCancelStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
     const [returnOrderId, setReturnOrderId] = useState<string | null>(null);
+    const [returnOrderSnapshot, setReturnOrderSnapshot] = useState<Order | null>(null);
     const [returnReason, setReturnReason] = useState("");
     const [returnMessage, setReturnMessage] = useState("");
     const [returnPhotos, setReturnPhotos] = useState<File[]>([]);
@@ -170,8 +173,9 @@ export default function OrderPage() {
                 const customEvent = event as CustomEvent;
                 if (customEvent.detail?.type === "order_status_updated" && customEvent.detail?.data) {
                     const { orderId, status } = customEvent.detail.data;
+
                     const pendingStatuses = ["paid", "preparing", "in_transit", "cancel_requested", "return_requested", "return_preparing", "return_in_transit"];
-                    const historyStatuses = ["delivered", "cancelled", "returned", "return_delivered"];
+                    const historyStatuses = ["delivered", "cancelled", "returned", "return_delivered", "return_requested", "return_preparing", "return_in_transit"];
                     const shouldBeInCurrentView = orderView === "pending"
                         ? pendingStatuses.includes(status)
                         : historyStatuses.includes(status);
@@ -206,6 +210,7 @@ export default function OrderPage() {
             cancel_requested: <FaHourglassHalf />,
             returned: <FaCheck />,
             return_requested: <FaCheck />,
+            return_preparing: <FaBoxOpen />,
             return_in_transit: <FaTruck />,
             return_delivered: <FaHome />
         };
@@ -313,23 +318,42 @@ export default function OrderPage() {
                                                             {!order.order.refundReason && order.shippingData && (
                                                                 <>
                                                                     <p>Mode de livraison : {getShippingMethodName(order.shippingData.shippingMethod?.operator, order.shippingData.shippingMethod?.serviceCode)}</p>
-                                                                    <p>
-                                                                        N° de suivi : {order.shippingData.trackingNumber ? (
-                                                                            (() => {
-                                                                                const trackingUrl = getTrackingUrl(order.shippingData.trackingNumber, order.shippingData.shippingMethod?.operator);
-                                                                                return trackingUrl ? (
-                                                                                    <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--mainColor)', textDecoration: 'underline' }}>
-                                                                                        {order.shippingData.trackingNumber}
-                                                                                    </a>
-                                                                                ) : order.shippingData.trackingNumber;
-                                                                            })()
-                                                                        ) : "En attente"}
-                                                                    </p>
+                                                                    {order.order.status.startsWith("return_") ? (
+                                                                        <p>
+                                                                            N° de suivi retour : {order.order.boxtalReturnShipmentId ? (
+                                                                                (() => {
+                                                                                    const trackingUrl = getTrackingUrl(order.order.boxtalReturnShipmentId, order.shippingData.shippingMethod?.operator);
+                                                                                    return trackingUrl ? (
+                                                                                        <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--mainColor)', textDecoration: 'underline' }}>
+                                                                                            {order.order.boxtalReturnShipmentId}
+                                                                                        </a>
+                                                                                    ) : order.order.boxtalReturnShipmentId;
+                                                                                })()
+                                                                            ) : "En attente"}
+                                                                        </p>
+                                                                    ) : (
+                                                                        <p>
+                                                                            N° de suivi : {order.shippingData.trackingNumber ? (
+                                                                                (() => {
+                                                                                    const trackingUrl = getTrackingUrl(order.shippingData.trackingNumber, order.shippingData.shippingMethod?.operator);
+                                                                                    return trackingUrl ? (
+                                                                                        <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--mainColor)', textDecoration: 'underline' }}>
+                                                                                            {order.shippingData.trackingNumber}
+                                                                                        </a>
+                                                                                    ) : order.shippingData.trackingNumber;
+                                                                                })()
+                                                                            ) : "En attente"}
+                                                                        </p>
+                                                                    )}
                                                                 </>
                                                             )}
                                                         </div>
-                                                        {order.shippingData && (
-
+                                                        {order.order.status.startsWith("return_") ? (
+                                                            <div className="info">
+                                                                <h3>Livraison</h3>
+                                                                <p>Atelier EffCraft</p>
+                                                            </div>
+                                                        ) : order.shippingData && (
                                                             <>
                                                                 {order.shippingData.shippingMethod?.relayPoint ? (() => {
                                                                     const tc = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
@@ -378,7 +402,7 @@ export default function OrderPage() {
                                                                 )}
                                                             </>
                                                         )}
-                                                        {orderView === "history" && order.order.status === "delivered" && order.order.deliveredAt && !order.order.returnRejected && (
+                                                        {orderView === "history" && order.order.status === "delivered" && order.order.deliveredAt && (
                                                             (() => {
                                                                 const deliveredDate = new Date(order.order.deliveredAt);
                                                                 const now = new Date();
@@ -387,6 +411,7 @@ export default function OrderPage() {
                                                                 return diffDays <= 14 ? (
                                                                     <button className="return" onClick={() => {
                                                                         setReturnOrderId(order._id);
+                                                                        setReturnOrderSnapshot(order);
                                                                         setReturnReason("");
                                                                         setReturnMessage("");
                                                                         setReturnPhotos([]);
@@ -500,7 +525,7 @@ export default function OrderPage() {
                 );
             })()}
             {returnOrderId && (() => {
-                const returnOrder = orders.find(o => o._id === returnOrderId);
+                const returnOrder = returnOrderSnapshot;
                 if (!returnOrder) return null;
                 const handleReturnSubmit = async () => {
                     if (!returnReason) return;
@@ -517,6 +542,11 @@ export default function OrderPage() {
                         });
                         if (res.ok) {
                             setReturnStatus("sent");
+                            setTimeout(() => {
+                                setReturnOrderId(null);
+                                setReturnOrderSnapshot(null);
+                                setReturnStatus("idle");
+                            }, 2000);
                         } else {
                             setReturnStatus("error");
                         }
@@ -525,15 +555,12 @@ export default function OrderPage() {
                     }
                 };
                 return (
-                    <div className="cancel-modal" onClick={() => { if (returnStatus !== "sending") { setReturnOrderId(null); setReturnStatus("idle"); } }}>
+                    <div className="cancel-modal" onClick={() => { if (returnStatus !== "sending") { setReturnOrderId(null); setReturnOrderSnapshot(null); setReturnStatus("idle"); } }}>
                         <div className="cancel-modal-content" onClick={(e) => e.stopPropagation()}>
                             {returnStatus === "sent" ? (
                                 <>
                                     <h3>Demande envoyée</h3>
                                     <p>Votre demande de retour a bien été transmise. Nous reviendrons vers vous rapidement.</p>
-                                    <div className="cancel-modal-actions">
-                                        <button className="back" onClick={() => { setReturnOrderId(null); setReturnStatus("idle"); }}>Fermer</button>
-                                    </div>
                                 </>
                             ) : (
                                 <>
@@ -575,7 +602,7 @@ export default function OrderPage() {
                                         <p className="cancel-modal-error">Une erreur est survenue. Veuillez réessayer.</p>
                                     )}
                                     <div className="cancel-modal-actions">
-                                        <button className="back" onClick={() => { setReturnOrderId(null); setReturnStatus("idle"); }} disabled={returnStatus === "sending"}>Retour</button>
+                                        <button className="back" onClick={() => { setReturnOrderId(null); setReturnOrderSnapshot(null); setReturnStatus("idle"); }} disabled={returnStatus === "sending"}>Retour</button>
                                         <button className="submit" onClick={handleReturnSubmit} disabled={!returnReason || returnStatus === "sending"}>
                                             {returnStatus === "sending" ? "Envoi en cours..." : "Envoyer la demande"}
                                         </button>
