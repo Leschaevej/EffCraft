@@ -153,7 +153,7 @@ export async function PATCH(req: NextRequest) {
                 const cancelSlimProducts = order.products.map((p: any) => ({
                     name: p.name,
                     price: p.price,
-                    image: p.images?.[0] || "",
+                    image: p.image || p.images?.[0] || "",
                 }));
                 await ordersCollection.updateOne(
                     { _id: new ObjectId(orderId) },
@@ -161,16 +161,17 @@ export async function PATCH(req: NextRequest) {
                         $set: {
                             "order.status": "cancelled",
                             "order.cancelledAt": new Date(),
-                            "order.refundReason": order.order?.cancelReason || "cancelled",
-                            products: cancelSlimProducts
+                            "order.cancelReason": isClientCancelRequest ? (order.order?.cancelReason || "client") : "admin",
+                            products: cancelSlimProducts,
                         },
                         $unset: {
                             shippingData: "",
                             billingData: "",
-                            "order.cancelReason": "",
+                            emailSubject: "",
+                            emailThreadId: "",
                             "order.cancelMessage": "",
-                            "order.cancelRequestedAt": "",
-                            "order.previousStatus": ""
+                            "order.refundReason": "",
+                            "order.paymentIntentId": ""
                         }
                     }
                 );
@@ -320,6 +321,11 @@ export async function PATCH(req: NextRequest) {
                         console.error("Erreur suppression photo retour Cloudinary:", e);
                     }
                 }
+                const returnSlimProducts = refundOrder.products.map((p: any) => ({
+                    name: p.name,
+                    price: p.price,
+                    image: p.image || p.images?.[0] || "",
+                }));
                 await ordersCollection.updateOne(
                     { _id: new ObjectId(orderId) },
                     {
@@ -327,15 +333,19 @@ export async function PATCH(req: NextRequest) {
                             "order.status": "returned",
                             "order.refundedAt": new Date(),
                             "order.refundReason": refundReason,
+                            products: returnSlimProducts,
                         },
                         $unset: {
                             shippingData: "",
                             billingData: "",
+                            emailSubject: "",
+                            emailThreadId: "",
                             "order.returnPhotos": "",
                             "order.returnMessage": "",
                             "order.returnRequestedAt": "",
                             "order.boxtalReturnShipmentId": "",
-                            "order.returnedAt": ""
+                            "order.returnedAt": "",
+                            "order.paymentIntentId": ""
                         }
                     }
                 );

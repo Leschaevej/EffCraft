@@ -651,7 +651,7 @@ export default function Backoffice() {
                                                         <div className="info">
                                                             <h3>Informations de commande</h3>
                                                             <p>Email : {order.userEmail}</p>
-                                                            <p>Date de commande : {new Date(order.order.createdAt).toLocaleDateString()} à {new Date(order.order.createdAt).toLocaleTimeString()}</p>
+                                                            <p>Date de commande : {new Date(order.order.createdAt).toLocaleDateString()} à {new Date(order.order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                                                             <p>Total : {order.order.totalPrice.toFixed(2)}€</p>
                                                             {order.order.cancelReason && (
                                                                 <>
@@ -661,11 +661,11 @@ export default function Backoffice() {
                                                                     )}
                                                                 </>
                                                             )}
+                                                            {(order.order.cancelledAt || order.order.refundedAt) && (
+                                                                <p>Date de remboursement : {new Date(order.order.cancelledAt || order.order.refundedAt!).toLocaleDateString()} à {new Date(order.order.cancelledAt || order.order.refundedAt!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                                            )}
                                                             {(order.order.refundReason || order.order.returnReason) && (
-                                                                <>
-                                                                    <p>{order.order.status === "returned" ? "Motif retour" : "Motif remboursement"} : {order.order.status === "returned" ? order.order.returnReason : (REFUND_REASON_LABELS[order.order.refundReason!] || order.order.refundReason)}</p>
-                                                                    <p>Date de remboursement : {new Date(order.order.cancelledAt || order.order.refundedAt || order.order.createdAt).toLocaleDateString()}</p>
-                                                                </>
+                                                                <p>{order.order.status === "returned" ? "Motif retour" : "Motif remboursement"} : {order.order.status === "returned" ? order.order.returnReason : (REFUND_REASON_LABELS[order.order.refundReason!] || order.order.refundReason)}</p>
                                                             )}
                                                             {!order.order.refundReason && order.shippingData && (
                                                                 <>

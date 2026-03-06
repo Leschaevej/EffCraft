@@ -118,8 +118,6 @@ export async function POST(req: Request) {
             {
                 $set: {
                     "order.status": "cancel_requested",
-                    "order.previousStatus": order.order.status,
-                    "order.cancelRequestedAt": new Date(),
                     "order.cancelReason": reasonKey,
                     "order.cancelMessage": cleanMessage || undefined,
                 }

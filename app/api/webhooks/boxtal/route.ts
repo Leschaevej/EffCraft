@@ -191,7 +191,7 @@ export async function POST(req: NextRequest) {
             }
         }
         const updateQuery: any = { $set: updateData };
-        if (updateData["order.status"] !== "delivered") {
+        if (status && updateData["order.status"] !== "delivered") {
             updateData["shippingData.boxtalStatus"] = status;
         }
         if (updateData["order.status"] === "delivered") {
