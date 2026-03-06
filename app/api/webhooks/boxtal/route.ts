@@ -195,17 +195,6 @@ export async function POST(req: NextRequest) {
             updateData["shippingData.boxtalStatus"] = status;
         }
         if (updateData["order.status"] === "delivered") {
-            // Garder uniquement les infos nécessaires pour un éventuel retour
-            updateData["order.boxtalShipmentId"] = order.shippingData?.boxtalShipmentId;
-            updateData["order.shippingMethod"] = order.shippingData?.shippingMethod;
-            updateData["shippingData.prenom"] = order.shippingData?.prenom;
-            updateData["shippingData.nom"] = order.shippingData?.nom;
-            updateData["shippingData.telephone"] = order.shippingData?.telephone;
-            updateData["shippingData.rue"] = order.shippingData?.rue;
-            updateData["shippingData.ville"] = order.shippingData?.ville;
-            updateData["shippingData.codePostal"] = order.shippingData?.codePostal;
-            updateData["shippingData.shippingMethod"] = order.shippingData?.shippingMethod;
-            // Supprimer les champs inutiles
             updateQuery.$unset = {
                 "shippingData.boxtalShipmentId": "",
                 "shippingData.boxtalStatus": "",
