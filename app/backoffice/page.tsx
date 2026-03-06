@@ -37,7 +37,7 @@ interface Order {
         deliveredAt?: Date;
         refundReason?: string;
         cancelledAt?: Date;
-        returnedAt?: Date;
+        refundedAt?: Date;
         readyAt?: Date;
         cancelReason?: string;
         cancelMessage?: string;
@@ -115,6 +115,7 @@ export default function Backoffice() {
     const [showReturnModal, setShowReturnModal] = useState(false);
     const [orderToReturn, setOrderToReturn] = useState<Order | null>(null);
     const [returnModalMessage, setReturnModalMessage] = useState<string | null>(null);
+    const [offerReturnShipping, setOfferReturnShipping] = useState(false);
     const [showEventForm, setShowEventForm] = useState(false);
     const [editingEventId, setEditingEventId] = useState<string | null>(null);
     const [eventForm, setEventForm] = useState({
@@ -467,6 +468,41 @@ export default function Backoffice() {
         await handleReturnOrder(order);
         mutate();
     };
+    const confirmRefundReturn = async (fullRefund: boolean) => {
+        if (!orderToReturn) return;
+        setReturnModalMessage("Remboursement en cours...");
+        try {
+            const response = await fetch("/api/order", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "refund-return", orderId: orderToReturn._id, fullRefund }),
+            });
+            if (response.ok) {
+                setReturnModalMessage("Remboursement effectué, client notifié par mail");
+                mutate();
+                setTimeout(() => {
+                    setShowReturnModal(false);
+                    setOrderToReturn(null);
+                    setReturnModalMessage(null);
+                }, 5000);
+            } else {
+                const error = await response.json();
+                setReturnModalMessage("Erreur : " + (error.error || "Erreur inconnue"));
+                setTimeout(() => {
+                    setShowReturnModal(false);
+                    setOrderToReturn(null);
+                    setReturnModalMessage(null);
+                }, 5000);
+            }
+        } catch (error) {
+            setReturnModalMessage("Erreur réseau");
+            setTimeout(() => {
+                setShowReturnModal(false);
+                setOrderToReturn(null);
+                setReturnModalMessage(null);
+            }, 5000);
+        }
+    };
     const getDisplayStatus = (order: Order): string => {
         return order.order.status;
     };
@@ -615,7 +651,7 @@ export default function Backoffice() {
                                                         <div className="info">
                                                             <h3>Informations de commande</h3>
                                                             <p>Email : {order.userEmail}</p>
-                                                            <p>Date : {new Date(order.order.createdAt).toLocaleDateString()} à {new Date(order.order.createdAt).toLocaleTimeString()}</p>
+                                                            <p>Date de commande : {new Date(order.order.createdAt).toLocaleDateString()} à {new Date(order.order.createdAt).toLocaleTimeString()}</p>
                                                             <p>Total : {order.order.totalPrice.toFixed(2)}€</p>
                                                             {order.order.cancelReason && (
                                                                 <>
@@ -625,10 +661,10 @@ export default function Backoffice() {
                                                                     )}
                                                                 </>
                                                             )}
-                                                            {order.order.refundReason && (
+                                                            {(order.order.refundReason || order.order.returnReason) && (
                                                                 <>
-                                                                    <p>Motif remboursement : {REFUND_REASON_LABELS[order.order.refundReason!] || order.order.refundReason}</p>
-                                                                    <p>Date remboursement : {new Date(order.order.cancelledAt || order.order.returnedAt || order.order.createdAt).toLocaleDateString()}</p>
+                                                                    <p>{order.order.status === "returned" ? "Motif retour" : "Motif remboursement"} : {order.order.status === "returned" ? order.order.returnReason : (REFUND_REASON_LABELS[order.order.refundReason!] || order.order.refundReason)}</p>
+                                                                    <p>Date de remboursement : {new Date(order.order.cancelledAt || order.order.refundedAt || order.order.createdAt).toLocaleDateString()}</p>
                                                                 </>
                                                             )}
                                                             {!order.order.refundReason && order.shippingData && (
@@ -994,6 +1030,7 @@ export default function Backoffice() {
                     if (!returnModalMessage) {
                         setShowReturnModal(false);
                         setOrderToReturn(null);
+                        setOfferReturnShipping(false);
                     }
                 }}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -1002,6 +1039,35 @@ export default function Backoffice() {
                                 <h3>{returnModalMessage.includes("cours") ? "Veuillez patienter" : returnModalMessage.includes("Erreur") ? "Erreur" : "Succès"}</h3>
                                 <p>{returnModalMessage}</p>
                             </>
+                        ) : orderToReturn.order.status === "return_delivered" ? (
+                            (() => {
+                                const FIXED_PRICES: { [key: string]: number } = {
+                                    "MONR-CpourToi": 5.90,
+                                    "SOGP-RelaisColis": 5.90,
+                                    "POFR-ColissimoAccess": 9.90,
+                                    "CHRP-Chrono18": 12.90
+                                };
+                                const op = orderToReturn.shippingData?.shippingMethod?.operator;
+                                const sc = orderToReturn.shippingData?.shippingMethod?.serviceCode;
+                                const shippingCost = FIXED_PRICES[`${op}-${sc}`] || 5.90;
+                                const refundAmount = Math.max(0, orderToReturn.order.totalPrice - shippingCost - (offerReturnShipping ? 0 : shippingCost));
+                                return (
+                                    <>
+                                        <h3>Rembourser le retour</h3>
+                                        <p>Total commande : <strong>{orderToReturn.order.totalPrice.toFixed(2)}€</strong></p>
+                                        <p>Frais de livraison : <strong>{shippingCost.toFixed(2)}€</strong></p>
+                                        <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", margin: "10px 0" }}>
+                                            <input type="checkbox" checked={offerReturnShipping} onChange={e => setOfferReturnShipping(e.target.checked)} />
+                                            Offrir les frais de retour
+                                        </label>
+                                        <p>Total remboursé : <strong>{refundAmount.toFixed(2)}€</strong></p>
+                                        <div className="modal-buttons">
+                                            <button className="btn-confirm" onClick={() => confirmRefundReturn(offerReturnShipping)}>Rembourser</button>
+                                            <button className="btn-cancel" onClick={() => { setShowReturnModal(false); setOrderToReturn(null); setOfferReturnShipping(false); }}>Annuler</button>
+                                        </div>
+                                    </>
+                                );
+                            })()
                         ) : (
                             <>
                                 <h3>Demande de retour</h3>
@@ -1025,7 +1091,7 @@ export default function Backoffice() {
                                 <div className="modal-buttons">
                                     <button className="btn-confirm" onClick={acceptReturnRequest}>Accepter le retour</button>
                                     <button className="btn-cancel" onClick={rejectReturnRequest}>Refuser le retour</button>
-                                    <button className="btn-cancel" onClick={() => { setShowReturnModal(false); setOrderToReturn(null); }}>Retour</button>
+                                    <button className="btn-cancel" onClick={() => { setShowReturnModal(false); setOrderToReturn(null); }}>Annuler</button>
                                 </div>
                             </>
                         )}

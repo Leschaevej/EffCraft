@@ -25,9 +25,9 @@ export async function GET(req: NextRequest) {
         const ordersCollection = db.collection("orders");
         let query: any;
         if (status === 'history') {
-            query = { "order.status": { $in: ['delivered', 'cancelled', 'returned', 'return_delivered', 'return_rejected'] } };
+            query = { "order.status": { $in: ['delivered', 'cancelled', 'returned', 'return_rejected'] } };
         } else if (status === 'pending') {
-            query = { "order.status": { $in: ['paid', 'preparing', 'in_transit', 'cancel_requested', 'return_requested', 'return_preparing', 'return_in_transit'] } };
+            query = { "order.status": { $in: ['paid', 'preparing', 'in_transit', 'cancel_requested', 'return_requested', 'return_preparing', 'return_in_transit', 'return_delivered'] } };
         } else {
             query = { "order.status": status };
         }
@@ -292,14 +292,12 @@ export async function PATCH(req: NextRequest) {
                 const shippingCode = `${returnShippingMethod?.operator || "MONR"}-${returnShippingMethod?.serviceCode || "CpourToi"}`;
                 const shippingCost = FIXED_PRICES[shippingCode] || 5.90;
                 let refundAmount;
-                let refundReason;
                 if (fullRefund) {
-                    refundAmount = Math.round((refundOrder.order.totalPrice - shippingCost) * 100); // en centimes
-                    refundReason = `Produit défectueux - Remboursement ${(refundOrder.order.totalPrice - shippingCost).toFixed(2)}€ (frais retour déduits)`;
+                    refundAmount = Math.round((refundOrder.order.totalPrice - shippingCost) * 100);
                 } else {
-                    refundAmount = Math.round((refundOrder.order.totalPrice - (shippingCost * 2)) * 100); // en centimes
-                    refundReason = `Changement d'avis - Remboursement ${(refundOrder.order.totalPrice - (shippingCost * 2)).toFixed(2)}€ (frais aller et retour déduits)`;
+                    refundAmount = Math.round((refundOrder.order.totalPrice - (shippingCost * 2)) * 100);
                 }
+                const refundReason = refundOrder.order.returnReason || "Retour";
                 try {
                     if (refundOrder.order?.paymentIntentId && refundAmount > 0) {
                         await stripe.refunds.create({
@@ -322,23 +320,22 @@ export async function PATCH(req: NextRequest) {
                         console.error("Erreur suppression photo retour Cloudinary:", e);
                     }
                 }
-                const returnSlimProducts = refundOrder.products.map((p: any) => ({
-                    name: p.name,
-                    price: p.price,
-                    image: p.images?.[0] || "",
-                }));
                 await ordersCollection.updateOne(
                     { _id: new ObjectId(orderId) },
                     {
                         $set: {
                             "order.status": "returned",
-                            "order.returnedAt": new Date(),
+                            "order.refundedAt": new Date(),
                             "order.refundReason": refundReason,
-                            products: returnSlimProducts
                         },
                         $unset: {
                             shippingData: "",
-                            billingData: ""
+                            billingData: "",
+                            "order.returnPhotos": "",
+                            "order.returnMessage": "",
+                            "order.returnRequestedAt": "",
+                            "order.boxtalReturnShipmentId": "",
+                            "order.returnedAt": ""
                         }
                     }
                 );

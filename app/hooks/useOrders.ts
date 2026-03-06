@@ -42,8 +42,8 @@ export function useOrders(status: 'pending' | 'history') {
 
 export function useUserOrders(orderView: 'pending' | 'history') {
   const statuses = orderView === "pending"
-    ? "paid,preparing,ready,in_transit,out_for_delivery,cancel_requested,return_requested,return_preparing,return_in_transit,return_out_for_delivery"
-    : "delivered,cancelled,returned,return_delivered,return_rejected";
+    ? "paid,preparing,ready,in_transit,out_for_delivery,cancel_requested,return_requested,return_preparing,return_in_transit,return_out_for_delivery,return_delivered"
+    : "delivered,cancelled,returned,return_rejected";
 
   const { data, error, isLoading, mutate } = useSWR(
     `/api/order/user?statuses=${statuses}`,

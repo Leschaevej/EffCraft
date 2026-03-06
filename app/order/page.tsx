@@ -62,11 +62,12 @@ interface Order {
         deliveredAt?: Date;
         refundReason?: string;
         cancelledAt?: Date;
-        returnedAt?: Date;
+        refundedAt?: Date;
         readyAt?: Date;
         cancelReason?: string;
         cancelMessage?: string;
         boxtalReturnShipmentId?: string;
+        returnReason?: string;
     };
 }
 const TRACKING_STEPS = [
@@ -301,10 +302,10 @@ export default function OrderPage() {
                                                             <h3>Informations de commande</h3>
                                                             <p>Date de commande : {new Date(order.order.createdAt).toLocaleDateString()}</p>
                                                             <p>Total : {order.order.totalPrice.toFixed(2)}€</p>
-                                                            {order.order.refundReason && (
+                                                            {(order.order.refundReason || order.order.returnReason) && (
                                                                 <>
-                                                                    <p>Motif de remboursement : {REFUND_REASON_LABELS[order.order.refundReason!] || order.order.refundReason}</p>
-                                                                    <p>Date de remboursement : {new Date(order.order.cancelledAt || order.order.returnedAt || order.order.createdAt).toLocaleDateString()}</p>
+                                                                    <p>{order.order.status === "returned" ? "Motif de retour" : "Motif de remboursement"} : {order.order.status === "returned" ? order.order.returnReason : (REFUND_REASON_LABELS[order.order.refundReason!] || order.order.refundReason)}</p>
+                                                                    <p>Date de remboursement : {new Date(order.order.cancelledAt || order.order.refundedAt || order.order.createdAt).toLocaleDateString()}</p>
                                                                 </>
                                                             )}
                                                             {order.order.cancelReason && (
