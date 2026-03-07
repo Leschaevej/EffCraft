@@ -301,7 +301,6 @@ export default function OrderPage() {
                                                         <div className="info">
                                                             <h3>Informations de commande</h3>
                                                             <p>Date de commande : {new Date(order.order.createdAt).toLocaleDateString()}</p>
-                                                            <p>Total : {order.order.totalPrice.toFixed(2)}€</p>
                                                             {(order.order.cancelledAt || order.order.refundedAt) && (
                                                                 <p>Date de remboursement : {new Date(order.order.cancelledAt || order.order.refundedAt!).toLocaleDateString()}</p>
                                                             )}
@@ -332,7 +331,7 @@ export default function OrderPage() {
                                                                                 })()
                                                                             ) : "En attente"}
                                                                         </p>
-                                                                    ) : (
+                                                                    ) : order.order.status !== "delivered" && (
                                                                         <p>
                                                                             N° de suivi : {order.shippingData.trackingNumber ? (
                                                                                 (() => {
@@ -348,6 +347,7 @@ export default function OrderPage() {
                                                                     )}
                                                                 </>
                                                             )}
+                                                            <p>Total : {order.order.totalPrice.toFixed(2)}€</p>
                                                         </div>
                                                         {order.order.status.startsWith("return_") ? (
                                                             <div className="info">

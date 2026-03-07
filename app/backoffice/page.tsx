@@ -652,7 +652,6 @@ export default function Backoffice() {
                                                             <h3>Informations de commande</h3>
                                                             <p>Email : {order.userEmail}</p>
                                                             <p>Date de commande : {new Date(order.order.createdAt).toLocaleDateString()} à {new Date(order.order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                                            <p>Total : {order.order.totalPrice.toFixed(2)}€</p>
                                                             {order.order.cancelReason && (
                                                                 <>
                                                                     <p>Raison d'annulation : {REFUND_REASON_LABELS[order.order.cancelReason!] || order.order.cancelReason}</p>
@@ -683,7 +682,7 @@ export default function Backoffice() {
                                                                                 })()
                                                                             ) : "En attente"}
                                                                         </p>
-                                                                    ) : (
+                                                                    ) : order.order.status !== "delivered" && (
                                                                         <p>
                                                                             N° suivi : {order.shippingData.trackingNumber ? (
                                                                                 (() => {
@@ -699,6 +698,7 @@ export default function Backoffice() {
                                                                     )}
                                                                 </>
                                                             )}
+                                                            <p>Total : {order.order.totalPrice.toFixed(2)}€</p>
                                                         </div>
                                                         {order.order.status.startsWith("return_") ? (
                                                             <div className="info">
