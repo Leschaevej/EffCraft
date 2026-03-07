@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
                     updateData["shippingData.trackingNumber"] = trackingNumber;
                 }
             }
-            else if (status === "DELIVERED" || status === "AVAILABLE_FOR_WITHDRAWAL") {
+            else if (status === "DELIVERED" || status === "AVAILABLE_FOR_WITHDRAWAL" || status === "REACHED_DELIVERY_PICKUP_POINT") {
                 if (order.order.status !== "delivered") {
                     updateData["order.status"] = "delivered";
                     updateData["order.deliveredAt"] = new Date();

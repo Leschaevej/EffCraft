@@ -52,6 +52,7 @@ interface Order {
         paymentIntentId?: string;
         boxtalReturnShipmentId?: string;
         returnTrackingNumber?: string;
+        returnRejectReason?: string;
     };
 }
 const STATUS_LABELS: { [key: string]: string } = {
@@ -67,6 +68,12 @@ const STATUS_LABELS: { [key: string]: string } = {
     return_delivered: "Livré",
     returned: "Remboursé",
     return_rejected: "Retour refusé"
+};
+const RETURN_REJECT_REASON_LABELS: { [key: string]: string } = {
+    damaged: "Produit endommagé par le client",
+    used: "Produit porté / utilisé",
+    modified: "Produit modifié",
+    custom: "Commande personnalisée",
 };
 const REFUND_REASON_LABELS: { [key: string]: string } = {
     error: "Erreur de commande",
@@ -117,6 +124,9 @@ export default function Backoffice() {
     const [orderToReturn, setOrderToReturn] = useState<Order | null>(null);
     const [returnModalMessage, setReturnModalMessage] = useState<string | null>(null);
     const [offerReturnShipping, setOfferReturnShipping] = useState(false);
+    const [returnRejectReason, setReturnRejectReason] = useState<string>("");
+    const [showRejectReasons, setShowRejectReasons] = useState(false);
+    const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
     const [showEventForm, setShowEventForm] = useState(false);
     const [editingEventId, setEditingEventId] = useState<string | null>(null);
     const [eventForm, setEventForm] = useState({
@@ -400,7 +410,7 @@ export default function Backoffice() {
             const response = await fetch("/api/order/return/reject", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ orderId: orderToReturn._id }),
+                body: JSON.stringify({ orderId: orderToReturn._id, rejectReason: returnRejectReason }),
             });
             if (response.ok) {
                 setReturnModalMessage("Demande de retour refusée, client notifié par mail");
@@ -656,13 +666,16 @@ export default function Backoffice() {
                                                             {(order.order.cancelledAt || order.order.refundedAt) && (
                                                                 <p>Date de remboursement : {new Date(order.order.cancelledAt || order.order.refundedAt!).toLocaleDateString()} à {new Date(order.order.cancelledAt || order.order.refundedAt!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                                                             )}
-                                                            {order.order.cancelReason && (
+                                                            {order.order.cancelReason && order.order.status !== "cancel_requested" && (
                                                                 <>
                                                                     <p>Raison d'annulation : {REFUND_REASON_LABELS[order.order.cancelReason!] || order.order.cancelReason}</p>
                                                                     {order.order.cancelMessage && (
                                                                         <p>Message : {order.order.cancelMessage}</p>
                                                                     )}
                                                                 </>
+                                                            )}
+                                                            {order.order.returnRejectReason && order.order.status === "return_rejected" && (
+                                                                <p>Raison du refus : {RETURN_REJECT_REASON_LABELS[order.order.returnRejectReason] || order.order.returnRejectReason}</p>
                                                             )}
                                                             {(order.order.refundReason || (order.order.returnReason && order.order.status === "returned")) && (
                                                                 <p>{order.order.status === "returned" ? "Motif retour" : "Motif remboursement"} : {order.order.status === "returned" ? order.order.returnReason : (REFUND_REASON_LABELS[order.order.refundReason!] || order.order.refundReason)}</p>
@@ -672,7 +685,7 @@ export default function Backoffice() {
                                                                     <p>Livraison : {getShippingMethodName(order.shippingData.shippingMethod?.operator, order.shippingData.shippingMethod?.serviceCode)}</p>
                                                                     {order.order.returnTrackingNumber && order.order.status.startsWith("return_") && order.order.status !== "return_rejected" ? (
                                                                         <p>
-                                                                            N° suivi retour : {order.order.returnTrackingNumber ? (
+                                                                            N° de suivi : {order.order.returnTrackingNumber ? (
                                                                                 (() => {
                                                                                     const trackingUrl = getTrackingUrl(order.order.returnTrackingNumber, order.shippingData.shippingMethod?.operator);
                                                                                     return trackingUrl ? (
@@ -685,7 +698,7 @@ export default function Backoffice() {
                                                                         </p>
                                                                     ) : order.shippingData.trackingNumber && order.order.status !== "delivered" && (
                                                                         <p>
-                                                                            N° suivi : {order.shippingData.trackingNumber ? (
+                                                                            N° de suivi : {order.shippingData.trackingNumber ? (
                                                                                 (() => {
                                                                                     const trackingUrl = getTrackingUrl(order.shippingData.trackingNumber, order.shippingData.shippingMethod?.operator);
                                                                                     return trackingUrl ? (
@@ -701,36 +714,44 @@ export default function Backoffice() {
                                                             )}
                                                             <p>Total : {order.order.totalPrice.toFixed(2)}€</p>
                                                         </div>
-                                                        {order.order.status.startsWith("return_") && order.order.status !== "return_rejected" ? (
-                                                            <div className="info">
-                                                                <h3>Livraison</h3>
-                                                                <p>Atelier EffCraft</p>
-                                                            </div>
-                                                        ) : order.order.status !== "return_rejected" && order.shippingData && (
-                                                            <div className="info">
-                                                                <h3>Livraison</h3>
-                                                                <p>{order.shippingData.nom || ''} {order.shippingData.prenom || ''}</p>
-                                                                <p>{order.shippingData.rue || ''}</p>
-                                                                <p>{order.shippingData.codePostal || ''} {order.shippingData.ville || ''}</p>
-                                                                {order.shippingData.shippingMethod?.relayPoint && (() => {
+                                                        <div className="info">
+                                                            {order.order.status.startsWith("return_") && order.order.status !== "return_rejected" ? (
+                                                                <>
+                                                                    <h3>Livraison</h3>
+                                                                    <p>Atelier EffCraft</p>
+                                                                </>
+                                                            ) : order.order.status !== "return_rejected" && order.shippingData && (
+                                                                order.shippingData.shippingMethod?.relayPoint ? (() => {
                                                                     const tc = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
                                                                     return (
                                                                         <>
-                                                                            <p style={{ marginTop: 10, fontWeight: 600 }}>Point relais</p>
+                                                                            <h3>Point relais</h3>
+                                                                            <p>{order.shippingData.prenom || ''} {order.shippingData.nom || ''}</p>
                                                                             <p>{tc(order.shippingData.shippingMethod.relayPoint.name)}</p>
                                                                             <p>{tc(order.shippingData.shippingMethod.relayPoint.address)}</p>
                                                                             <p>{order.shippingData.shippingMethod.relayPoint.zipcode} {tc(order.shippingData.shippingMethod.relayPoint.city)}</p>
                                                                         </>
                                                                     );
-                                                                })()}
-                                                            </div>
-                                                        )}
-                                                        {!order.order.status.startsWith("return_") && order.billingData && order.billingData !== "same" && (
+                                                                })() : (
+                                                                    <>
+                                                                        <h3>Livraison</h3>
+                                                                        <p>{order.shippingData.prenom || ''} {order.shippingData.nom || ''}</p>
+                                                                        <p>{order.shippingData.rue || ''}</p>
+                                                                        <p>{order.shippingData.codePostal || ''} {order.shippingData.ville || ''}</p>
+                                                                    </>
+                                                                )
+                                                            )}
+                                                        </div>
+                                                        {!order.order.status.startsWith("return_") && (
                                                             <div className="info">
-                                                                <h3>Facturation</h3>
-                                                                <p>{order.billingData.prenom || ''} {order.billingData.nom || ''}</p>
-                                                                <p>{order.billingData.rue || ''}</p>
-                                                                <p>{order.billingData.codePostal || ''} {order.billingData.ville || ''}</p>
+                                                                {order.billingData && order.billingData !== "same" && (
+                                                                    <>
+                                                                        <h3>Facturation</h3>
+                                                                        <p>{order.billingData.prenom || ''} {order.billingData.nom || ''}</p>
+                                                                        <p>{order.billingData.rue || ''}</p>
+                                                                        <p>{order.billingData.codePostal || ''} {order.billingData.ville || ''}</p>
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         )}
                                                     </div>
@@ -1000,26 +1021,28 @@ export default function Backoffice() {
                                 <h3>Annulation de commande</h3>
                                 {orderToCancel?.order.status === "cancel_requested" ? (
                                     <>
-                                        <p>Le client a demandé l'annulation de cette commande.</p>
-                                        {orderToCancel.order.cancelReason && (
-                                            <p><strong>Raison :</strong> {REFUND_REASON_LABELS[orderToCancel.order.cancelReason] || orderToCancel.order.cancelReason}</p>
-                                        )}
-                                        {orderToCancel.order.cancelMessage && (
-                                            <p><strong>Message :</strong> {orderToCancel.order.cancelMessage}</p>
-                                        )}
+                                        <div className="info">
+                                            {orderToCancel.order.cancelReason && (
+                                                <p><strong>Raison :</strong> {REFUND_REASON_LABELS[orderToCancel.order.cancelReason] || orderToCancel.order.cancelReason}</p>
+                                            )}
+                                            {orderToCancel.order.cancelMessage && (
+                                                <p><strong>Message :</strong> {orderToCancel.order.cancelMessage}</p>
+                                            )}
+                                        </div>
+                                        <p>Annuler la commande et rembourser le client ?</p>
                                     </>
                                 ) : (
-                                    <p>Cette action va annuler la commande et rembourser automatiquement le client.</p>
+                                    <p>Annuler la commande et rembourser le client ?</p>
                                 )}
                                 <div className="modal-buttons">
-                                    <button className="btn-confirm" onClick={confirmCancelOrder}>Annuler et rembourser</button>
+                                    <button className="btn-confirm" onClick={confirmCancelOrder}>Oui</button>
                                     {orderToCancel?.order.status === "cancel_requested" && orderToCancel?.shippingData?.boxtalShipmentId && (
                                         <button className="btn-cancel" onClick={rejectCancelRequest}>Colis déjà expédié</button>
                                     )}
                                     <button className="btn-cancel" onClick={() => {
                                         setShowCancelModal(false);
                                         setOrderToCancel(null);
-                                    }}>Retour</button>
+                                    }}>Non</button>
                                 </div>
                             </>
                         )}
@@ -1032,6 +1055,8 @@ export default function Backoffice() {
                         setShowReturnModal(false);
                         setOrderToReturn(null);
                         setOfferReturnShipping(false);
+                        setReturnRejectReason("");
+                        setShowRejectReasons(false);
                     }
                 }}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -1072,32 +1097,56 @@ export default function Backoffice() {
                         ) : (
                             <>
                                 <h3>Demande de retour</h3>
-                                <div style={{ display: "flex", gap: 16, marginTop: 12 }}>
-                                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8, textAlign: "left" }}>
-                                        {orderToReturn.order.returnReason && (
-                                            <p><strong>Raison :</strong> {orderToReturn.order.returnReason}</p>
-                                        )}
-                                        {orderToReturn.order.returnMessage && (
-                                            <p><strong>Message :</strong> {orderToReturn.order.returnMessage}</p>
-                                        )}
-                                    </div>
-                                    {orderToReturn.order.returnPhotos && orderToReturn.order.returnPhotos.length > 0 && (
-                                        <div style={{ width: "50%", display: "flex", flexDirection: "column", gap: 8 }}>
-                                            {orderToReturn.order.returnPhotos.map((url: string, i: number) => (
-                                                <img key={i} src={url} alt={`Photo ${i + 1}`} style={{ width: "100%", height: "auto", objectFit: "cover", borderRadius: 4 }} />
+                                {showRejectReasons ? (
+                                    <>
+                                        <div className="reject-reasons">
+                                            {Object.entries(RETURN_REJECT_REASON_LABELS).map(([key, label]) => (
+                                                <label key={key}>
+                                                    <input type="radio" name="rejectReason" value={key} checked={returnRejectReason === key} onChange={() => setReturnRejectReason(key)} />
+                                                    {label}
+                                                </label>
                                             ))}
                                         </div>
-                                    )}
-                                </div>
-                                <div className="modal-buttons">
-                                    <button className="btn-confirm" onClick={acceptReturnRequest}>Accepter le retour</button>
-                                    <button className="btn-cancel" onClick={rejectReturnRequest}>Refuser le retour</button>
-                                </div>
+                                        <div className="modal-buttons">
+                                            <button className="btn-confirm" onClick={() => { setShowRejectReasons(false); setReturnRejectReason(""); }}>Retour</button>
+                                            <button className="btn-cancel" onClick={rejectReturnRequest} disabled={!returnRejectReason}>Refuser le retour</button>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <>
+                                        <div className="modal-return-body">
+                                            <div className="info">
+                                                {orderToReturn.order.returnReason && (
+                                                    <p><strong>Raison :</strong> {orderToReturn.order.returnReason}</p>
+                                                )}
+                                                {orderToReturn.order.returnMessage && (
+                                                    <p><strong>Message :</strong> {orderToReturn.order.returnMessage}</p>
+                                                )}
+                                            </div>
+                                            {orderToReturn.order.returnPhotos && orderToReturn.order.returnPhotos.length > 0 && (
+                                                <div className="modal-return-photos">
+                                                    {orderToReturn.order.returnPhotos.map((url: string, i: number) => (
+                                                        <img key={i} src={url} alt={`Photo ${i + 1}`} onClick={() => setLightboxUrl(url)} />
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="modal-buttons">
+                                            <button className="btn-confirm" onClick={acceptReturnRequest}>Accepter le retour</button>
+                                            <button className="btn-cancel" onClick={() => setShowRejectReasons(true)}>Refuser le retour</button>
+                                        </div>
+                                    </>
+                                )}
                             </>
                         )}
                     </div>
                 </div>
             )}
+        {lightboxUrl && (
+            <div className="lightbox-overlay" onClick={() => setLightboxUrl(null)}>
+                <img src={lightboxUrl} alt="Photo agrandie" />
+            </div>
+        )}
         </main>
     );
 }

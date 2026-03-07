@@ -313,7 +313,7 @@ export default function OrderPage() {
                                                                     <p>Mode de livraison : {getShippingMethodName(order.shippingData.shippingMethod?.operator, order.shippingData.shippingMethod?.serviceCode)}</p>
                                                                     {order.order.returnTrackingNumber && order.order.status.startsWith("return_") && order.order.status !== "return_rejected" ? (
                                                                         <p>
-                                                                            N° de suivi retour : {order.order.returnTrackingNumber ? (
+                                                                            N° de suivi : {order.order.returnTrackingNumber ? (
                                                                                 (() => {
                                                                                     const trackingUrl = getTrackingUrl(order.order.returnTrackingNumber, order.shippingData.shippingMethod?.operator);
                                                                                     return trackingUrl ? (
@@ -362,19 +362,21 @@ export default function OrderPage() {
                                                                 })() : (
                                                                     <div className="info">
                                                                         <h3>Livraison</h3>
-                                                                        <p>{order.shippingData.nom || ''} {order.shippingData.prenom || ''}</p>
+                                                                        <p>{order.shippingData.prenom || ''} {order.shippingData.nom || ''}</p>
                                                                         <p>{order.shippingData.rue || ''}</p>
                                                                         <p>{order.shippingData.codePostal || ''} {order.shippingData.ville || ''}</p>
                                                                     </div>
                                                                 )}
-                                                                {order.billingData && order.billingData !== "same" && (
-                                                                    <div className="info">
-                                                                        <h3>Facturation</h3>
-                                                                        <p>{order.billingData.prenom || ''} {order.billingData.nom || ''}</p>
-                                                                        <p>{order.billingData.rue || ''}</p>
-                                                                        <p>{order.billingData.codePostal || ''} {order.billingData.ville || ''}</p>
-                                                                    </div>
-                                                                )}
+                                                                <div className="info">
+                                                                    {order.billingData && order.billingData !== "same" && (
+                                                                        <>
+                                                                            <h3>Facturation</h3>
+                                                                            <p>{order.billingData.prenom || ''} {order.billingData.nom || ''}</p>
+                                                                            <p>{order.billingData.rue || ''}</p>
+                                                                            <p>{order.billingData.codePostal || ''} {order.billingData.ville || ''}</p>
+                                                                        </>
+                                                                    )}
+                                                                </div>
                                                             </>
                                                         )}
                                                     </div>

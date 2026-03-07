@@ -14,7 +14,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
         }
 
-        const { orderId } = await req.json();
+        const { orderId, rejectReason } = await req.json();
         if (!orderId) {
             return NextResponse.json({ error: "orderId manquant" }, { status: 400 });
         }
@@ -82,7 +82,7 @@ export async function POST(req: Request) {
         await ordersCollection.updateOne(
             { _id: new ObjectId(orderId) },
             {
-                $set: { "order.status": "return_rejected" },
+                $set: { "order.status": "return_rejected", ...(rejectReason && { "order.returnRejectReason": rejectReason }) },
                 $unset: {
                     "order.returnRejected": "",
                     "order.returnPhotos": "",
