@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/route";
 import clientPromise from "../../../lib/mongodb";
+import cloudinary from "../../../lib/cloudinary";
 
 export async function GET(req: NextRequest) {
     try {
@@ -32,22 +33,31 @@ export async function GET(req: NextRequest) {
             .sort({ "order.createdAt": -1 })
             .toArray();
 
-        // Nettoyer shippingData des commandes livrées depuis plus de 14 jours
-        const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
-        const toClean = orders
-            .filter(o =>
-                o.order?.status === "delivered" &&
-                o.order?.deliveredAt &&
-                new Date(o.order.deliveredAt) < fourteenDaysAgo &&
-                o.shippingData
-            )
-            .map(o => o._id);
+        // Supprimer les commandes livrées depuis plus de 14 jours
+        const fourteenDaysAgo = new Date(Date.now() - 1 * 60 * 60 * 1000); // TEST: 1h (remettre 14 * 24 * 60 * 60 * 1000)
+        const toDelete = orders.filter(o =>
+            o.order?.status === "delivered" &&
+            o.order?.deliveredAt &&
+            new Date(o.order.deliveredAt) < fourteenDaysAgo
+        );
 
-        if (toClean.length > 0) {
-            ordersCollection.updateMany(
-                { _id: { $in: toClean } },
-                { $unset: { shippingData: "" } }
-            ).catch(err => console.error("Erreur nettoyage shippingData:", err));
+        if (toDelete.length > 0) {
+            const deleteTask = async () => {
+                for (const order of toDelete) {
+                    for (const product of (order.products || [])) {
+                        if (product.image) {
+                            try {
+                                const match = product.image.match(/effcraft\/products\/[^.]+/);
+                                if (match) await cloudinary.uploader.destroy(match[0]);
+                            } catch (e) {
+                                console.error("Erreur suppression image produit Cloudinary:", e);
+                            }
+                        }
+                    }
+                }
+                await ordersCollection.deleteMany({ _id: { $in: toDelete.map(o => o._id) } });
+            };
+            deleteTask().catch(err => console.error("Erreur suppression commandes expirées:", err));
         }
 
         return NextResponse.json({ orders });

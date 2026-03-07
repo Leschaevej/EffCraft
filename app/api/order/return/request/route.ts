@@ -41,6 +41,12 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Cette commande ne peut pas faire l'objet d'un retour" }, { status: 400 });
         }
 
+        const fourteenDaysAgo = new Date();
+        fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+        if (!order.order.deliveredAt || new Date(order.order.deliveredAt) < fourteenDaysAgo) {
+            return NextResponse.json({ error: "Le délai de retour de 14 jours est dépassé" }, { status: 400 });
+        }
+
         const cleanMessage = message.trim().slice(0, 500);
         const orderDate = new Date(order.order.createdAt).toLocaleDateString("fr-FR");
 

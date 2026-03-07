@@ -398,25 +398,17 @@ export default function OrderPage() {
                                                                 )}
                                                             </>
                                                         )}
-                                                        {orderView === "history" && order.order.status === "delivered" && order.order.deliveredAt && (
-                                                            (() => {
-                                                                const deliveredDate = new Date(order.order.deliveredAt);
-                                                                const now = new Date();
-                                                                const diffTime = now.getTime() - deliveredDate.getTime();
-                                                                const diffDays = diffTime / (1000 * 60 * 60 * 24);
-                                                                return diffDays <= 14 ? (
-                                                                    <button className="return" onClick={() => {
-                                                                        setReturnOrderId(order._id);
-                                                                        setReturnOrderSnapshot(order);
-                                                                        setReturnReason("");
-                                                                        setReturnMessage("");
-                                                                        setReturnPhotos([]);
-                                                                        setReturnStatus("idle");
-                                                                    }}>
-                                                                        Demander un retour
-                                                                    </button>
-                                                                ) : null;
-                                                            })()
+                                                        {orderView === "history" && order.order.status === "delivered" && (
+                                                            <button className="return" onClick={() => {
+                                                                setReturnOrderId(order._id);
+                                                                setReturnOrderSnapshot(order);
+                                                                setReturnReason("");
+                                                                setReturnMessage("");
+                                                                setReturnPhotos([]);
+                                                                setReturnStatus("idle");
+                                                            }}>
+                                                                Demander un retour
+                                                            </button>
                                                         )}
                                                     </div>
                                                 </div>
