@@ -19,6 +19,7 @@ interface Product {
 }
 interface Order {
     _id: string;
+    _returnId?: string;
     userEmail: string;
     products: Product[];
     shippingData: {
@@ -38,21 +39,19 @@ interface Order {
         refundReason?: string;
         cancelledAt?: Date;
         refundedAt?: Date;
+        refundAmount?: number;
         readyAt?: Date;
         cancelReason?: string;
         cancelMessage?: string;
         cancelRequestedAt?: Date;
-        cancellationRequested?: boolean;
-        cancellationRequestedAt?: Date;
-        returnRequested?: boolean;
         returnRequestedAt?: Date;
         returnReason?: string;
         returnMessage?: string;
         returnPhotos?: string[];
         paymentIntentId?: string;
-        boxtalReturnShipmentId?: string;
         returnTrackingNumber?: string;
         returnRejectReason?: string;
+        returnItems?: { name: string; price: number }[];
     };
 }
 const STATUS_LABELS: { [key: string]: string } = {
@@ -66,7 +65,7 @@ const STATUS_LABELS: { [key: string]: string } = {
     return_preparing: "Préparation",
     return_in_transit: "Livraison",
     return_delivered: "Livré",
-    returned: "Remboursé",
+    return_refunded: "Remboursé",
     return_rejected: "Retour refusé"
 };
 const RETURN_REJECT_REASON_LABELS: { [key: string]: string } = {
@@ -116,7 +115,7 @@ export default function Backoffice() {
     const { orders: swrOrders, isLoading: swrLoading, mutate } = useOrders(orderView);
     const [orders, setOrders] = useState<Order[]>([]);
     const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
-    const [printingOrderId, setPrintingOrderId] = useState<string | null>(null);
+    const [printingOrderIds, setPrintingOrderIds] = useState<Set<string>>(new Set());
     const [showCancelModal, setShowCancelModal] = useState(false);
     const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
     const [cancelModalMessage, setCancelModalMessage] = useState<string | null>(null);
@@ -205,11 +204,11 @@ export default function Backoffice() {
         }
     }, [session, status, router]);
     const handlePrintLabel = async (order: Order) => {
-        if (printingOrderId) {
+        if (printingOrderIds.has(order._id)) {
             return;
         }
         try {
-            setPrintingOrderId(order._id);
+            setPrintingOrderIds(prev => new Set(prev).add(order._id));
             if (!order.shippingData.boxtalShipmentId) {
                 const createResponse = await fetch("/api/shipping", {
                     method: "POST",
@@ -269,7 +268,7 @@ export default function Backoffice() {
             console.error("Erreur impression bordereau:", error);
             alert("Erreur lors de l'impression du bordereau: " + error);
         } finally {
-            setPrintingOrderId(null);
+            setPrintingOrderIds(prev => { const next = new Set(prev); next.delete(order._id); return next; });
         }
     };
     const handleCancelOrder = async (order: Order) => {
@@ -349,55 +348,6 @@ export default function Backoffice() {
             }, 5000);
         }
     };
-    const handleReturnOrder = async (order: Order) => {
-        if (!confirm(`Générer un bon de retour pour cette commande ?`)) {
-            return;
-        }
-        try {
-            const response = await fetch("/api/order", {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    orderId: order._id,
-                    action: "request-return-only"
-                }),
-            });
-            if (!response.ok) {
-                const error = await response.json();
-                alert("Erreur lors de la demande de retour: " + (error.error || "Erreur inconnue"));
-                return;
-            }
-            if (order.shippingData.boxtalShipmentId) {
-                const labelResponse = await fetch("/api/shipping?action=return-label", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ orderId: order._id }),
-                });
-                if (labelResponse.ok) {
-                    const blob = await labelResponse.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    window.open(url, '_blank');
-                    alert("Bon de retour généré avec succès");
-                } else {
-                    const contentType = labelResponse.headers.get("content-type");
-                    let errorMessage = "Erreur inconnue";
-                    if (contentType && contentType.includes("application/json")) {
-                        const error = await labelResponse.json();
-                        errorMessage = error.error || JSON.stringify(error);
-                    } else {
-                        errorMessage = await labelResponse.text();
-                    }
-                    alert("Erreur lors de la génération du bordereau: " + errorMessage);
-                }
-            } else {
-                alert("Pas d'expédition Boxtal associée à cette commande");
-            }
-            mutate();
-        } catch (error) {
-            console.error("Erreur génération bon de retour:", error);
-            alert("Erreur: " + error);
-        }
-    };
     const handleRefundReturn = async (order: Order) => {
         setOrderToReturn(order);
         setReturnModalMessage(null);
@@ -410,7 +360,7 @@ export default function Backoffice() {
             const response = await fetch("/api/order/return/reject", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ orderId: orderToReturn._id, rejectReason: returnRejectReason }),
+                body: JSON.stringify({ returnId: orderToReturn._returnId, rejectReason: returnRejectReason }),
             });
             if (response.ok) {
                 setReturnModalMessage("Demande de retour refusée, client notifié par mail");
@@ -446,7 +396,7 @@ export default function Backoffice() {
             const response = await fetch("/api/order/return/accept", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ orderId: orderToReturn._id }),
+                body: JSON.stringify({ returnId: orderToReturn._returnId }),
             });
             if (response.ok) {
                 setReturnModalMessage("Retour accepté, bordereau envoyé au client par mail");
@@ -475,10 +425,6 @@ export default function Backoffice() {
             }, 5000);
         }
     };
-    const handleReturnOrderWithMutate = async (order: Order) => {
-        await handleReturnOrder(order);
-        mutate();
-    };
     const confirmRefundReturn = async (fullRefund: boolean) => {
         if (!orderToReturn) return;
         setReturnModalMessage("Remboursement en cours...");
@@ -486,7 +432,7 @@ export default function Backoffice() {
             const response = await fetch("/api/order", {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "refund-return", orderId: orderToReturn._id, fullRefund }),
+                body: JSON.stringify({ action: "refund-return", orderId: orderToReturn._id, returnId: orderToReturn._returnId, fullRefund }),
             });
             if (response.ok) {
                 setReturnModalMessage("Remboursement effectué, client notifié par mail");
@@ -644,9 +590,9 @@ export default function Backoffice() {
                                                 <button
                                                     className="print"
                                                     onClick={() => handlePrintLabel(order)}
-                                                    disabled={printingOrderId === order._id}
+                                                    disabled={printingOrderIds.has(order._id)}
                                                 >
-                                                    {printingOrderId === order._id ? "Traitement..." : "Bordereau"}
+                                                    {printingOrderIds.has(order._id) ? "Traitement..." : "Bordereau"}
                                                 </button>
                                             )}
                                             <button onClick={() => setExpandedOrderId(expandedOrderId === order._id ? null : order._id)}>
@@ -757,7 +703,12 @@ export default function Backoffice() {
                                                     </div>
                                                     <div className="actions">
                                                         {order.order.status !== "cancel_requested" && (
-                                                            <button className="invoice" onClick={() => window.open(`/api/invoice?orderId=${order._id}`, '_blank')}>Facture</button>
+                                                            <button className="invoice" onClick={() => {
+                                                                const url = order._returnId
+                                                                    ? `/api/invoice?orderId=${order._id}&returnId=${order._returnId}`
+                                                                    : `/api/invoice?orderId=${order._id}`;
+                                                                window.open(url, '_blank');
+                                                            }}>Facture</button>
                                                         )}
                                                         {["paid", "preparing", "cancel_requested"].includes(order.order.status) && (
                                                             <button
@@ -1076,12 +1027,26 @@ export default function Backoffice() {
                                 const op = orderToReturn.shippingData?.shippingMethod?.operator;
                                 const sc = orderToReturn.shippingData?.shippingMethod?.serviceCode;
                                 const shippingCost = FIXED_PRICES[`${op}-${sc}`] || 5.90;
-                                const refundAmount = Math.max(0, orderToReturn.order.totalPrice - shippingCost - (offerReturnShipping ? 0 : shippingCost));
+                                const retItems: { name: string; price: number }[] = orderToReturn.order.returnItems || [];
+                                const retItemsTotal = retItems.length > 0
+                                    ? retItems.reduce((sum: number, item: { price: number }) => sum + item.price, 0)
+                                    : orderToReturn.order.totalPrice - shippingCost;
+                                const refundAmount = Math.max(0, retItemsTotal - (offerReturnShipping ? 0 : shippingCost));
                                 return (
                                     <>
                                         <h3>Rembourser le retour</h3>
-                                        <p>Total commande : <strong>{orderToReturn.order.totalPrice.toFixed(2)}€</strong></p>
-                                        <p>Frais de livraison : <strong>{shippingCost.toFixed(2)}€</strong></p>
+                                        {retItems.length > 0 && (
+                                            <div style={{ margin: "8px 0" }}>
+                                                <p><strong>Articles retournés :</strong></p>
+                                                <ul style={{ margin: "4px 0 4px 16px", padding: 0 }}>
+                                                    {retItems.map((item, i) => (
+                                                        <li key={i}>{item.name} — {item.price.toFixed(2)}€</li>
+                                                    ))}
+                                                </ul>
+                                                <p>Sous-total articles : <strong>{retItemsTotal.toFixed(2)}€</strong></p>
+                                            </div>
+                                        )}
+                                        <p>Frais de livraison retour : <strong>{shippingCost.toFixed(2)}€</strong></p>
                                         <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", margin: "10px 0" }}>
                                             <input type="checkbox" checked={offerReturnShipping} onChange={e => setOfferReturnShipping(e.target.checked)} />
                                             Offrir les frais de retour
@@ -1116,6 +1081,16 @@ export default function Backoffice() {
                                     <>
                                         <div className="modal-return-body">
                                             <div className="info">
+                                                {orderToReturn.order.returnItems && orderToReturn.order.returnItems.length > 0 && (
+                                                    <div>
+                                                        <p><strong>Articles à retourner :</strong></p>
+                                                        <ul style={{ margin: "4px 0 4px 16px", padding: 0 }}>
+                                                            {orderToReturn.order.returnItems.map((item, i) => (
+                                                                <li key={i}>{item.name} — {item.price.toFixed(2)}€</li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
                                                 {orderToReturn.order.returnReason && (
                                                     <p><strong>Raison :</strong> {orderToReturn.order.returnReason}</p>
                                                 )}

@@ -14,23 +14,60 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
         }
 
-        const { orderId, rejectReason } = await req.json();
-        if (!orderId) {
-            return NextResponse.json({ error: "orderId manquant" }, { status: 400 });
+        const { returnId, rejectReason } = await req.json();
+        if (!returnId) {
+            return NextResponse.json({ error: "returnId manquant" }, { status: 400 });
         }
 
         const client = await clientPromise;
         const db = client.db("effcraftdatabase");
+        const returnsCollection = db.collection("returns");
         const ordersCollection = db.collection("orders");
 
-        const order = await ordersCollection.findOne({ _id: new ObjectId(orderId) });
+        const ret = await returnsCollection.findOne({ _id: new ObjectId(returnId) });
+        if (!ret) {
+            return NextResponse.json({ error: "Retour introuvable" }, { status: 404 });
+        }
+        if (ret.status !== "requested") {
+            return NextResponse.json({ error: "Ce retour n'est pas en attente d'acceptation" }, { status: 400 });
+        }
+
+        const order = await ordersCollection.findOne({ _id: ret.orderId });
         if (!order) {
             return NextResponse.json({ error: "Commande introuvable" }, { status: 404 });
         }
 
-        if (order.order.status !== "return_requested") {
-            return NextResponse.json({ error: "Cette commande n'a pas de demande de retour en cours" }, { status: 400 });
+        // Supprimer les photos Cloudinary
+        if (ret.photos?.length > 0) {
+            for (const photoUrl of ret.photos) {
+                try {
+                    const match = photoUrl.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
+                    if (match && match[1]) {
+                        await cloudinary.uploader.destroy(match[1]);
+                    }
+                } catch (e) {
+                    console.error("Erreur suppression photo retour Cloudinary:", e);
+                }
+            }
         }
+
+        // Mettre à jour le retour
+        await returnsCollection.updateOne(
+            { _id: new ObjectId(returnId) },
+            {
+                $set: {
+                    status: "rejected",
+                    rejectedAt: new Date(),
+                    ...(rejectReason && { rejectReason }),
+                },
+                $unset: { photos: "" }
+            }
+        );
+
+        await notifyClients({
+            type: "order_status_updated",
+            data: { orderId: ret.orderId.toString(), status: "return_rejected" }
+        });
 
         const transporter = nodemailer.createTransport({
             host: "ssl0.ovh.net",
@@ -43,7 +80,7 @@ export async function POST(req: Request) {
         });
 
         const orderDate = new Date(order.order.createdAt).toLocaleDateString("fr-FR");
-        const threadId = order.emailThreadId || `<order-${orderId}@effcraft.fr>`;
+        const threadId = order.emailThreadId || `<order-${ret.orderId.toString()}@effcraft.fr>`;
         const subject = order.emailSubject || `EffCraft - Mise à jour de votre commande du ${orderDate}`;
 
         await transporter.sendMail({
@@ -64,43 +101,6 @@ export async function POST(req: Request) {
                 <p>Si vous avez des questions, n'hésitez pas à nous contacter en répondant à cet email.</p>
                 <p>Cordialement,<br>L'équipe EffCraft</p>
             `,
-        });
-
-        if (order.order.returnPhotos?.length > 0) {
-            for (const photoUrl of order.order.returnPhotos) {
-                try {
-                    const match = photoUrl.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
-                    if (match && match[1]) {
-                        await cloudinary.uploader.destroy(match[1]);
-                    }
-                } catch (e) {
-                    console.error("Erreur suppression photo retour Cloudinary:", e);
-                }
-            }
-        }
-
-        await ordersCollection.updateOne(
-            { _id: new ObjectId(orderId) },
-            {
-                $set: { "order.status": "return_rejected", ...(rejectReason && { "order.returnRejectReason": rejectReason }) },
-                $unset: {
-                    "order.returnRejected": "",
-                    "order.returnPhotos": "",
-                    "order.returnMessage": "",
-                    "order.returnReason": "",
-                    "order.returnRequestedAt": "",
-                    shippingData: "",
-                    billingData: "",
-                    emailSubject: "",
-                    emailThreadId: "",
-                    "order.paymentIntentId": "",
-                }
-            }
-        );
-
-        await notifyClients({
-            type: "order_status_updated",
-            data: { orderId, status: "return_rejected" }
         });
 
         return NextResponse.json({ message: "Demande de retour refusée, client notifié" });

@@ -19,14 +19,26 @@ export async function POST(req: Request) {
         const reason = formData.get("reason") as string;
         const message = (formData.get("message") as string) || "";
         const photos = formData.getAll("photos") as File[];
+        const returnItemsRaw = formData.get("returnItems") as string;
 
         if (!orderId || !reason) {
             return NextResponse.json({ error: "Raison obligatoire" }, { status: 400 });
         }
 
+        let returnItemKeys: string[] = [];
+        try {
+            returnItemKeys = returnItemsRaw ? JSON.parse(returnItemsRaw) : [];
+        } catch {
+            return NextResponse.json({ error: "Articles invalides" }, { status: 400 });
+        }
+        if (returnItemKeys.length === 0) {
+            return NextResponse.json({ error: "Sélectionnez au moins un article" }, { status: 400 });
+        }
+
         const client = await clientPromise;
         const db = client.db("effcraftdatabase");
         const ordersCollection = db.collection("orders");
+        const returnsCollection = db.collection("returns");
 
         const order = await ordersCollection.findOne({
             _id: new ObjectId(orderId),
@@ -41,6 +53,12 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Cette commande ne peut pas faire l'objet d'un retour" }, { status: 400 });
         }
 
+        // Vérifie qu'il n'y a pas déjà un retour pour cette commande
+        const existingReturn = await returnsCollection.findOne({ orderId: new ObjectId(orderId) });
+        if (existingReturn) {
+            return NextResponse.json({ error: "Une demande de retour a déjà été effectuée pour cette commande" }, { status: 400 });
+        }
+
         const fourteenDaysAgo = new Date();
         fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
         if (!order.order.deliveredAt || new Date(order.order.deliveredAt) < fourteenDaysAgo) {
@@ -50,18 +68,28 @@ export async function POST(req: Request) {
         const cleanMessage = message.trim().slice(0, 500);
         const orderDate = new Date(order.order.createdAt).toLocaleDateString("fr-FR");
 
-        // Mettre à jour le statut immédiatement
-        await ordersCollection.updateOne(
-            { _id: new ObjectId(orderId) },
-            {
-                $set: {
-                    "order.status": "return_requested",
-                    "order.returnRequestedAt": new Date(),
-                    "order.returnReason": reason,
-                    "order.returnMessage": cleanMessage || undefined,
-                }
-            }
-        );
+        // Construire la liste des articles retournés avec leurs prix
+        const returnItems = order.products
+            .filter((p: any, index: number) => {
+                const key = p._id?.toString() || `${orderId}-${index}`;
+                return returnItemKeys.includes(key);
+            })
+            .map((p: any) => ({ name: p.name, price: p.price }));
+
+        if (returnItems.length === 0) {
+            return NextResponse.json({ error: "Articles introuvables" }, { status: 400 });
+        }
+
+        // Créer le document return dans la collection returns
+        const returnResult = await returnsCollection.insertOne({
+            orderId: new ObjectId(orderId),
+            userEmail: session.user.email,
+            items: returnItems,
+            reason,
+            message: cleanMessage || undefined,
+            status: "requested",
+            requestedAt: new Date(),
+        });
 
         await notifyClients({
             type: "order_status_updated",
@@ -88,13 +116,13 @@ export async function POST(req: Request) {
                 }
 
                 if (photoUrls.length > 0) {
-                    await ordersCollection.updateOne(
-                        { _id: new ObjectId(orderId) },
-                        { $set: { "order.returnPhotos": photoUrls } }
+                    await returnsCollection.updateOne(
+                        { _id: returnResult.insertedId },
+                        { $set: { photos: photoUrls } }
                     );
                 }
 
-                const productsList = order.products.map((p: any) => p.name).join(", ");
+                const productsList = returnItems.map((p: any) => `${p.name} (${p.price.toFixed(2)}€)`).join(", ");
                 const escapedReason = reason.replace(/</g, "&lt;").replace(/>/g, "&gt;");
                 const escapedMessage = cleanMessage.replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
                 const photosHtml = photoUrls.length > 0

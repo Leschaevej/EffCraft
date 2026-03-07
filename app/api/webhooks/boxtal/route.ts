@@ -102,37 +102,52 @@ export async function POST(req: NextRequest) {
         const client = await clientPromise;
         const db = client.db("effcraftdatabase");
         const ordersCollection = db.collection("orders");
+        const returnsCollection = db.collection("returns");
+
+        // Chercher d'abord si c'est un shipmentId de retour (dans returns collection)
+        const ret = await returnsCollection.findOne({ boxtalReturnShipmentId: shipmentId });
+        if (ret) {
+            console.log(`🔄 Retour trouvé dans returns collection, statut actuel: ${ret.status}, Boxtal: ${status}`);
+            const retUpdateData: any = {};
+            if (trackingNumber && !ret.returnTrackingNumber) {
+                retUpdateData.returnTrackingNumber = trackingNumber;
+            }
+            if (status === "SHIPPED" || status === "IN_TRANSIT") {
+                if (ret.status === "preparing") {
+                    retUpdateData.status = "in_transit";
+                }
+            } else if (status === "DELIVERED" || status === "AVAILABLE_FOR_WITHDRAWAL") {
+                if (ret.status !== "delivered") {
+                    retUpdateData.status = "delivered";
+                    retUpdateData.deliveredAt = new Date();
+                }
+            }
+            if (Object.keys(retUpdateData).length > 0) {
+                await returnsCollection.updateOne(
+                    { _id: ret._id },
+                    { $set: retUpdateData }
+                );
+            }
+            await notifyClients({
+                type: "order_status_updated",
+                data: {
+                    orderId: ret.orderId.toString(),
+                    status: retUpdateData.status ? `return_${retUpdateData.status}` : `return_${ret.status}`,
+                }
+            });
+            return NextResponse.json({ success: true });
+        }
+
+        // Sinon chercher la commande par shipmentId normal
         const order = await ordersCollection.findOne({
-            $or: [
-                { "shippingData.boxtalShipmentId": shipmentId },
-                { "order.boxtalReturnShipmentId": shipmentId }
-            ]
+            "shippingData.boxtalShipmentId": shipmentId
         });
         if (!order) {
             console.warn(`Commande introuvable pour shipmentId: ${shipmentId}`);
             return NextResponse.json({ success: true, message: "Commande introuvable" });
         }
         const updateData: any = {};
-        const isReturn = order.order.status === "return_requested" || order.order.status?.startsWith("return_");
-        if (isReturn) {
-            console.log(`🔄 Retour : statut actuel ${order.order.status}, nouveau statut Boxtal: ${status}`);
-            if (trackingNumber && !order.order.returnTrackingNumber) {
-                updateData["order.returnTrackingNumber"] = trackingNumber;
-            }
-            if (status === "ANNOUNCED" || status === "PENDING" || status === "READY_TO_SHIP" || status === "AT_PICKUP_LOCATION" || status === "PICKED_UP") {
-                if (order.order.status === "return_requested") {
-                }
-            } else if (status === "SHIPPED" || status === "IN_TRANSIT") {
-                if (["return_requested"].includes(order.order.status)) {
-                    updateData["order.status"] = "return_in_transit";
-                }
-            } else if (status === "DELIVERED" || status === "AVAILABLE_FOR_WITHDRAWAL") {
-                if (order.order.status !== "return_delivered") {
-                    updateData["order.status"] = "return_delivered";
-                }
-            }
-            console.log(`🔄 Retour : mise à jour boxtalStatus à ${status}, order.status à ${updateData["order.status"] || order.order.status}`);
-        } else {
+        {
             console.log(`📦 Statut actuel de la commande: ${order.order.status}, Nouveau statut Boxtal: ${status}`);
             if (status === "ANNOUNCED" || status === "PENDING" || status === "READY_TO_SHIP" || status === "AT_PICKUP_LOCATION" || status === "PICKED_UP") {
                 if (order.order.status === "paid") {

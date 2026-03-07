@@ -5,8 +5,6 @@ import clientPromise from "../../lib/mongodb";
 import { ObjectId } from "mongodb";
 import { generateInvoicePdf, generateCreditNotePdf } from "../../lib/generate-invoice";
 
-const CREDIT_NOTE_STATUSES = ["cancelled", "returned", "return_delivered"];
-
 export async function GET(req: NextRequest) {
     try {
         const session = await getServerSession(authOptions);
@@ -15,9 +13,12 @@ export async function GET(req: NextRequest) {
         }
         const { searchParams } = new URL(req.url);
         const orderId = searchParams.get("orderId");
+        const returnId = searchParams.get("returnId");
+
         if (!orderId) {
             return NextResponse.json({ error: "orderId manquant" }, { status: 400 });
         }
+
         const client = await clientPromise;
         const db = client.db("effcraftdatabase");
         const order = await db.collection("orders").findOne({ _id: new ObjectId(orderId) });
@@ -31,7 +32,25 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: "Facture indisponible pendant la demande d'annulation" }, { status: 403 });
         }
 
-        if (CREDIT_NOTE_STATUSES.includes(order.order?.status)) {
+        // Avoir pour un retour (depuis la collection returns)
+        if (returnId) {
+            const ret = await db.collection("returns").findOne({ _id: new ObjectId(returnId) });
+            if (!ret) {
+                return NextResponse.json({ error: "Retour introuvable" }, { status: 404 });
+            }
+            const refundAmount = ret.refundAmount;
+            const { buffer, creditNoteNumber } = await generateCreditNotePdf(order, orderId, refundAmount);
+            return new NextResponse(new Uint8Array(buffer), {
+                status: 200,
+                headers: {
+                    "Content-Type": "application/pdf",
+                    "Content-Disposition": `inline; filename="avoir-${creditNoteNumber}.pdf"`,
+                },
+            });
+        }
+
+        // Avoir pour une annulation
+        if (order.order?.status === "cancelled") {
             const refundAmount = order.order?.refundAmount;
             const { buffer, creditNoteNumber } = await generateCreditNotePdf(order, orderId, refundAmount);
             return new NextResponse(new Uint8Array(buffer), {
@@ -43,6 +62,7 @@ export async function GET(req: NextRequest) {
             });
         }
 
+        // Facture normale
         const { buffer, invoiceNumber } = await generateInvoicePdf(order, orderId);
         return new NextResponse(new Uint8Array(buffer), {
             status: 200,

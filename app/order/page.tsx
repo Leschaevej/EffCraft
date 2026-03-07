@@ -66,10 +66,13 @@ interface Order {
         readyAt?: Date;
         cancelReason?: string;
         cancelMessage?: string;
-        boxtalReturnShipmentId?: string;
         returnTrackingNumber?: string;
         returnReason?: string;
+        returnRequestedAt?: Date;
+        returnItems?: { name: string; price: number }[];
+        refundAmount?: number;
     };
+    _returnId?: string;
 }
 const TRACKING_STEPS = [
     { label: "Confirmé", icon: <FaCheck /> },
@@ -92,7 +95,9 @@ const STATUS_STEPS: { [key: string]: number } = {
     return_requested: 1,
     return_preparing: 2,
     return_in_transit: 3,
-    return_delivered: 4
+    return_delivered: 4,
+    return_refunded: 4,
+    return_rejected: 1
 };
 const STATUS_LABELS: { [key: string]: string } = {
     paid: "Confirmé",
@@ -105,7 +110,7 @@ const STATUS_LABELS: { [key: string]: string } = {
     return_preparing: "Préparation",
     return_in_transit: "Livraison",
     return_delivered: "Livré",
-    returned: "Remboursé",
+    return_refunded: "Remboursé",
     return_rejected: "Retour refusé"
 };
 const REFUND_REASON_LABELS: { [key: string]: string } = {
@@ -158,6 +163,7 @@ export default function OrderPage() {
     const [returnMessage, setReturnMessage] = useState("");
     const [returnPhotos, setReturnPhotos] = useState<File[]>([]);
     const [returnStatus, setReturnStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+    const [returnSelectedItems, setReturnSelectedItems] = useState<string[]>([]);
     useEffect(() => {
         if (!swrLoading) {
             setOrders(swrOrders);
@@ -177,13 +183,20 @@ export default function OrderPage() {
                     const { orderId, status } = customEvent.detail.data;
 
                     const pendingStatuses = ["paid", "preparing", "in_transit", "cancel_requested", "return_requested", "return_preparing", "return_in_transit"];
-                    const historyStatuses = ["delivered", "cancelled", "returned", "return_delivered", "return_requested", "return_preparing", "return_in_transit"];
+                    const finalStatuses = ["delivered", "cancelled", "return_delivered", "return_refunded", "return_rejected"];
+                    // Statuts finaux : rechargement complet (données retour enrichies depuis l'API)
+                    if (finalStatuses.includes(status)) {
+                        mutate();
+                        return;
+                    }
                     const shouldBeInCurrentView = orderView === "pending"
                         ? pendingStatuses.includes(status)
-                        : historyStatuses.includes(status);
+                        : false;
                     if (shouldBeInCurrentView) {
                         setOrders(prev => prev.map(order =>
-                            order._id === orderId ? { ...order, status } : order
+                            order._id === orderId
+                                ? { ...order, order: { ...order.order, status } }
+                                : order
                         ));
                     } else {
                         setOrders(prev => prev.filter(order => order._id !== orderId));
@@ -210,7 +223,8 @@ export default function OrderPage() {
             delivered: <FaHome />,
             cancelled: <FaCheck />,
             cancel_requested: <FaHourglassHalf />,
-            returned: <FaCheck />,
+            return_refunded: <FaCheck />,
+            return_rejected: <FaCheck />,
             return_requested: <FaHourglassHalf />,
             return_preparing: <FaBoxOpen />,
             return_in_transit: <FaTruck />,
@@ -305,8 +319,11 @@ export default function OrderPage() {
                                                             {(order.order.cancelledAt || order.order.refundedAt) && (
                                                                 <p>Date de remboursement : {new Date(order.order.cancelledAt || order.order.refundedAt!).toLocaleDateString()}</p>
                                                             )}
-                                                            {(order.order.refundReason || (order.order.returnReason && order.order.status === "returned")) && (
-                                                                <p>{order.order.status === "returned" ? "Motif de retour" : "Motif de remboursement"} : {order.order.status === "returned" ? order.order.returnReason : (REFUND_REASON_LABELS[order.order.refundReason!] || order.order.refundReason)}</p>
+                                                            {order.order.returnReason && order.order.status.startsWith("return_") && (
+                                                                <p>Motif de retour : {order.order.returnReason}</p>
+                                                            )}
+                                                            {order.order.refundReason && !order.order.status.startsWith("return_") && (
+                                                                <p>Motif de remboursement : {REFUND_REASON_LABELS[order.order.refundReason] || order.order.refundReason}</p>
                                                             )}
                                                             {!order.order.refundReason && order.shippingData && (
                                                                 <>
@@ -382,7 +399,14 @@ export default function OrderPage() {
                                                     </div>
                                                     <div className="actions">
                                                         {order.order.status !== "cancel_requested" && (
-                                                            <button className="invoice" onClick={() => window.open(`/api/invoice?orderId=${order._id}`, '_blank')}>Facture</button>
+                                                            <button className="invoice" onClick={() => {
+                                                                const url = order._returnId
+                                                                    ? `/api/invoice?orderId=${order._id}&returnId=${order._returnId}`
+                                                                    : `/api/invoice?orderId=${order._id}`;
+                                                                window.open(url, '_blank');
+                                                            }}>
+                                                                {order._returnId ? "Avoir" : "Facture"}
+                                                            </button>
                                                         )}
                                                         {orderView === "pending" && (
                                                             <>
@@ -406,6 +430,7 @@ export default function OrderPage() {
                                                                 setReturnMessage("");
                                                                 setReturnPhotos([]);
                                                                 setReturnStatus("idle");
+                                                                setReturnSelectedItems([]);
                                                             }}>
                                                                 Demander un retour
                                                             </button>
@@ -516,13 +541,14 @@ export default function OrderPage() {
                 const returnOrder = returnOrderSnapshot;
                 if (!returnOrder) return null;
                 const handleReturnSubmit = async () => {
-                    if (!returnReason) return;
+                    if (!returnReason || returnSelectedItems.length === 0) return;
                     setReturnStatus("sending");
                     try {
                         const formData = new FormData();
                         formData.append("orderId", returnOrderId);
                         formData.append("reason", returnReason);
                         formData.append("message", returnMessage);
+                        formData.append("returnItems", JSON.stringify(returnSelectedItems));
                         returnPhotos.forEach(photo => formData.append("photos", photo));
                         const res = await fetch("/api/order/return/request", {
                             method: "POST",
@@ -558,6 +584,28 @@ export default function OrderPage() {
                                         <p>Montant : {returnOrder.order.totalPrice.toFixed(2)}€</p>
                                     </div>
                                     <div className="cancel-modal-form">
+                                        <label>Articles à retourner</label>
+                                        <div className="return-items-list">
+                                            {returnOrder.products.map((product, index) => {
+                                                const itemKey = product._id || `${returnOrderId}-${index}`;
+                                                return (
+                                                    <label key={itemKey} className="return-item-check">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={returnSelectedItems.includes(itemKey)}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setReturnSelectedItems(prev => [...prev, itemKey]);
+                                                                } else {
+                                                                    setReturnSelectedItems(prev => prev.filter(k => k !== itemKey));
+                                                                }
+                                                            }}
+                                                        />
+                                                        <span>{product.name} — {product.price.toFixed(2)}€</span>
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
                                         <label>Raison du retour</label>
                                         <select value={returnReason} onChange={(e) => setReturnReason(e.target.value)}>
                                             <option value="">-- Sélectionnez une raison --</option>
@@ -591,7 +639,7 @@ export default function OrderPage() {
                                     )}
                                     <div className="cancel-modal-actions">
                                         <button className="back" onClick={() => { setReturnOrderId(null); setReturnOrderSnapshot(null); setReturnStatus("idle"); }} disabled={returnStatus === "sending"}>Retour</button>
-                                        <button className="submit" onClick={handleReturnSubmit} disabled={!returnReason || returnStatus === "sending"}>
+                                        <button className="submit" onClick={handleReturnSubmit} disabled={!returnReason || returnSelectedItems.length === 0 || returnStatus === "sending"}>
                                             {returnStatus === "sending" ? "Envoi en cours..." : "Envoyer la demande"}
                                         </button>
                                     </div>

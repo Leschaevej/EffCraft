@@ -15,26 +15,35 @@ const PACKAGE_WEIGHT = 0.5;
 const PACKAGE_LENGTH = 18;
 const PACKAGE_WIDTH = 13;
 const PACKAGE_HEIGHT = 8;
+
 export async function POST(req: Request) {
     try {
         const session = await getServerSession(authOptions);
         if (!session?.user?.email || session.user.role !== "admin") {
             return NextResponse.json({ error: "Non autorisé" }, { status: 403 });
         }
-        const { orderId } = await req.json();
-        if (!orderId) {
-            return NextResponse.json({ error: "orderId manquant" }, { status: 400 });
+        const { returnId } = await req.json();
+        if (!returnId) {
+            return NextResponse.json({ error: "returnId manquant" }, { status: 400 });
         }
         const client = await clientPromise;
         const db = client.db("effcraftdatabase");
+        const returnsCollection = db.collection("returns");
         const ordersCollection = db.collection("orders");
-        const order = await ordersCollection.findOne({ _id: new ObjectId(orderId) });
+
+        const ret = await returnsCollection.findOne({ _id: new ObjectId(returnId) });
+        if (!ret) {
+            return NextResponse.json({ error: "Retour introuvable" }, { status: 404 });
+        }
+        if (ret.status !== "requested") {
+            return NextResponse.json({ error: "Ce retour n'est pas en attente d'acceptation" }, { status: 400 });
+        }
+
+        const order = await ordersCollection.findOne({ _id: ret.orderId });
         if (!order) {
             return NextResponse.json({ error: "Commande introuvable" }, { status: 404 });
         }
-        if (order.order.status !== "return_requested") {
-            return NextResponse.json({ error: "Cette commande n'a pas de demande de retour en cours" }, { status: 400 });
-        }
+
         const isProduction = process.env.BOXTAL_ENV === "production";
         const apiKey = isProduction ? process.env.BOXTAL_V3_PROD_KEY : process.env.BOXTAL_V3_TEST_KEY;
         const apiSecret = isProduction ? process.env.BOXTAL_V3_PROD_SECRET : process.env.BOXTAL_V3_TEST_SECRET;
@@ -43,6 +52,7 @@ export async function POST(req: Request) {
         }
         const authString = Buffer.from(`${apiKey}:${apiSecret}`).toString("base64");
         const apiUrl = getBoxtalApiUrl();
+
         const returnShipmentData = {
             shipment: {
                 packages: [{
@@ -52,7 +62,7 @@ export async function POST(req: Request) {
                     width: PACKAGE_WIDTH,
                     height: PACKAGE_HEIGHT,
                     value: {
-                        value: order.products.reduce((sum: number, p: any) => sum + p.price, 0),
+                        value: ret.items.reduce((sum: number, p: any) => sum + p.price, 0),
                         currency: "EUR"
                     },
                     content: {
@@ -104,6 +114,7 @@ export async function POST(req: Request) {
             },
             shippingOfferCode: `${order.shippingData?.shippingMethod?.operator || "MONR"}-${order.shippingData?.shippingMethod?.serviceCode || "CpourToi"}`
         };
+
         const createReturnResponse = await fetch(`${apiUrl}/shipping/v3.1/shipping-order`, {
             method: "POST",
             headers: {
@@ -119,16 +130,18 @@ export async function POST(req: Request) {
         }
         const returnShipmentResult = await createReturnResponse.json();
         const returnShipmentId = returnShipmentResult.content?.id || returnShipmentResult.id;
-        if (returnShipmentId) {
-            await ordersCollection.updateOne(
-                { _id: new ObjectId(orderId) },
-                {
-                    $set: {
-                        "order.boxtalReturnShipmentId": returnShipmentId
-                    }
+
+        // Mettre à jour le retour avec le shipmentId et le statut preparing
+        await returnsCollection.updateOne(
+            { _id: new ObjectId(returnId) },
+            {
+                $set: {
+                    status: "preparing",
+                    boxtalReturnShipmentId: returnShipmentId,
                 }
-            );
-        }
+            }
+        );
+
         await new Promise(resolve => setTimeout(resolve, 3000));
         const labelResponse = await fetch(
             `${apiUrl}/shipping/v3.1/shipping-order/${returnShipmentId}/shipping-document`,
@@ -153,16 +166,12 @@ export async function POST(req: Request) {
                 }
             }
         }
-        await ordersCollection.updateOne(
-            { _id: new ObjectId(orderId) },
-            {
-                $set: { "order.status": "return_preparing" }
-            }
-        );
+
         await notifyClients({
             type: "order_status_updated",
-            data: { orderId, status: "return_preparing" }
+            data: { orderId: ret.orderId.toString(), status: "return_preparing" }
         });
+
         const transporter = nodemailer.createTransport({
             host: "ssl0.ovh.net",
             port: 465,
@@ -173,7 +182,7 @@ export async function POST(req: Request) {
             },
         });
         const orderDate = new Date(order.order.createdAt).toLocaleDateString("fr-FR");
-        const threadId = order.emailThreadId || `<order-${orderId}@effcraft.fr>`;
+        const threadId = order.emailThreadId || `<order-${ret.orderId.toString()}@effcraft.fr>`;
         const subject = order.emailSubject || `EffCraft - Retour de votre commande du ${orderDate}`;
         const mailOptions: any = {
             from: `"EffCraft" <${process.env.MAIL_USER}>`,
@@ -196,12 +205,13 @@ export async function POST(req: Request) {
         };
         if (pdfBuffer) {
             mailOptions.attachments = [{
-                filename: `bordereau-retour-${orderId}.pdf`,
+                filename: `bordereau-retour-${returnId}.pdf`,
                 content: pdfBuffer,
                 contentType: "application/pdf",
             }];
         }
         await transporter.sendMail(mailOptions);
+
         return NextResponse.json({ message: "Retour accepté, bordereau envoyé au client" });
     } catch (error) {
         console.error("Erreur acceptation retour:", error);

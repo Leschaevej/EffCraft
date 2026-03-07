@@ -345,6 +345,13 @@ export async function POST(req: NextRequest) {
 }
 async function createShipment(req: NextRequest) {
     try {
+        const session = await getServerSession(authOptions);
+        if (!session?.user?.email || session.user.role !== "admin") {
+            return NextResponse.json(
+                { error: "Non autorisé" },
+                { status: 403 }
+            );
+        }
         const { orderId } = await req.json();
         if (!orderId) {
             return NextResponse.json(

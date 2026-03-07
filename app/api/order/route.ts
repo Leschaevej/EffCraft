@@ -23,19 +23,75 @@ export async function GET(req: NextRequest) {
         const client = await clientPromise;
         const db = client.db("effcraftdatabase");
         const ordersCollection = db.collection("orders");
-        let query: any;
+        const returnsCollection = db.collection("returns");
+
+        let orderQuery: any;
+        let returnStatusFilter: string[] = [];
+
         if (status === 'history') {
-            query = { "order.status": { $in: ['delivered', 'cancelled', 'returned', 'return_rejected'] } };
+            orderQuery = { "order.status": { $in: ['delivered', 'cancelled'] } };
+            returnStatusFilter = ["refunded", "rejected"];
         } else if (status === 'pending') {
-            query = { "order.status": { $in: ['paid', 'preparing', 'in_transit', 'cancel_requested', 'return_requested', 'return_preparing', 'return_in_transit', 'return_delivered'] } };
+            orderQuery = { "order.status": { $in: ['paid', 'preparing', 'in_transit', 'cancel_requested'] } };
+            returnStatusFilter = ["requested", "preparing", "in_transit", "delivered"];
         } else {
-            query = { "order.status": status };
+            orderQuery = { "order.status": status };
         }
+
         const orders = await ordersCollection
-            .find(query)
+            .find(orderQuery)
             .sort({ "order.createdAt": -1 })
             .toArray();
-        return NextResponse.json({ orders });
+
+        // Récupérer les retours selon le filtre
+        let returnOrders: any[] = [];
+        if (returnStatusFilter.length > 0) {
+            const returns = await returnsCollection.find({
+                status: { $in: returnStatusFilter }
+            }).sort({ requestedAt: -1 }).toArray();
+
+            if (returns.length > 0) {
+                const orderIds = returns.map(r => r.orderId);
+                const relatedOrders = await ordersCollection.find({
+                    _id: { $in: orderIds }
+                }).toArray();
+                const relatedOrderMap = new Map(relatedOrders.map(o => [o._id.toString(), o]));
+
+                returnOrders = returns.map(ret => {
+                    const baseOrder = relatedOrderMap.get(ret.orderId.toString());
+                    if (!baseOrder) return null;
+                    const returnStatus = `return_${ret.status}`;
+                    return {
+                        ...baseOrder,
+                        order: {
+                            ...baseOrder.order,
+                            status: returnStatus,
+                            returnRequestedAt: ret.requestedAt,
+                            returnReason: ret.reason,
+                            returnMessage: ret.message,
+                            returnPhotos: ret.photos,
+                            returnItems: ret.items,
+                            returnTrackingNumber: ret.returnTrackingNumber,
+                            returnRejectReason: ret.rejectReason,
+                            refundedAt: ret.refundedAt,
+                            refundAmount: ret.refundAmount,
+                        },
+                        _returnId: ret._id.toString(),
+                    };
+                }).filter(Boolean);
+            }
+        }
+
+        // Pour "pending" : exclure les commandes delivered qui ont un retour actif
+        const orderIdsWithActiveReturn = new Set(returnOrders.map(r => r._id.toString()));
+        const filteredOrders = orders.filter(o =>
+            !(o.order?.status === "delivered" && orderIdsWithActiveReturn.has(o._id.toString()))
+        );
+
+        const allOrders = [...filteredOrders, ...returnOrders]
+            .sort((a, b) => new Date(b.order.createdAt).getTime() - new Date(a.order.createdAt).getTime());
+
+        return NextResponse.json({ orders: allOrders });
     } catch (error: any) {
         console.error("Erreur récupération commandes:", error);
         return NextResponse.json(
@@ -53,7 +109,7 @@ export async function PATCH(req: NextRequest) {
                 { status: 403 }
             );
         }
-        const { orderId, action, fullRefund } = await req.json();
+        const { orderId, action, fullRefund, returnId } = await req.json();
         if (!orderId || !action) {
             return NextResponse.json(
                 { error: "Paramètres manquants" },
@@ -276,12 +332,20 @@ export async function PATCH(req: NextRequest) {
                 });
 
             case "refund-return":
-                const refundOrder = await ordersCollection.findOne({ _id: new ObjectId(orderId) });
+                if (!returnId) {
+                    return NextResponse.json({ error: "returnId manquant" }, { status: 400 });
+                }
+                const returnsCollection = db.collection("returns");
+                const ret = await returnsCollection.findOne({ _id: new ObjectId(returnId) });
+                if (!ret) {
+                    return NextResponse.json({ error: "Retour introuvable" }, { status: 404 });
+                }
+                if (ret.status !== "delivered") {
+                    return NextResponse.json({ error: "Le retour n'a pas encore été réceptionné" }, { status: 400 });
+                }
+                const refundOrder = await ordersCollection.findOne({ _id: ret.orderId });
                 if (!refundOrder) {
-                    return NextResponse.json(
-                        { error: "Commande introuvable" },
-                        { status: 404 }
-                    );
+                    return NextResponse.json({ error: "Commande introuvable" }, { status: 404 });
                 }
                 const FIXED_PRICES: { [key: string]: number } = {
                     "MONR-CpourToi": 5.90,
@@ -292,13 +356,14 @@ export async function PATCH(req: NextRequest) {
                 const returnShippingMethod = refundOrder.shippingData?.shippingMethod;
                 const shippingCode = `${returnShippingMethod?.operator || "MONR"}-${returnShippingMethod?.serviceCode || "CpourToi"}`;
                 const shippingCost = FIXED_PRICES[shippingCode] || 5.90;
+                const returnItemsTotal = ret.items.reduce((sum: number, item: { price: number }) => sum + item.price, 0);
                 let refundAmount;
                 if (fullRefund) {
-                    refundAmount = Math.round((refundOrder.order.totalPrice - shippingCost) * 100);
+                    refundAmount = Math.round(returnItemsTotal * 100);
                 } else {
-                    refundAmount = Math.round((refundOrder.order.totalPrice - (shippingCost * 2)) * 100);
+                    refundAmount = Math.round(Math.max(0, returnItemsTotal - shippingCost) * 100);
                 }
-                const refundReason = refundOrder.order.returnReason || "Retour";
+                const refundReason = ret.reason || "Retour";
                 try {
                     if (refundOrder.order?.paymentIntentId && refundAmount > 0) {
                         await stripe.refunds.create({
@@ -313,55 +378,44 @@ export async function PATCH(req: NextRequest) {
                         { status: 500 }
                     );
                 }
-                for (const photoUrl of (refundOrder.order?.returnPhotos || [])) {
+                // Supprimer les photos Cloudinary du retour
+                for (const photoUrl of (ret.photos || [])) {
                     try {
-                        const matches = photoUrl.match(/effcraft\/returns\/[^.]+/);
-                        if (matches) await cloudinary.uploader.destroy(matches[0]);
+                        const match = photoUrl.match(/\/upload\/(?:v\d+\/)?(.+)\.\w+$/);
+                        if (match && match[1]) await cloudinary.uploader.destroy(match[1]);
                     } catch (e) {
                         console.error("Erreur suppression photo retour Cloudinary:", e);
                     }
                 }
-                const returnSlimProducts = refundOrder.products.map((p: any) => ({
-                    name: p.name,
-                    price: p.price,
-                    image: p.image || p.images?.[0] || "",
-                }));
-                await ordersCollection.updateOne(
-                    { _id: new ObjectId(orderId) },
+                // Mettre à jour le retour : statut refunded, supprimer photos
+                await returnsCollection.updateOne(
+                    { _id: new ObjectId(returnId) },
                     {
                         $set: {
-                            "order.status": "returned",
-                            "order.refundedAt": new Date(),
-                            "order.refundReason": refundReason,
-                            products: returnSlimProducts,
+                            status: "refunded",
+                            refundedAt: new Date(),
+                            refundAmount: refundAmount / 100,
                         },
-                        $unset: {
-                            shippingData: "",
-                            billingData: "",
-                            emailSubject: "",
-                            emailThreadId: "",
-                            "order.returnPhotos": "",
-                            "order.returnMessage": "",
-                            "order.returnRequestedAt": "",
-                            "order.boxtalReturnShipmentId": "",
-                            "order.returnTrackingNumber": "",
-                            "order.returnedAt": "",
-                            "order.paymentIntentId": ""
-                        }
+                        $unset: { photos: "" }
                     }
+                );
+                // Nettoyer le paymentIntentId de la commande originale (désormais remboursé)
+                await ordersCollection.updateOne(
+                    { _id: ret.orderId },
+                    { $unset: { "order.paymentIntentId": "" } }
                 );
                 await notifyClients({
                     type: "order_status_updated",
                     data: {
-                        orderId: orderId,
-                        status: "returned"
+                        orderId: ret.orderId.toString(),
+                        status: "return_refunded"
                     }
                 });
                 try {
                     const returnOrderDate = new Date(refundOrder.order.createdAt).toLocaleDateString("fr-FR");
-                    const returnProductsList = refundOrder.products.map((p: any) => `<li>${p.name} - ${p.price.toFixed(2)} €</li>`).join("");
+                    const returnProductsList = ret.items.map((p: any) => `<li>${p.name} - ${p.price.toFixed(2)} €</li>`).join("");
                     const refundAmountEuros = refundAmount / 100;
-                    const { buffer: returnCreditNoteBuffer, creditNoteNumber: returnCreditNoteNumber } = await generateCreditNotePdf(refundOrder, orderId, refundAmountEuros);
+                    const { buffer: returnCreditNoteBuffer, creditNoteNumber: returnCreditNoteNumber } = await generateCreditNotePdf(refundOrder, ret.orderId.toString(), refundAmountEuros);
                     const returnTransporter = nodemailer.createTransport({
                         host: "ssl0.ovh.net",
                         port: 465,
@@ -371,7 +425,7 @@ export async function PATCH(req: NextRequest) {
                             pass: process.env.MAIL_PASSWORD,
                         },
                     });
-                    const returnThreadId = refundOrder.emailThreadId || `<order-${orderId}@effcraft.fr>`;
+                    const returnThreadId = refundOrder.emailThreadId || `<order-${ret.orderId.toString()}@effcraft.fr>`;
                     const returnSubject = refundOrder.emailSubject || `EffCraft - Retour traité - Commande du ${returnOrderDate}`;
                     await returnTransporter.sendMail({
                         from: `"EffCraft" <${process.env.MAIL_USER}>`,
