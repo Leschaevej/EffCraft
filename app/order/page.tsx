@@ -305,21 +305,13 @@ export default function OrderPage() {
                                                             {(order.order.cancelledAt || order.order.refundedAt) && (
                                                                 <p>Date de remboursement : {new Date(order.order.cancelledAt || order.order.refundedAt!).toLocaleDateString()}</p>
                                                             )}
-                                                            {(order.order.refundReason || order.order.returnReason) && (
+                                                            {(order.order.refundReason || (order.order.returnReason && order.order.status === "returned")) && (
                                                                 <p>{order.order.status === "returned" ? "Motif de retour" : "Motif de remboursement"} : {order.order.status === "returned" ? order.order.returnReason : (REFUND_REASON_LABELS[order.order.refundReason!] || order.order.refundReason)}</p>
-                                                            )}
-                                                            {order.order.cancelReason && (
-                                                                <>
-                                                                    <p>Raison d'annulation : {REFUND_REASON_LABELS[order.order.cancelReason!] || order.order.cancelReason}</p>
-                                                                    {order.order.cancelMessage && (
-                                                                        <p>Message : {order.order.cancelMessage}</p>
-                                                                    )}
-                                                                </>
                                                             )}
                                                             {!order.order.refundReason && order.shippingData && (
                                                                 <>
                                                                     <p>Mode de livraison : {getShippingMethodName(order.shippingData.shippingMethod?.operator, order.shippingData.shippingMethod?.serviceCode)}</p>
-                                                                    {order.order.status.startsWith("return_") && order.order.status !== "return_rejected" ? (
+                                                                    {order.order.returnTrackingNumber && order.order.status.startsWith("return_") && order.order.status !== "return_rejected" ? (
                                                                         <p>
                                                                             N° de suivi retour : {order.order.returnTrackingNumber ? (
                                                                                 (() => {
@@ -332,7 +324,7 @@ export default function OrderPage() {
                                                                                 })()
                                                                             ) : "En attente"}
                                                                         </p>
-                                                                    ) : order.order.status !== "delivered" && (
+                                                                    ) : order.shippingData.trackingNumber && order.order.status !== "delivered" && (
                                                                         <p>
                                                                             N° de suivi : {order.shippingData.trackingNumber ? (
                                                                                 (() => {
@@ -350,12 +342,12 @@ export default function OrderPage() {
                                                             )}
                                                             <p>Total : {order.order.totalPrice.toFixed(2)}€</p>
                                                         </div>
-                                                        {order.order.status.startsWith("return_") ? (
+                                                        {order.order.status.startsWith("return_") && order.order.status !== "return_rejected" ? (
                                                             <div className="info">
                                                                 <h3>Livraison</h3>
                                                                 <p>Atelier EffCraft</p>
                                                             </div>
-                                                        ) : order.shippingData && (
+                                                        ) : order.order.status !== "return_rejected" && order.shippingData && (
                                                             <>
                                                                 {order.shippingData.shippingMethod?.relayPoint ? (() => {
                                                                     const tc = (s: string) => s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());

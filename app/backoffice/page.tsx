@@ -653,6 +653,9 @@ export default function Backoffice() {
                                                             <h3>Informations de commande</h3>
                                                             <p>Email : {order.userEmail}</p>
                                                             <p>Date de commande : {new Date(order.order.createdAt).toLocaleDateString()} à {new Date(order.order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                                            {(order.order.cancelledAt || order.order.refundedAt) && (
+                                                                <p>Date de remboursement : {new Date(order.order.cancelledAt || order.order.refundedAt!).toLocaleDateString()} à {new Date(order.order.cancelledAt || order.order.refundedAt!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                                            )}
                                                             {order.order.cancelReason && (
                                                                 <>
                                                                     <p>Raison d'annulation : {REFUND_REASON_LABELS[order.order.cancelReason!] || order.order.cancelReason}</p>
@@ -661,16 +664,13 @@ export default function Backoffice() {
                                                                     )}
                                                                 </>
                                                             )}
-                                                            {(order.order.cancelledAt || order.order.refundedAt) && (
-                                                                <p>Date de remboursement : {new Date(order.order.cancelledAt || order.order.refundedAt!).toLocaleDateString()} à {new Date(order.order.cancelledAt || order.order.refundedAt!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                                                            )}
-                                                            {(order.order.refundReason || order.order.returnReason) && (
+                                                            {(order.order.refundReason || (order.order.returnReason && order.order.status === "returned")) && (
                                                                 <p>{order.order.status === "returned" ? "Motif retour" : "Motif remboursement"} : {order.order.status === "returned" ? order.order.returnReason : (REFUND_REASON_LABELS[order.order.refundReason!] || order.order.refundReason)}</p>
                                                             )}
                                                             {!order.order.refundReason && order.shippingData && (
                                                                 <>
                                                                     <p>Livraison : {getShippingMethodName(order.shippingData.shippingMethod?.operator, order.shippingData.shippingMethod?.serviceCode)}</p>
-                                                                    {order.order.status.startsWith("return_") && order.order.status !== "return_rejected" ? (
+                                                                    {order.order.returnTrackingNumber && order.order.status.startsWith("return_") && order.order.status !== "return_rejected" ? (
                                                                         <p>
                                                                             N° suivi retour : {order.order.returnTrackingNumber ? (
                                                                                 (() => {
@@ -683,7 +683,7 @@ export default function Backoffice() {
                                                                                 })()
                                                                             ) : "En attente"}
                                                                         </p>
-                                                                    ) : order.order.status !== "delivered" && (
+                                                                    ) : order.shippingData.trackingNumber && order.order.status !== "delivered" && (
                                                                         <p>
                                                                             N° suivi : {order.shippingData.trackingNumber ? (
                                                                                 (() => {
@@ -701,12 +701,12 @@ export default function Backoffice() {
                                                             )}
                                                             <p>Total : {order.order.totalPrice.toFixed(2)}€</p>
                                                         </div>
-                                                        {order.order.status.startsWith("return_") ? (
+                                                        {order.order.status.startsWith("return_") && order.order.status !== "return_rejected" ? (
                                                             <div className="info">
                                                                 <h3>Livraison</h3>
                                                                 <p>Atelier EffCraft</p>
                                                             </div>
-                                                        ) : order.shippingData && (
+                                                        ) : order.order.status !== "return_rejected" && order.shippingData && (
                                                             <div className="info">
                                                                 <h3>Livraison</h3>
                                                                 <p>{order.shippingData.nom || ''} {order.shippingData.prenom || ''}</p>
@@ -1072,27 +1072,26 @@ export default function Backoffice() {
                         ) : (
                             <>
                                 <h3>Demande de retour</h3>
-                                <p>Le client a demandé le retour de cette commande.</p>
-                                {orderToReturn.order.returnReason && (
-                                    <p><strong>Raison :</strong> {orderToReturn.order.returnReason}</p>
-                                )}
-                                {orderToReturn.order.returnMessage && (
-                                    <p><strong>Message :</strong> {orderToReturn.order.returnMessage}</p>
-                                )}
-                                {orderToReturn.order.returnPhotos && orderToReturn.order.returnPhotos.length > 0 && (
-                                    <div className="return-photos">
-                                        <p><strong>Photos :</strong></p>
-                                        <div className="photos-grid">
+                                <div style={{ display: "flex", gap: 16, marginTop: 12 }}>
+                                    <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 8, textAlign: "left" }}>
+                                        {orderToReturn.order.returnReason && (
+                                            <p><strong>Raison :</strong> {orderToReturn.order.returnReason}</p>
+                                        )}
+                                        {orderToReturn.order.returnMessage && (
+                                            <p><strong>Message :</strong> {orderToReturn.order.returnMessage}</p>
+                                        )}
+                                    </div>
+                                    {orderToReturn.order.returnPhotos && orderToReturn.order.returnPhotos.length > 0 && (
+                                        <div style={{ width: "50%", display: "flex", flexDirection: "column", gap: 8 }}>
                                             {orderToReturn.order.returnPhotos.map((url: string, i: number) => (
-                                                <img key={i} src={url} alt={`Photo ${i + 1}`} style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 4 }} />
+                                                <img key={i} src={url} alt={`Photo ${i + 1}`} style={{ width: "100%", height: "auto", objectFit: "cover", borderRadius: 4 }} />
                                             ))}
                                         </div>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                                 <div className="modal-buttons">
                                     <button className="btn-confirm" onClick={acceptReturnRequest}>Accepter le retour</button>
                                     <button className="btn-cancel" onClick={rejectReturnRequest}>Refuser le retour</button>
-                                    <button className="btn-cancel" onClick={() => { setShowReturnModal(false); setOrderToReturn(null); }}>Annuler</button>
                                 </div>
                             </>
                         )}
