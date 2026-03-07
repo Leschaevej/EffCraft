@@ -74,7 +74,7 @@ export async function POST(req: Request) {
                 const key = p._id?.toString() || `${orderId}-${index}`;
                 return returnItemKeys.includes(key);
             })
-            .map((p: any) => ({ name: p.name, price: p.price }));
+            .map((p: any) => ({ name: p.name, price: p.price, image: p.image || p.images?.[0] || "" }));
 
         if (returnItems.length === 0) {
             return NextResponse.json({ error: "Articles introuvables" }, { status: 400 });
@@ -90,6 +90,15 @@ export async function POST(req: Request) {
             status: "requested",
             requestedAt: new Date(),
         });
+
+        // Retirer les produits retournés de la commande d'origine
+        const returnedNames = new Set(returnItems.map((p: any) => p.name));
+        const remainingProducts = order.products.filter((p: any) => !returnedNames.has(p.name));
+        const remainingTotal = remainingProducts.reduce((sum: number, p: any) => sum + p.price, 0);
+        await ordersCollection.updateOne(
+            { _id: new ObjectId(orderId) },
+            { $set: { products: remainingProducts, "order.totalPrice": remainingTotal } }
+        );
 
         await notifyClients({
             type: "order_status_updated",

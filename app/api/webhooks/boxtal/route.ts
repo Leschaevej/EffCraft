@@ -137,13 +137,19 @@ export async function POST(req: NextRequest) {
             });
             return NextResponse.json({ success: true });
         }
-
-        // Sinon chercher la commande par shipmentId normal
-        const order = await ordersCollection.findOne({
+        let order = await ordersCollection.findOne({
             "shippingData.boxtalShipmentId": shipmentId
         });
+        if (!order && trackingNumber) {
+            order = await ordersCollection.findOne({
+                "shippingData.trackingNumber": trackingNumber
+            });
+            if (order) {
+                console.log(`⚠️ Commande trouvée par trackingNumber (shipmentId incorrect): ${trackingNumber}`);
+            }
+        }
         if (!order) {
-            console.warn(`Commande introuvable pour shipmentId: ${shipmentId}`);
+            console.warn(`Commande introuvable pour shipmentId: ${shipmentId} et trackingNumber: ${trackingNumber}`);
             return NextResponse.json({ success: true, message: "Commande introuvable" });
         }
         const updateData: any = {};

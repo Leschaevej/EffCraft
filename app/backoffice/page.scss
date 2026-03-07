@@ -577,14 +577,17 @@
         z-index: 1000;
         .modal-content {
             background-color: var(--secondBackgroundColor);
-            padding: 50px;
+            padding: 40px;
             border-radius: 30px;
             display: flex;
             flex-direction: column;
-            gap: 30px;
+            gap: 20px;
             text-align: center;
-            width: 50vw;
-            height: 50vh;
+            width: fit-content;
+            min-width: 300px;
+            max-width: 70vw;
+            max-height: 90vh;
+            overflow-y: auto;
             h3 {
                 font-size: 24px;
                 color: var(--mainColor);
@@ -642,20 +645,24 @@
             }
             .modal-return-body {
                 display: flex;
+                flex-direction: column;
                 gap: 16px;
-                flex: 1;
-                overflow: hidden;
+                text-align: left;
             }
             .modal-return-photos {
                 display: flex;
-                flex-direction: column;
+                flex-wrap: wrap;
                 gap: 8px;
-                overflow: hidden;
                 img {
-                    height: 100%;
-                    width: auto;
-                    border-radius: 4px;
+                    width: 120px;
+                    height: 120px;
+                    object-fit: cover;
+                    border-radius: 8px;
                     cursor: pointer;
+                    transition: opacity 0.2s;
+                    &:hover {
+                        opacity: 0.85;
+                    }
                 }
             }
             .modal-buttons {

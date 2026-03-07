@@ -341,7 +341,7 @@ export default function OrderPage() {
                                                                                 })()
                                                                             ) : "En attente"}
                                                                         </p>
-                                                                    ) : order.shippingData.trackingNumber && order.order.status !== "delivered" && (
+                                                                    ) : order.shippingData.trackingNumber && order.order.status !== "delivered" && order.order.status !== "cancel_requested" && (
                                                                         <p>
                                                                             N° de suivi : {order.shippingData.trackingNumber ? (
                                                                                 (() => {
@@ -460,7 +460,7 @@ export default function OrderPage() {
                 const cancelOrder = orders.find(o => o._id === cancelOrderId);
                 if (!cancelOrder) return null;
                 const handleSubmit = async () => {
-                    if (!cancelReason) return;
+                    if (!cancelReason || cancelMessage.length < 20) return;
                     setCancelStatus("sending");
                     try {
                         const res = await fetch("/api/order/cancel", {
@@ -500,10 +500,6 @@ export default function OrderPage() {
                             ) : (
                                 <>
                                     <h3>Demander une annulation</h3>
-                                    <div className="cancel-modal-recap">
-                                        <p>Commande du {new Date(cancelOrder.order.createdAt).toLocaleDateString()}</p>
-                                        <p>Montant : {cancelOrder.order.totalPrice.toFixed(2)}€</p>
-                                    </div>
                                     <div className="cancel-modal-form">
                                         <label>Raison de l'annulation</label>
                                         <select value={cancelReason} onChange={(e) => setCancelReason(e.target.value)}>
@@ -513,21 +509,24 @@ export default function OrderPage() {
                                             <option value="Changement d'avis">Changement d&apos;avis</option>
                                             <option value="Autre">Autre</option>
                                         </select>
-                                        <label>Message complémentaire (optionnel)</label>
+                                        <label>Message</label>
                                         <textarea
                                             value={cancelMessage}
                                             onChange={(e) => setCancelMessage(e.target.value)}
                                             placeholder="Précisez votre demande..."
-                                            maxLength={200}
+                                            maxLength={300}
                                             rows={4}
                                         />
+                                        <p className="return-char-count" style={{ color: cancelMessage.length >= 300 ? "var(--errorColor)" : "var(--thirdColor)" }}>
+                                            {cancelMessage.length}/300
+                                        </p>
                                     </div>
                                     {cancelStatus === "error" && (
                                         <p className="cancel-modal-error">Une erreur est survenue. Veuillez réessayer.</p>
                                     )}
                                     <div className="cancel-modal-actions">
                                         <button className="back" onClick={() => setCancelOrderId(null)} disabled={cancelStatus === "sending"}>Retour</button>
-                                        <button className="submit" onClick={handleSubmit} disabled={!cancelReason || cancelStatus === "sending"}>
+                                        <button className="submit" onClick={handleSubmit} disabled={!cancelReason || cancelMessage.length < 20 || cancelStatus === "sending"}>
                                             {cancelStatus === "sending" ? "Envoi en cours..." : "Envoyer la demande"}
                                         </button>
                                     </div>
@@ -541,7 +540,7 @@ export default function OrderPage() {
                 const returnOrder = returnOrderSnapshot;
                 if (!returnOrder) return null;
                 const handleReturnSubmit = async () => {
-                    if (!returnReason || returnSelectedItems.length === 0) return;
+                    if (!returnReason || returnSelectedItems.length === 0 || returnMessage.length < 20 || returnPhotos.length === 0) return;
                     setReturnStatus("sending");
                     try {
                         const formData = new FormData();
@@ -579,30 +578,29 @@ export default function OrderPage() {
                             ) : (
                                 <>
                                     <h3>Demander un retour</h3>
-                                    <div className="cancel-modal-recap">
-                                        <p>Commande du {new Date(returnOrder.order.createdAt).toLocaleDateString()}</p>
-                                        <p>Montant : {returnOrder.order.totalPrice.toFixed(2)}€</p>
-                                    </div>
                                     <div className="cancel-modal-form">
                                         <label>Articles à retourner</label>
-                                        <div className="return-items-list">
+                                        <div className="return-items-grid">
                                             {returnOrder.products.map((product, index) => {
                                                 const itemKey = product._id || `${returnOrderId}-${index}`;
+                                                const selected = returnSelectedItems.includes(itemKey);
+                                                const img = product.image || product.images?.[0];
                                                 return (
-                                                    <label key={itemKey} className="return-item-check">
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={returnSelectedItems.includes(itemKey)}
-                                                            onChange={(e) => {
-                                                                if (e.target.checked) {
-                                                                    setReturnSelectedItems(prev => [...prev, itemKey]);
-                                                                } else {
-                                                                    setReturnSelectedItems(prev => prev.filter(k => k !== itemKey));
-                                                                }
-                                                            }}
-                                                        />
-                                                        <span>{product.name} — {product.price.toFixed(2)}€</span>
-                                                    </label>
+                                                    <div
+                                                        key={itemKey}
+                                                        className={`return-item-card ${selected ? "selected" : ""}`}
+                                                        onClick={() => {
+                                                            if (selected) {
+                                                                setReturnSelectedItems(prev => prev.filter(k => k !== itemKey));
+                                                            } else {
+                                                                setReturnSelectedItems(prev => [...prev, itemKey]);
+                                                            }
+                                                        }}
+                                                    >
+                                                        {img && <img src={img} alt={product.name} />}
+                                                        <p>{product.name}</p>
+                                                        <p className="price">{product.price.toFixed(2)}€</p>
+                                                    </div>
                                                 );
                                             })}
                                         </div>
@@ -615,31 +613,53 @@ export default function OrderPage() {
                                             <option value="Erreur de commande">Erreur de commande</option>
                                             <option value="Autre">Autre</option>
                                         </select>
-                                        <label>Message complémentaire (optionnel)</label>
+                                        <label>Message</label>
                                         <textarea
                                             value={returnMessage}
                                             onChange={(e) => setReturnMessage(e.target.value)}
                                             placeholder="Décrivez votre problème..."
-                                            maxLength={500}
+                                            maxLength={300}
                                             rows={4}
                                         />
-                                        <label>Photos (optionnel)</label>
+                                        <p className="return-char-count" style={{ color: returnMessage.length >= 300 ? "var(--errorColor)" : "var(--thirdColor)" }}>
+                                            {returnMessage.length}/300
+                                        </p>
+                                        <label>Photo</label>
+                                        <div className="return-photo-wrapper">
+                                            <div
+                                                className="return-photo-upload"
+                                                onClick={() => document.getElementById("return-photo-input")?.click()}
+                                            >
+                                                {returnPhotos.length > 0
+                                                    ? <img src={URL.createObjectURL(returnPhotos[0])} alt="preview" />
+                                                    : <span>+</span>
+                                                }
+                                            </div>
+                                            {returnPhotos.length > 0 && (
+                                                <button
+                                                    className="return-photo-delete"
+                                                    onClick={(e) => { e.stopPropagation(); setReturnPhotos([]); }}
+                                                    type="button"
+                                                >×</button>
+                                            )}
+                                        </div>
                                         <input
+                                            id="return-photo-input"
                                             type="file"
                                             accept="image/*"
-                                            multiple
-                                            onChange={(e) => setReturnPhotos(Array.from(e.target.files || []))}
+                                            style={{ display: "none" }}
+                                            onChange={(e) => {
+                                                const file = e.target.files?.[0];
+                                                setReturnPhotos(file ? [file] : []);
+                                            }}
                                         />
-                                        {returnPhotos.length > 0 && (
-                                            <p style={{ fontSize: "0.85em", opacity: 0.7 }}>{returnPhotos.length} photo(s) sélectionnée(s)</p>
-                                        )}
                                     </div>
                                     {returnStatus === "error" && (
                                         <p className="cancel-modal-error">Une erreur est survenue. Veuillez réessayer.</p>
                                     )}
                                     <div className="cancel-modal-actions">
                                         <button className="back" onClick={() => { setReturnOrderId(null); setReturnOrderSnapshot(null); setReturnStatus("idle"); }} disabled={returnStatus === "sending"}>Retour</button>
-                                        <button className="submit" onClick={handleReturnSubmit} disabled={!returnReason || returnSelectedItems.length === 0 || returnStatus === "sending"}>
+                                        <button className="submit" onClick={handleReturnSubmit} disabled={!returnReason || returnSelectedItems.length === 0 || returnMessage.length < 20 || returnPhotos.length === 0 || returnStatus === "sending"}>
                                             {returnStatus === "sending" ? "Envoi en cours..." : "Envoyer la demande"}
                                         </button>
                                     </div>

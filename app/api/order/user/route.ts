@@ -125,6 +125,7 @@ export async function GET(req: NextRequest) {
                 return {
                     ...baseOrder,
                     _id: baseOrder._id,
+                    products: ret.items,
                     // On surcharge avec le statut du retour
                     order: {
                         ...baseOrder.order,

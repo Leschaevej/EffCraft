@@ -642,7 +642,7 @@ export default function Backoffice() {
                                                                                 })()
                                                                             ) : "En attente"}
                                                                         </p>
-                                                                    ) : order.shippingData.trackingNumber && order.order.status !== "delivered" && (
+                                                                    ) : order.shippingData.trackingNumber && order.order.status !== "delivered" && order.order.status !== "cancel_requested" && (
                                                                         <p>
                                                                             N° de suivi : {order.shippingData.trackingNumber ? (
                                                                                 (() => {
