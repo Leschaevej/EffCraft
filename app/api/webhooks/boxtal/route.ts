@@ -116,6 +116,9 @@ export async function POST(req: NextRequest) {
         const isReturn = order.order.status === "return_requested" || order.order.status?.startsWith("return_");
         if (isReturn) {
             console.log(`🔄 Retour : statut actuel ${order.order.status}, nouveau statut Boxtal: ${status}`);
+            if (trackingNumber && !order.order.returnTrackingNumber) {
+                updateData["order.returnTrackingNumber"] = trackingNumber;
+            }
             if (status === "ANNOUNCED" || status === "PENDING" || status === "READY_TO_SHIP" || status === "AT_PICKUP_LOCATION" || status === "PICKED_UP") {
                 if (order.order.status === "return_requested") {
                 }

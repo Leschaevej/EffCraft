@@ -51,6 +51,7 @@ interface Order {
         returnPhotos?: string[];
         paymentIntentId?: string;
         boxtalReturnShipmentId?: string;
+        returnTrackingNumber?: string;
     };
 }
 const STATUS_LABELS: { [key: string]: string } = {
@@ -60,8 +61,8 @@ const STATUS_LABELS: { [key: string]: string } = {
     delivered: "Livré",
     cancelled: "Remboursé",
     cancel_requested: "Annulation demandée",
-    return_requested: "Confirmé",
-    return_preparing: "En préparation",
+    return_requested: "Traitement",
+    return_preparing: "Préparation",
     return_in_transit: "Livraison",
     return_delivered: "Livré",
     returned: "Remboursé",
@@ -515,7 +516,7 @@ export default function Backoffice() {
             cancelled: <FaCheck />,
             cancel_requested: <FaHourglassHalf />,
             returned: <FaCheck />,
-            return_requested: <FaCheck />,
+            return_requested: <FaHourglassHalf />,
             return_preparing: <FaBoxOpen />,
             return_in_transit: <FaTruck />,
             return_delivered: <FaHome />
@@ -669,16 +670,16 @@ export default function Backoffice() {
                                                             {!order.order.refundReason && order.shippingData && (
                                                                 <>
                                                                     <p>Livraison : {getShippingMethodName(order.shippingData.shippingMethod?.operator, order.shippingData.shippingMethod?.serviceCode)}</p>
-                                                                    {order.order.status.startsWith("return_") ? (
+                                                                    {order.order.status.startsWith("return_") && order.order.status !== "return_rejected" ? (
                                                                         <p>
-                                                                            N° suivi retour : {order.order.boxtalReturnShipmentId ? (
+                                                                            N° suivi retour : {order.order.returnTrackingNumber ? (
                                                                                 (() => {
-                                                                                    const trackingUrl = getTrackingUrl(order.order.boxtalReturnShipmentId, order.shippingData.shippingMethod?.operator);
+                                                                                    const trackingUrl = getTrackingUrl(order.order.returnTrackingNumber, order.shippingData.shippingMethod?.operator);
                                                                                     return trackingUrl ? (
                                                                                         <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--mainColor)', textDecoration: 'underline' }}>
-                                                                                            {order.order.boxtalReturnShipmentId}
+                                                                                            {order.order.returnTrackingNumber}
                                                                                         </a>
-                                                                                    ) : order.order.boxtalReturnShipmentId;
+                                                                                    ) : order.order.returnTrackingNumber;
                                                                                 })()
                                                                             ) : "En attente"}
                                                                         </p>

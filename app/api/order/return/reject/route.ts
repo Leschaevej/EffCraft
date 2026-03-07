@@ -89,6 +89,11 @@ export async function POST(req: Request) {
                     "order.returnMessage": "",
                     "order.returnReason": "",
                     "order.returnRequestedAt": "",
+                    shippingData: "",
+                    billingData: "",
+                    emailSubject: "",
+                    emailThreadId: "",
+                    "order.paymentIntentId": "",
                 }
             }
         );

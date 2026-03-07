@@ -344,6 +344,7 @@ export async function PATCH(req: NextRequest) {
                             "order.returnMessage": "",
                             "order.returnRequestedAt": "",
                             "order.boxtalReturnShipmentId": "",
+                            "order.returnTrackingNumber": "",
                             "order.returnedAt": "",
                             "order.paymentIntentId": ""
                         }

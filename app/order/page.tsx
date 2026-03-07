@@ -67,6 +67,7 @@ interface Order {
         cancelReason?: string;
         cancelMessage?: string;
         boxtalReturnShipmentId?: string;
+        returnTrackingNumber?: string;
         returnReason?: string;
     };
 }
@@ -77,8 +78,8 @@ const TRACKING_STEPS = [
     { label: "Livré", icon: <FaHome /> }
 ];
 const RETURN_TRACKING_STEPS = [
-    { label: "Confirmé", icon: <FaCheck /> },
-    { label: "En préparation", icon: <FaBoxOpen /> },
+    { label: "Traitement", icon: <FaHourglassHalf /> },
+    { label: "Préparation", icon: <FaBoxOpen /> },
     { label: "Livraison", icon: <FaTruck /> },
     { label: "Livré", icon: <FaHome /> }
 ];
@@ -100,8 +101,8 @@ const STATUS_LABELS: { [key: string]: string } = {
     delivered: "Livré",
     cancelled: "Remboursé",
     cancel_requested: "Demande en cours",
-    return_requested: "Confirmé",
-    return_preparing: "En préparation",
+    return_requested: "Traitement",
+    return_preparing: "Préparation",
     return_in_transit: "Livraison",
     return_delivered: "Livré",
     returned: "Remboursé",
@@ -210,7 +211,7 @@ export default function OrderPage() {
             cancelled: <FaCheck />,
             cancel_requested: <FaHourglassHalf />,
             returned: <FaCheck />,
-            return_requested: <FaCheck />,
+            return_requested: <FaHourglassHalf />,
             return_preparing: <FaBoxOpen />,
             return_in_transit: <FaTruck />,
             return_delivered: <FaHome />
@@ -318,16 +319,16 @@ export default function OrderPage() {
                                                             {!order.order.refundReason && order.shippingData && (
                                                                 <>
                                                                     <p>Mode de livraison : {getShippingMethodName(order.shippingData.shippingMethod?.operator, order.shippingData.shippingMethod?.serviceCode)}</p>
-                                                                    {order.order.status.startsWith("return_") ? (
+                                                                    {order.order.status.startsWith("return_") && order.order.status !== "return_rejected" ? (
                                                                         <p>
-                                                                            N° de suivi retour : {order.order.boxtalReturnShipmentId ? (
+                                                                            N° de suivi retour : {order.order.returnTrackingNumber ? (
                                                                                 (() => {
-                                                                                    const trackingUrl = getTrackingUrl(order.order.boxtalReturnShipmentId, order.shippingData.shippingMethod?.operator);
+                                                                                    const trackingUrl = getTrackingUrl(order.order.returnTrackingNumber, order.shippingData.shippingMethod?.operator);
                                                                                     return trackingUrl ? (
                                                                                         <a href={trackingUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--mainColor)', textDecoration: 'underline' }}>
-                                                                                            {order.order.boxtalReturnShipmentId}
+                                                                                            {order.order.returnTrackingNumber}
                                                                                         </a>
-                                                                                    ) : order.order.boxtalReturnShipmentId;
+                                                                                    ) : order.order.returnTrackingNumber;
                                                                                 })()
                                                                             ) : "En attente"}
                                                                         </p>
