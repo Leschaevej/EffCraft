@@ -120,15 +120,24 @@ export async function GET(req: NextRequest) {
             // Construire des pseudo-commandes pour les retours (avec statut return_*)
             returnOrders = userReturns.map(ret => {
                 const baseOrder = relatedOrderMap.get(ret.orderId.toString());
-                if (!baseOrder) return null;
-                const returnStatus = `return_${ret.status}`; // ex: return_requested, return_preparing...
+                // Utiliser le snapshot si la commande d'origine a été supprimée (retour total)
+                const snap = ret.orderSnapshot;
+                if (!baseOrder && !snap) return null;
+                const returnStatus = `return_${ret.status}`;
+                const baseOrderData = baseOrder || {
+                    shippingData: snap.shippingData,
+                    emailThreadId: snap.emailThreadId,
+                    emailSubject: snap.emailSubject,
+                };
+                const baseOrderInfo = baseOrder?.order || {};
                 return {
-                    ...baseOrder,
-                    _id: baseOrder._id,
+                    ...baseOrderData,
+                    _id: ret.orderId,
                     products: ret.items,
-                    // On surcharge avec le statut du retour
                     order: {
-                        ...baseOrder.order,
+                        ...baseOrderInfo,
+                        createdAt: snap?.createdAt || baseOrderInfo.createdAt,
+                        totalPrice: snap?.totalPrice || baseOrderInfo.totalPrice,
                         status: returnStatus,
                         returnRequestedAt: ret.requestedAt,
                         returnReason: ret.reason,
@@ -140,7 +149,6 @@ export async function GET(req: NextRequest) {
                         refundedAt: ret.refundedAt,
                         refundAmount: ret.refundAmount,
                     },
-                    // Identifiant du retour pour les actions
                     _returnId: ret._id.toString(),
                 };
             }).filter(Boolean);

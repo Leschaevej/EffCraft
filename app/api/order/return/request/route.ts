@@ -89,6 +89,14 @@ export async function POST(req: Request) {
             message: cleanMessage || undefined,
             status: "requested",
             requestedAt: new Date(),
+            // Snapshot des infos commande pour affichage même si l'originale est supprimée
+            orderSnapshot: {
+                createdAt: order.order.createdAt,
+                totalPrice: order.order.totalPrice,
+                shippingData: order.shippingData,
+                emailThreadId: order.emailThreadId,
+                emailSubject: order.emailSubject,
+            },
         });
 
         // Retirer les produits retournés de la commande d'origine
