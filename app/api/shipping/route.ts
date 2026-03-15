@@ -151,17 +151,17 @@ function getAvailableShippingOptionsForZipcode(zipcode: string) {
             serviceCode: "CpourToi",
             type: "relay"
         },
-        {
-            id: "SOGP-RelaisColis",
-            name: "Relais Colis",
-            service: "Livraison en point relais (6 jours)",
-            price: FIXED_PRICES["SOGP-RelaisColis"],
-            currency: "EUR",
-            logo: "/delivery/relayColis.webp",
-            operator: "SOGP",
-            serviceCode: "RelaisColis",
-            type: "relay"
-        },
+        // {
+        //     id: "SOGP-RelaisColis",
+        //     name: "Relais Colis",
+        //     service: "Livraison en point relais (6 jours)",
+        //     price: FIXED_PRICES["SOGP-RelaisColis"],
+        //     currency: "EUR",
+        //     logo: "/delivery/relayColis.webp",
+        //     operator: "SOGP",
+        //     serviceCode: "RelaisColis",
+        //     type: "relay"
+        // },
         {
             id: "POFR-ColissimoAccess",
             name: "Colissimo",

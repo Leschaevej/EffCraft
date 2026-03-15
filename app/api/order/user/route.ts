@@ -45,8 +45,8 @@ export async function GET(req: NextRequest) {
             .sort({ "order.createdAt": -1 })
             .toArray();
 
-        // Supprimer les commandes terminées depuis plus de 14 jours
-        const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+        // Supprimer les commandes terminées depuis plus de 1H (test) / 14 jours (prod)
+        const fourteenDaysAgo = new Date(Date.now() - 1 * 60 * 60 * 1000);
         const toDelete = orders.filter(o => {
             if (o.order?.status === "delivered" && o.order?.deliveredAt) {
                 return new Date(o.order.deliveredAt) < fourteenDaysAgo;
