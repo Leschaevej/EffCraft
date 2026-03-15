@@ -94,11 +94,16 @@ export async function POST(req: Request) {
         // Retirer les produits retournés de la commande d'origine
         const returnedNames = new Set(returnItems.map((p: any) => p.name));
         const remainingProducts = order.products.filter((p: any) => !returnedNames.has(p.name));
-        const remainingTotal = remainingProducts.reduce((sum: number, p: any) => sum + p.price, 0);
-        await ordersCollection.updateOne(
-            { _id: new ObjectId(orderId) },
-            { $set: { products: remainingProducts, "order.totalPrice": remainingTotal } }
-        );
+        if (remainingProducts.length === 0) {
+            // Tous les produits sont retournés → supprimer la commande d'origine
+            await ordersCollection.deleteOne({ _id: new ObjectId(orderId) });
+        } else {
+            const remainingTotal = remainingProducts.reduce((sum: number, p: any) => sum + p.price, 0);
+            await ordersCollection.updateOne(
+                { _id: new ObjectId(orderId) },
+                { $set: { products: remainingProducts, "order.totalPrice": remainingTotal } }
+            );
+        }
 
         await notifyClients({
             type: "order_status_updated",
